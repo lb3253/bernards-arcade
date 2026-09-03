@@ -2918,7 +2918,7 @@ function drawCloud(x,y,s){
 function drawFlapBernard(){
   const b=F.bird;
   const wing = Math.sin(b.wing)*(b.flap>0?1:.55);
-  if (drawSprC("fly", b.x, b.y, 96, 54, b.tilt)) return;
+  if (drawSprC("fly", b.x, b.y, 118, 66, b.tilt)) return;
   ctx.save();
   ctx.translate(b.x,b.y);
   ctx.rotate(b.tilt);
@@ -3748,7 +3748,7 @@ const A_TOP   = 70, A_BOT = 556;      // flyable band
 let A = null, abg = null;
 let A_PLANE = "biplane";              // "biplane" | "jet"
 
-const A_PTS = { bird:15, plane:50, cat:200, close:20 };
+const A_PTS = { bird:15, plane:50, balloon:40, cat:200, close:20 };
 const A_XMIN = 90, A_XMAX = 560;            // how far the plane can roam on screen
 const A_LIVES = 3, A_INV = 1.5;
 const A_WEAPONS = [
@@ -4004,18 +4004,25 @@ function updateAir(dt){
   }
   A.gusts=A.gusts.filter(g=>aX(g.wx)>-320);
 
-  // ---- balloons (cat ones are shootable + popping)
+  // ---- balloons (all shootable; cat balloons score more)
   for (const bl of A.balloons){
     if (bl.popped) continue;
     const bx=aX(bl.wx), by=bl.y+Math.sin(A.t*1.3+bl.bob)*7;
-    if (bl.cat) for (const sh of A.shots){
-      if (Math.abs(sh.x-bx)<34 && Math.abs(sh.y-by)<40){
-        bl.popped=true; sh.life=0; A.cats++;
-        sfx.yowl(); aBurst(bx,by,"#ff8fc4",30,280);
+    for (const sh of A.shots){
+      if (Math.abs(sh.x-bx)<38 && Math.abs(sh.y-by)<50){
+        bl.popped=true; sh.life=0;
         const cols=["#ffcf3a","#b6f23a","#ff8fc4","#6fd0ff","#fff6c9"];
-        for(let i=0;i<70;i++) A.confetti.push({ x:bx+rand(-30,30), y:by+rand(-30,30), vx:rand(-120,120), vy:rand(-160,40), sz:rand(6,12), rot:rand(0,6.3), vr:rand(-8,8), col:cols[i%5], life:rand(1.6,3) });
-        aGain(A_PTS.cat,bx,by,"CAT BALLOON!","#ff8fc4");
-        aToast("YOWL!","#ff8fc4",bx,by-70);
+        if (bl.cat){
+          A.cats++;
+          sfx.yowl(); aBurst(bx,by,"#ff8fc4",30,280);
+          for(let i=0;i<70;i++) A.confetti.push({ x:bx+rand(-30,30), y:by+rand(-30,30), vx:rand(-120,120), vy:rand(-160,40), sz:rand(6,12), rot:rand(0,6.3), vr:rand(-8,8), col:cols[i%5], life:rand(1.6,3) });
+          aGain(A_PTS.cat,bx,by,"CAT BALLOON!","#ff8fc4");
+          aToast("YOWL!","#ff8fc4",bx,by-70);
+        } else {
+          sfx.pick("gold"); aBurst(bx,by,"#ffd36a",22,220);
+          for(let i=0;i<28;i++) A.confetti.push({ x:bx+rand(-22,22), y:by+rand(-22,22), vx:rand(-90,90), vy:rand(-140,30), sz:rand(5,10), rot:rand(0,6.3), vr:rand(-8,8), col:cols[i%5], life:rand(1.1,2.2) });
+          aGain(A_PTS.balloon,bx,by,"BALLOON!","#ffd36a");
+        }
         break;
       }
     }
@@ -4098,7 +4105,7 @@ function drawAirPlane(x,y,tilt,type,xray,dim){
   if (!xray && !dim){
     const key=type==="jet"?"jet":"biplane";
     const sz=type==="jet"?[176,86]:[168,94];
-    if (drawSprC(key,x,y,sz[0],sz[1],tilt)) return;
+    if (drawSprC(key,x,y,sz[0],sz[1],tilt,true)) return;
   }
   ctx.save(); ctx.translate(x,y); ctx.rotate(tilt);
   if (dim) ctx.globalAlpha=.4;
