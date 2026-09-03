@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Bernard's Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="shell">
+  <header>
+    <div class="mark">
+      <div class="eyebrow">Ballies with</div>
+      <div class="word">BERNARD<span class="pip"></span></div>
+    </div>
+  </header>
+
+  <div id="frame">
+    <span class="stud" style="left:9px;top:9px"></span>
+    <span class="stud" style="right:9px;top:9px"></span>
+    <span class="stud" style="left:9px;bottom:9px"></span>
+    <span class="stud" style="right:9px;bottom:9px"></span>
+    <div id="stage">
+      <canvas id="cv" width="900" height="680" aria-label="Bernard's Arcade"></canvas>
+
+      <div class="overlay on" id="home">
+        <div class="scrim"></div>
+        <div class="panel">
+          <div class="marquee">
+            <span class="bulbs"><i></i><i></i><i></i><i></i></span>
+            <span class="t">BERNARD'S <span>ARCADE</span></span>
+            <span class="bulbs"><i></i><i></i><i></i><i></i></span>
+          </div>
+          <div class="lobby">
+            <figure class="star">
+              <img id="starPic" src="art/bernard-portrait.jpg" alt="Bernard" width="800" height="800" data-which="flap">
+              <figcaption id="starCap">The proprietor</figcaption>
+            </figure>
+            <div class="picks picks-two">
+              <button class="pick cab" id="pickFlap">
+                <span class="badge">SKY</span><span class="best" id="bestFlap"></span>
+                <span class="thumb"></span>
+                <span class="cab-bezel"></span>
+                <span class="cap">
+                  <span class="nm">Flappy Bernard</span>
+                  <span class="sub">He found the sky. Flap through the gaps.</span>
+                </span>
+              </button>
+              <button class="pick cab" id="pickAir">
+                <span class="badge">AIR</span><span class="best" id="bestAir"></span>
+                <span class="thumb"></span>
+                <span class="cab-bezel"></span>
+                <span class="cap">
+                  <span class="nm">Flying with Bernard</span>
+                  <span class="sub">Goggles on. Three lives, and a cat in a balloon.</span>
+                </span>
+              </button>
+              <button class="pick parked" id="pickBallies" tabindex="-1" aria-hidden="true"><span class="best" id="bestBallies"></span><span class="thumb"></span></button>
+              <button class="pick parked" id="pickTita" tabindex="-1" aria-hidden="true"><span class="best" id="bestTita"></span><span class="thumb"></span></button>
+              <button class="pick parked" id="pickPaddle" tabindex="-1" aria-hidden="true"><span class="best" id="bestPaddle"></span><span class="thumb"></span></button>
+            </div>
+          </div>
+          <div class="snesbar" aria-label="SNES controller">
+            <span><span class="k dpad">D-PAD</span> choose</span>
+            <span><span class="k b">B</span> play</span>
+            <span><span class="k a">A</span> play</span>
+            <span><span class="k start">START</span> pause</span>
+            <span><span class="k sel">SELECT</span> back</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay" id="airmenu">
+        <div class="shot" role="img" aria-label="Bernard in goggles flying a plane"></div>
+        <div class="scrim"></div>
+        <button class="backBtn" id="airBack">&larr; Games</button>
+        <div class="panel">
+          <div class="menubar">
+            <div class="kicker">Nobody checked his licence</div>
+            <div class="tagline">Fly right, collect balls, shoot the birds and the enemy planes. Storm clouds flash before they strike &mdash; get clear. If a cat balloon drifts by, pop it.</div>
+            <div class="chooser">
+              <button class="who chosen" id="airBiplane">Biplane</button>
+              <button class="who" id="airJet">Firefighter Jet</button>
+            </div>
+            <button class="play" id="airStartBtn">Take off</button>
+            <div class="hint">Fly in all four directions &middot; button to shoot &middot; three paws, then it's over. Bones, paws and red balls upgrade your gun.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay" id="pause">
+        <div class="scrim"></div>
+        <div class="panel">
+          <div class="pausecard">
+            <h2>Paused</h2>
+            <button class="who chosen" id="pauseResume">Resume</button>
+            <button class="who" id="pauseSound">Sound: on</button>
+            <button class="who" id="pauseQuit">Quit to Arcade</button>
+          </div>
+        </div>
+      </div>
+      <button id="pauseBtn" aria-label="Pause">&#10074;&#10074;</button>
+
+      <div class="overlay" id="paddlemenu">
+        <div class="shot" role="img" aria-label="Paddleboarding out on the water with Bernard"></div>
+        <div class="scrim"></div>
+        <button class="backBtn" id="padBack">&larr; Games</button>
+        <div class="panel">
+          <div class="menubar">
+            <div class="kicker">He is a terrible passenger</div>
+            <div class="tagline">Paddle out to the boat and collect balls for Bernard along the way. Hit a shark, the kelp or a jellyfish and he goes in the drink &mdash; you'll have to drift back and get him.</div>
+            <div class="chooser">
+              <button class="who chosen" id="padGiulia">Giulia</button>
+              <button class="who" id="padNic">Nic</button>
+            </div>
+            <button class="play" id="padStartBtn">Play</button>
+            <div class="hint">Press to paddle &middot; up/down to steer &middot; hold left to drift back for Bernard.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay" id="flapmenu">
+        <div class="shot" role="img" aria-label="Bernard flying over the brick fence"></div>
+        <div class="scrim"></div>
+        <button class="backBtn" id="flapBack">&larr; Games</button>
+        <div class="panel">
+          <div class="menubar">
+            <div class="kicker">Nobody told him he can't</div>
+            <div class="tagline">Tap to flap. Thread the gaps in the brick and grab the balls floating in them. No finish line &mdash; just beat your own best.</div>
+            <button class="play" id="flapStartBtn">Play</button>
+            <div class="hint">One button, that's it. Gates are worth 10, balls are worth 25 &mdash; and the gaps keep tightening.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay" id="titamenu">
+        <div class="shot" role="img" aria-label="The living room, with Tita coming off the stairs"></div>
+        <div class="scrim"></div>
+        <button class="backBtn" id="titaBack">&larr; Games</button>
+        <div class="panel">
+          <div class="menubar">
+            <div class="kicker">She hears everything</div>
+            <div class="tagline">Grab the toys before Bernard does and stash them in the bin. Bank <b id="titaGoal">500</b> to save the toy box.</div>
+            <button class="play" id="titaStartBtn">Play</button>
+            <div class="hint">Don't let him chew your Crocs &mdash; three and it's over. And <span class="warn">stay off the stairs</span> or Tita comes down.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay" id="menu">
+        <div class="shot" role="img" aria-label="Bernard lying in the grass beside his green ball"></div>
+        <div class="scrim"></div>
+        <button class="backBtn" id="menuBack">&larr; Games</button>
+        <div class="panel">
+          <div class="menubar">
+            <div class="kicker">He has never once given it back</div>
+            <div class="tagline">Scoop up his balls, get clear, throw them back. Bank <b id="goalNum">600</b> to beat him.</div>
+            <button class="play" id="startBtn">Play</button>
+            <div class="hint">He only has to catch you once. And <span class="warn">watch out for Laura</span> &mdash; get too close to the house and she'll come out swinging the broom.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay" id="gameover">
+        <div class="shot" id="overShot" role="img" aria-label="End of round"></div>
+        <div class="scrim"></div>
+        <div class="panel">
+          <div class="card">
+            <h2 id="overTitle">Time!</h2>
+            <p id="finalLine"></p>
+            <button class="play" id="againBtn">Play again</button>
+            <div><button class="homeBtn" id="overHome">&larr; Back to games</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+          
+  <footer>
+    <span class="snesfoot">SNES: D-pad choose &nbsp;&middot;&nbsp; B / A play &nbsp;&middot;&nbsp; START pause &nbsp;&middot;&nbsp; SELECT back</span>
+    <span class="btns">
+      <span id="padChip">No controller</span>
+      <button class="icon-btn" id="glareBtn" aria-pressed="true">Glare: on</button>
+      <button class="icon-btn" id="soundBtn" aria-pressed="true">Sound: on</button>
+    </span>
+  </footer>
+</div>
+
+<script src="arcade.js"></script>
+</html>
