@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Bernard's Arcade</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -58,11 +61,10 @@
               </span>
             </button>
           </div>
-            <div class="parked-wrap" hidden>
-              <button class="pick parked" id="pickBallies" tabindex="-1" aria-hidden="true"><span class="best" id="bestBallies"></span><span class="thumb"></span></button>
-              <button class="pick parked" id="pickTita" tabindex="-1" aria-hidden="true"><span class="best" id="bestTita"></span><span class="thumb"></span></button>
-              <button class="pick parked" id="pickPaddle" tabindex="-1" aria-hidden="true"><span class="best" id="bestPaddle"></span><span class="thumb"></span></button>
-            </div>
+          <div class="parked-wrap" hidden>
+            <button class="pick parked" id="pickBallies" tabindex="-1" aria-hidden="true"><span class="best" id="bestBallies"></span><span class="thumb"></span></button>
+            <button class="pick parked" id="pickTita" tabindex="-1" aria-hidden="true"><span class="best" id="bestTita"></span><span class="thumb"></span></button>
+            <button class="pick parked" id="pickPaddle" tabindex="-1" aria-hidden="true"><span class="best" id="bestPaddle"></span><span class="thumb"></span></button>
           </div>
           <div class="snesbar" aria-label="SNES controller">
             <span><span class="k dpad">D-PAD</span> choose</span>
@@ -71,6 +73,7 @@
             <span><span class="k start">START</span> pause</span>
             <span><span class="k sel">SELECT</span> back</span>
           </div>
+          <div class="phonebar">Tap a cabinet · tap the screen to flap or shoot</div>
         </div>
       </div>
 
@@ -104,6 +107,12 @@
         </div>
       </div>
       <button id="pauseBtn" aria-label="Pause">&#10074;&#10074;</button>
+      <div id="hudpad" aria-hidden="true">
+        <div class="stick" id="stick" role="application" aria-label="Move">
+          <span class="knob" id="knob"></span>
+        </div>
+        <button type="button" id="hudFire">FIRE</button>
+      </div>
 
       <div class="overlay" id="paddlemenu">
         <div class="shot" role="img" aria-label="Paddleboarding out on the water with Bernard"></div>

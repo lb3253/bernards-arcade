@@ -5,7 +5,7 @@ TV arcade starring **Bernard**, a long-haired German Shepherd.
 - **Flappy Bernard** — flap through the brick gaps
 - **Flying with Bernard** — biplane or firefighter jet
 
-Play in a browser. Built for an Onn 4K Pro with a USB SNES pad.
+Same link on a phone, a laptop, or the TV. On a phone: tap a cabinet, tap to flap, and use the on-screen stick to fly. On the Onn 4K Pro, plug in a USB SNES pad.
 
 ## Play locally
 

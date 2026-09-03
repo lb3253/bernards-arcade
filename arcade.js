@@ -433,6 +433,43 @@ cv.addEventListener("pointermove",e=>{ if(!pointer.down) return; const p=canvasP
 cv.addEventListener("pointerup",()=>{ pointer.down=false; actionUp(); });
 cv.addEventListener("pointercancel",()=>{ pointer.down=false; actionUp(); });
 
+const IS_TOUCH = matchMedia("(pointer: coarse)").matches || "ontouchstart" in window;
+document.body.classList.toggle("touch", IS_TOUCH);
+const STICK = {x:0, y:0};
+function syncHud(){
+  const hud=document.getElementById("hudpad");
+  if (!hud) return;
+  const play = IS_TOUCH && MODE==="air" && A && A.running && !PAUSED;
+  hud.classList.toggle("on", !!play);
+  hud.setAttribute("aria-hidden", play ? "false" : "true");
+}
+(function setupTouchHud(){
+  const stick=document.getElementById("stick");
+  const knob=document.getElementById("knob");
+  const fire=document.getElementById("hudFire");
+  if (!stick || !knob || !fire) return;
+  let sid=null;
+  function at(e){
+    const r=stick.getBoundingClientRect();
+    const cx=r.left+r.width/2, cy=r.top+r.height/2;
+    let dx=e.clientX-cx, dy=e.clientY-cy;
+    const max=r.width*0.36, d=Math.hypot(dx,dy)||1, cl=Math.min(d,max);
+    dx=dx/d*cl; dy=dy/d*cl;
+    knob.style.transform=`translate(${dx}px,${dy}px)`;
+    STICK.x=dx/max; STICK.y=dy/max;
+  }
+  function end(){
+    sid=null; STICK.x=0; STICK.y=0; knob.style.transform="";
+  }
+  stick.addEventListener("pointerdown",e=>{ e.preventDefault(); e.stopPropagation(); sid=e.pointerId; stick.setPointerCapture(e.pointerId); at(e); });
+  stick.addEventListener("pointermove",e=>{ if (sid===e.pointerId) at(e); });
+  stick.addEventListener("pointerup",end);
+  stick.addEventListener("pointercancel",end);
+  fire.addEventListener("pointerdown",e=>{ e.preventDefault(); e.stopPropagation(); fire.setPointerCapture(e.pointerId); actionDown(); });
+  fire.addEventListener("pointerup",e=>{ e.preventDefault(); actionUp(); });
+  fire.addEventListener("pointercancel",()=>actionUp());
+})();
+
 let MODE="ballies";
 function actionDown(){
   if (MODE==="tita") titaShoo();
@@ -3844,15 +3881,15 @@ function updateAir(dt){
 
   // ---- steering
   let my=0;
-  if (keys.has("ArrowUp")||keys.has("KeyW")) my-=1;
-  if (keys.has("ArrowDown")||keys.has("KeyS")) my+=1;
+  if (keys.has("ArrowUp")||keys.has("KeyW")||STICK.y<-.28) my-=1;
+  if (keys.has("ArrowDown")||keys.has("KeyS")||STICK.y>.28) my+=1;
   const target=my*aTurn();
   s.vy = lerp(s.vy, target + A.gustV, 1-Math.pow(.02,dt));
   s.y = clamp(s.y + s.vy*dt, A_TOP, A_BOT);
   s.tilt = lerp(s.tilt, clamp(s.vy/560,-.45,.45), dt*9);
   let mx=0;
-  if (keys.has("ArrowLeft")||keys.has("KeyA"))  mx-=1;
-  if (keys.has("ArrowRight")||keys.has("KeyD")) mx+=1;
+  if (keys.has("ArrowLeft")||keys.has("KeyA")||STICK.x<-.28)  mx-=1;
+  if (keys.has("ArrowRight")||keys.has("KeyD")||STICK.x>.28) mx+=1;
   s.vx = lerp(s.vx, mx*(A_PLANE==="jet"?300:240), 1-Math.pow(.02,dt));
   s.x = clamp(s.x + s.vx*dt, A_XMIN, A_XMAX);
   A.gustV = lerp(A.gustV, 0, dt*3);
@@ -4292,9 +4329,9 @@ function drawAirHUD(){
   ctx.fillText(A.balls+" balls \u00b7 "+A.birds+" birds \u00b7 "+A.planes+" planes"+(A.cats?" \u00b7 "+A.cats+" cats":"")+(A.squirrel>0?"  \u00b7 x2 "+Math.ceil(A.squirrel)+"s":""), W-24, 74);
   if (!A.started){
     const pl=(Math.sin(A.pulse*2.2)+1)/2; ctx.globalAlpha=.6+pl*.4; ctx.textAlign="center";
-    chunky(ctx,"PRESS TO TAKE OFF",W/2,H-92,26,"#fff6c9","#12405c",700); ctx.globalAlpha=1;
+    chunky(ctx, IS_TOUCH?"TAP TO TAKE OFF":"PRESS TO TAKE OFF",W/2,H-92,26,"#fff6c9","#12405c",700); ctx.globalAlpha=1;
     ctx.font="600 13px Fredoka, system-ui, sans-serif"; ctx.fillStyle="rgba(255,255,255,.85)";
-    ctx.fillText("fly with the d-pad, all four ways \u00b7 button to shoot \u00b7 grab bones, paws and balls for better guns", W/2, H-62);
+    ctx.fillText(IS_TOUCH?"left stick to fly  ·  FIRE to shoot":"fly with the d-pad, all four ways · button to shoot · grab bones, paws and balls for better guns", W/2, H-62);
   }
 }
 
@@ -4307,7 +4344,7 @@ function frame(now){
   const dt=Math.min((now-last)/1000,.05); last=now;
   try{
     const pl = gameRunning() ? "1" : "0";
-    if (pl!==lastPlaying){ lastPlaying=pl; document.body.dataset.playing=pl; }
+    if (pl!==lastPlaying){ lastPlaying=pl; document.body.dataset.playing=pl; syncHud(); }
     const d = PAUSED ? 0 : dt;
     if (PAUSED) pollGamepad();
     if (MODE==="tita"){ if (T){ if(!PAUSED) updateTita(d); drawTita(); } }
@@ -4349,6 +4386,7 @@ function hideAll(){
   titaEl.classList.remove("on"); flapEl.classList.remove("on"); padEl.classList.remove("on");
   airEl.classList.remove("on"); pauseEl.classList.remove("on"); PAUSED=false;
   overEl.classList.remove("on","won","lost");
+  syncHud();
 }
 function refreshBests(){
   const get=k=>{ try{ return +localStorage.getItem(k)||0; }catch(e){ return 0; } };
@@ -4464,8 +4502,9 @@ function togglePause(){
   PAUSED=!PAUSED;
   pauseEl.classList.toggle("on",PAUSED);
   if (PAUSED){ UI_FOCUS=true; GP.focus=0; GP.lastScreen="pause"; gpApplyFocus(); }
+  syncHud();
 }
-function resumeGame(){ if (PAUSED){ PAUSED=false; pauseEl.classList.remove("on"); } }
+function resumeGame(){ if (PAUSED){ PAUSED=false; pauseEl.classList.remove("on"); } syncHud(); }
 function quitToArcade(){
   // don't throw away a high score just because they bailed early
   try{
