@@ -9,6 +9,50 @@ const cv = document.getElementById("cv");
 const ctx = cv.getContext("2d");
 const W = cv.width, H = cv.height;
 
+const SPR={};
+function loadSpr(name,src){
+  const im=new Image();
+  im.src=src;
+  SPR[name]=im;
+  return im;
+}
+loadSpr("fly","/art/spr-bernard-fly.png");
+loadSpr("biplane","/art/spr-biplane.png");
+loadSpr("jet","/art/spr-jet.png");
+loadSpr("bird","/art/spr-bird.png");
+loadSpr("enemy","/art/spr-enemy.png");
+loadSpr("balloon","/art/spr-balloon.png");
+loadSpr("storm","/art/spr-storm.png");
+loadSpr("skyAir","/art/sky-air.jpg");
+["fly","biplane","jet","bird","enemy","balloon","storm","skyAir"].forEach(n=>{ SPR[n].addEventListener("load",()=>{ try{ if(typeof bakeAirSky==="function") bakeAirSky(); if(typeof bakeFlapSky==="function") bakeFlapSky(); }catch(e){} }); });
+function sprReady(name){
+  const im=SPR[name];
+  return !!(im && im.complete && im.naturalWidth>0);
+}
+function drawSprC(name,x,y,w,h,rot,flip){
+  if (!sprReady(name)) return false;
+  const im=SPR[name];
+  ctx.save();
+  ctx.translate(x,y);
+  if (rot) ctx.rotate(rot);
+  if (flip) ctx.scale(-1,1);
+  ctx.drawImage(im,-w/2,-h/2,w,h);
+  ctx.restore();
+  return true;
+}
+function aHit(px,py,rx,ry){
+  if (!A) return false;
+  const s=A.ship;
+  const R=A_PLANE==="jet"?{rx:86,ry:28}:{rx:80,ry:30};
+  rx=rx||R.rx; ry=ry||R.ry;
+  const dx=px-s.x, dy=py-s.y;
+  const c=Math.cos(-s.tilt), si=Math.sin(-s.tilt);
+  const lx=dx*c-dy*si, ly=dx*si+dy*c;
+  const nx=lx/rx, ny=ly/ry;
+  return nx*nx+ny*ny<1;
+}
+
+
 // ---------------------------------------------------------------- layout
 const CAP_TOP = 150, WALL_BOTTOM = 196;
 const FENCE_W = 26;
@@ -2874,6 +2918,7 @@ function drawCloud(x,y,s){
 function drawFlapBernard(){
   const b=F.bird;
   const wing = Math.sin(b.wing)*(b.flap>0?1:.55);
+  if (drawSprC("fly", b.x, b.y, 96, 54, b.tilt)) return;
   ctx.save();
   ctx.translate(b.x,b.y);
   ctx.rotate(b.tilt);
@@ -3982,7 +4027,7 @@ function updateAir(dt){
   for (const it of A.items){
     if (it.taken) continue;
     const ix=aX(it.wx), iy=it.y+Math.sin(A.t*2+it.bob)*6;
-    if (Math.abs(ix-s.x)<34 && Math.abs(iy-s.y)<30){
+    if (aHit(ix,iy)){
       it.taken=true; A.balls++;
       const v=KINDS[it.kind].value;
       sfx.pick(it.kind); aBurst(ix,iy,KINDS[it.kind].light,10,150);
@@ -3993,14 +4038,14 @@ function updateAir(dt){
   for (const ac of A.acorns){
     if (ac.taken) continue;
     const ax=aX(ac.wx), ay=ac.y+Math.sin(A.t*2+ac.bob)*5;
-    if (Math.abs(ax-s.x)<34 && Math.abs(ay-s.y)<30){ ac.taken=true; A.squirrel=7; sfx.perfect(); aToast("SQUIRREL CO-PILOT! x2","#ffb347",s.x,s.y-60); aBurst(ax,ay,"#ffb347",14,160); }
+    if (aHit(ax,ay)){ ac.taken=true; A.squirrel=7; sfx.perfect(); aToast("SQUIRREL CO-PILOT! x2","#ffb347",s.x,s.y-60); aBurst(ax,ay,"#ffb347",14,160); }
   }
   A.acorns=A.acorns.filter(a=>!a.taken && aX(a.wx)>-40);
   for (const pk of A.pickups){
     if (pk.taken) continue;
     pk.spin+=dt*1.6;
     const px=aX(pk.wx), py=pk.y+Math.sin(A.t*2+pk.spin)*6;
-    if (Math.abs(px-s.x)<36 && Math.abs(py-s.y)<32){
+    if (aHit(px,py)){
       pk.taken=true;
       const w=A_WEAPONS[pk.tier];
       if (pk.tier>=A.weapon){ A.weapon=pk.tier; }
@@ -4034,6 +4079,10 @@ function airLand(){
 function bakeAirSky(){
   abg=document.createElement("canvas"); abg.width=W; abg.height=H;
   const b=abg.getContext("2d");
+  if (sprReady("skyAir")){
+    b.drawImage(SPR.skyAir,0,0,W,H);
+    return;
+  }
   const sky=b.createLinearGradient(0,0,0,H);
   sky.addColorStop(0,"#5fb4e6"); sky.addColorStop(.6,"#a9dcf3"); sky.addColorStop(1,"#e4f2ec");
   b.fillStyle=sky; b.fillRect(0,0,W,H);
@@ -4046,6 +4095,11 @@ function bakeAirSky(){
   b.fillStyle="#5aa055"; b.beginPath(); b.ellipse(W/2,690,W*.8,80,0,0,Math.PI*2); b.fill();
 }
 function drawAirPlane(x,y,tilt,type,xray,dim){
+  if (!xray && !dim){
+    const key=type==="jet"?"jet":"biplane";
+    const sz=type==="jet"?[176,86]:[168,94];
+    if (drawSprC(key,x,y,sz[0],sz[1],tilt)) return;
+  }
   ctx.save(); ctx.translate(x,y); ctx.rotate(tilt);
   if (dim) ctx.globalAlpha=.4;
   const body = type==="jet" ? ["#e33d2f","#8f1d14"] : ["#f2c744","#a37a12"];
@@ -4166,6 +4220,10 @@ function drawPaw(x,y,alive){
   ctx.restore();
 }
 function drawAirCloud(x,y,w,h,dark,flash){
+  if (dark && drawSprC("storm",x,y,w*1.15,h*1.35,0)){
+    if (flash>0){ ctx.save(); ctx.globalAlpha=flash*.85; ctx.fillStyle="#fffbd0"; ctx.beginPath(); ctx.ellipse(x,y,w*.5,h*.5,0,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+    return;
+  }
   ctx.save();
   const g=ctx.createLinearGradient(0,y-h/2,0,y+h/2);
   if (dark){ g.addColorStop(0,"#7a8794"); g.addColorStop(1,"#3f4a56"); } else { g.addColorStop(0,"#ffffff"); g.addColorStop(1,"#c6d3dc"); }
@@ -4180,6 +4238,7 @@ function drawAirCloud(x,y,w,h,dark,flash){
   ctx.restore();
 }
 function drawBird(x,y,flap,s){
+  if (drawSprC("bird",x,y,46,46,Math.sin(flap)*.18)) return;
   const f=Math.sin(flap)*7;
   ctx.fillStyle="#3b3f47";
   ctx.beginPath(); ctx.ellipse(x,y,9,5.5,0,0,Math.PI*2); ctx.fill();
@@ -4189,6 +4248,7 @@ function drawBird(x,y,flap,s){
   ctx.fillStyle="#f2b23a"; ctx.beginPath(); ctx.moveTo(x-9,y); ctx.lineTo(x-15,y+1.5); ctx.lineTo(x-9,y+3); ctx.closePath(); ctx.fill();
 }
 function drawEnemy(x,y){
+  if (drawSprC("enemy",x,y,108,36,0,false)) return;
   ctx.save(); ctx.translate(x,y); ctx.scale(-1,1);
   ctx.fillStyle="#586470";
   ctx.beginPath(); ctx.ellipse(0,2,38,11,0,0,Math.PI*2); ctx.fill();
@@ -4201,6 +4261,7 @@ function drawEnemy(x,y){
   ctx.restore();
 }
 function drawBalloon(x,y,cat){
+  if (drawSprC("balloon",x,y+8,58,110,0)) return;
   ctx.save();
   const g=ctx.createRadialGradient(x-10,y-14,6,x,y,40);
   if (cat){ g.addColorStop(0,"#ffd4e8"); g.addColorStop(1,"#e0578f"); } else { g.addColorStop(0,"#fff0b0"); g.addColorStop(1,"#e0952a"); }
