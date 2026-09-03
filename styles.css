@@ -530,3 +530,25 @@ body.touch{
   user-select:none;
   overscroll-behavior:none;
 }
+
+#airstory .storyshot{
+  position:absolute;inset:0;
+  background:#0a1020 center/cover no-repeat;
+  transform:scale(1.02);
+}
+#airstory .storyscrim{
+  background:linear-gradient(180deg, rgba(6,8,16,.15) 0%, rgba(6,8,16,.2) 48%, rgba(6,8,16,.92) 100%);
+}
+#airstory .storypanel{align-items:end;padding:18px 22px 22px}
+#airstory .storycap{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%}
+#airstory .storycap p{
+  margin:0;max-width:640px;font-size:clamp(16px,2.4vw,22px);font-weight:600;line-height:1.35;
+  color:#fff6c9;text-shadow:0 2px 10px #000;
+}
+.storydots{display:flex;gap:8px;justify-content:center}
+.storydots i{
+  width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.28);
+  display:block;
+}
+.storydots i.on{background:#c9f24d;box-shadow:0 0 10px #c9f24d}
+

@@ -24,7 +24,11 @@ loadSpr("enemy","/art/spr-enemy.png");
 loadSpr("balloon","/art/spr-balloon.png");
 loadSpr("storm","/art/spr-storm.png");
 loadSpr("skyAir","/art/sky-air.jpg");
-["fly","biplane","jet","bird","enemy","balloon","storm","skyAir"].forEach(n=>{ SPR[n].addEventListener("load",()=>{ try{ if(typeof bakeAirSky==="function") bakeAirSky(); if(typeof bakeFlapSky==="function") bakeFlapSky(); }catch(e){} }); });
+loadSpr("saucer","/art/spr-saucer.png");
+loadSpr("drone","/art/spr-drone.png");
+loadSpr("diver","/art/spr-diver.png");
+loadSpr("mothership","/art/spr-mothership.png");
+["fly","biplane","jet","bird","enemy","balloon","storm","skyAir","saucer","drone","diver","mothership"].forEach(n=>{ SPR[n].addEventListener("load",()=>{ try{ if(typeof bakeAirSky==="function") bakeAirSky(); if(typeof bakeFlapSky==="function") bakeFlapSky(); }catch(e){} }); });
 function sprReady(name){
   const im=SPR[name];
   return !!(im && im.complete && im.naturalWidth>0);
@@ -253,6 +257,7 @@ const GP_ITEMS = {
   flapmenu: ["flapStartBtn","flapBack"],
   paddlemenu: ["padGiulia","padNic","padStartBtn","padBack"],
   airmenu: ["airBiplane","airJet","airStartBtn","airBack"],
+  airstory: ["storyNext"],
   pause: ["pauseResume","pauseSound","pauseQuit"],
   over:     ["againBtn","overHome"]
 };
@@ -265,6 +270,7 @@ function gpScreen(){
   if (on("pause")) return "pause";
   if (on("paddlemenu")) return "paddlemenu";
   if (on("airmenu")) return "airmenu";
+  if (on("airstory")) return "airstory";
   if (on("gameover")) return "over";
   return "play";
 }
@@ -3748,7 +3754,8 @@ const A_TOP   = 70, A_BOT = 556;      // flyable band
 let A = null, abg = null;
 let A_PLANE = "biplane";              // "biplane" | "jet"
 
-const A_PTS = { bird:15, plane:50, balloon:40, cat:200, close:20 };
+const A_PTS = { bird:15, plane:50, balloon:40, cat:200, close:20, saucer:30, drone:25, dive:40, mothership:500 };
+const A_BOSS_AT = 9200;
 const A_XMIN = 90, A_XMAX = 560;            // how far the plane can roam on screen
 const A_LIVES = 3, A_INV = 1.5;
 const A_WEAPONS = [
@@ -3767,9 +3774,10 @@ function newAir(best){
     lives:3, weapon:0, ammo:0, over:false, pickups:[],
     scroll:0, gustV:0, rain:0, dark:0,
     shots:[], eshots:[], birdsL:[], enemies:[], clouds:[], storms:[],
-    balloons:[], gusts:[], items:[], acorns:[], bolts:[],
+    balloons:[], gusts:[], items:[], acorns:[], bolts:[], aliens:[],
+    boss:null, phase:"fly",
     squirrel:0, fireCool:0,
-    nx:{ item:520, bird:760, cloud:1100, storm:1700, enemy:2200, balloon:1500, gust:2600, acorn:3600, cat:5200, weapon:1400 },
+    nx:{ item:520, bird:760, cloud:1100, storm:1700, enemy:2800, balloon:1500, gust:2600, acorn:3600, cat:5200, weapon:1400, alien:640 },
     shake:0, flash:0, flashCol:"224,58,47",
     toasts:[], particles:[], confetti:[], feathers:[], winFx:0
   };
@@ -3878,7 +3886,14 @@ function aSpawnAhead(){
   }
   while (n.cloud < R){ A.clouds.push({ wx:n.cloud, y:rand(A_TOP+50,A_BOT-90), w:rand(120,170), h:rand(60,84) }); n.cloud+=rand(900,1500); }
   while (n.storm < R){ A.storms.push({ wx:n.storm, y:rand(A_TOP+20,A_TOP+120), w:150, arm:0, phase:"drift", tmr:rand(.9,1.8), flashed:0, close:false }); n.storm+=rand(1100,1900); }
-  while (n.enemy < R){ A.enemies.push({ wx:n.enemy, y:rand(A_TOP+40,A_BOT-40), vy:0, fire:rand(1.2,2.2), dead:false, ph:rand(0,6.3) }); n.enemy+=rand(1300,2100); }
+  while (n.enemy < R){ A.enemies.push({ wx:n.enemy, y:rand(A_TOP+40,A_BOT-40), vy:0, fire:rand(1.2,2.2), dead:false, ph:rand(0,6.3) }); n.enemy+=rand(1600,2400); }
+  while (n.alien < R && A.phase!=="boss"){
+    const r=Math.random();
+    const kind = r<.42?"saucer": r<.78?"drone":"dive";
+    const y=rand(A_TOP+36,A_BOT-36);
+    A.aliens.push({ wx:n.alien, y, y0:y, kind, dead:false, ph:rand(0,6.3), amp:rand(28,78), sp: kind==="dive"?46: kind==="drone"?96:72 });
+    n.alien += rand(380,640);
+  }
   while (n.balloon < R){
     const cat = A.scroll > n.cat;
     A.balloons.push({ wx:n.balloon, y:rand(A_TOP+70,A_BOT-90), cat, popped:false, bob:rand(0,6.3) });
@@ -3921,8 +3936,10 @@ function updateAir(dt){
 
   if (!A.started){ s.y=300+Math.sin(A.t*2.4)*10; s.tilt=Math.sin(A.t*2.4)*.06; return; }
 
-  A.timeLeft-=dt;
-  if (A.timeLeft<=0){ A.timeLeft=0; airLand(); return; }
+  if (A.phase==="fly"){
+    A.timeLeft = Math.max(0, (A_BOSS_AT-A.scroll)/aSpeed());
+    if (A.scroll>=A_BOSS_AT) spawnBoss();
+  }
 
   // ---- steering
   let my=0;
@@ -3939,9 +3956,9 @@ function updateAir(dt){
   s.x = clamp(s.x + s.vx*dt, A_XMIN, A_XMAX);
   A.gustV = lerp(A.gustV, 0, dt*3);
 
-  const sp=aSpeed();
-  A.scroll += sp*dt;
-  aSpawnAhead();
+  const sp=A.phase==="boss"? aSpeed()*.35 : aSpeed();
+  if (A.phase!=="boss") A.scroll += sp*dt;
+  if (A.phase!=="boss") aSpawnAhead();
 
   // ---- shots
   for (const b of A.shots){ b.x+=b.vx*dt; b.y+=(b.vy||0)*dt; b.life-=dt; }
@@ -4062,6 +4079,9 @@ function updateAir(dt){
     }
   }
   A.pickups=A.pickups.filter(p=>!p.taken && aX(p.wx)>-40);
+
+  updateAliens(dt);
+  updateBoss(dt);
 }
 
 function airLand(){
@@ -4105,7 +4125,7 @@ function drawAirPlane(x,y,tilt,type,xray,dim){
   if (!xray && !dim){
     const key=type==="jet"?"jet":"biplane";
     const sz=type==="jet"?[176,86]:[168,94];
-    if (drawSprC(key,x,y,sz[0],sz[1],tilt,true)) return;
+    if (drawSprC(key,x,y,sz[0],sz[1],tilt, type!=="jet")) return;
   }
   ctx.save(); ctx.translate(x,y); ctx.rotate(tilt);
   if (dim) ctx.globalAlpha=.4;
@@ -4330,6 +4350,8 @@ function drawAir(){
   for (const pk of A.pickups){ const px=aX(pk.wx); if (px>-40&&px<W+40) drawWeaponIcon(px,pk.y+Math.sin(A.t*2+pk.spin)*6,pk.tier,pk.spin,1); }
   for (const b of A.birdsL){ const bx=aX(b.wx); if (bx>-40&&bx<W+40) drawBird(bx,b.y+Math.sin(b.ph)*b.amp,b.flap); }
   for (const e of A.enemies){ const ex=aX(e.wx); if (ex>-80&&ex<W+80) drawEnemy(ex,e.y); }
+  for (const al of A.aliens) drawAlien(al);
+  if (A.boss) drawBoss();
   for (const b of A.eshots){ ctx.fillStyle="#ff6a3d"; ctx.beginPath(); ctx.ellipse(b.x,b.y,8,3,0,0,Math.PI*2); ctx.fill(); }
   for (const b of A.shots){ ctx.fillStyle=A.weapon?A_WEAPONS[A.weapon].col:"#fff3b0"; ctx.beginPath(); ctx.ellipse(b.x,b.y,10,3,Math.atan2(b.vy||0,b.vx),0,Math.PI*2); ctx.fill(); ctx.fillStyle="rgba(255,220,120,.5)"; ctx.beginPath(); ctx.ellipse(b.x-12,b.y,10,2,0,0,Math.PI*2); ctx.fill(); }
   for (const f of A.feathers){ ctx.save(); ctx.globalAlpha=clamp(f.life,0,1); ctx.translate(f.x,f.y); ctx.rotate(f.rot); ctx.fillStyle=f.col; ctx.beginPath(); ctx.ellipse(0,0,7,2.5,0,0,Math.PI*2); ctx.fill(); ctx.restore(); }
@@ -4374,10 +4396,14 @@ function drawAirHUD(){
   chunky(ctx,String(A.score),30,38,26,"#fff6c9","#4a1f08",700);
   ctx.textAlign="right"; ctx.font="600 11px Fredoka, system-ui, sans-serif";
   ctx.fillStyle="rgba(255,255,255,.5)"; ctx.fillText("BEST "+A.best,182,30);
-  goldPanel(ctx,W/2-58,14,116,44,12);
+  goldPanel(ctx,W/2-70,14,140,44,12);
   ctx.textAlign="center";
-  const mm=Math.floor(A.timeLeft/60), ss=Math.floor(A.timeLeft%60);
-  chunky(ctx,mm+":"+String(ss).padStart(2,"0"),W/2,36,23,A.timeLeft<=10?"#ff8a7a":"#fff6c9","#4a1f08",700);
+  if (A.phase==="boss" && A.boss){
+    chunky(ctx,"BOSS",W/2,36,22,"#c9f24d","#4a1f08",700);
+  } else {
+    const pct=clamp(A.scroll/A_BOSS_AT,0,1);
+    chunky(ctx,Math.round(pct*100)+"%",W/2,36,22,"#fff6c9","#4a1f08",700);
+  }
   goldPanel(ctx,W-236,14,220,52,13);
   for (let i=0;i<A_LIVES;i++) drawPaw(W-214+i*22,40,i<A.lives);
   const wx=W-130, wy=40;
@@ -4401,6 +4427,221 @@ function drawAirHUD(){
     ctx.font="600 13px Fredoka, system-ui, sans-serif"; ctx.fillStyle="rgba(255,255,255,.85)";
     ctx.fillText(IS_TOUCH?"left stick to fly  ·  FIRE to shoot":"fly with the d-pad, all four ways · button to shoot · grab bones, paws and balls for better guns", W/2, H-62);
   }
+}
+
+
+function angNorm(a){ while(a>Math.PI) a-=Math.PI*2; while(a<-Math.PI) a+=Math.PI*2; return a; }
+function inShieldGap(b, dx, dy){
+  const a=angNorm(Math.atan2(dy,dx)-b.ang);
+  const g=b.gap;
+  return Math.abs(a)<g || Math.abs(Math.abs(a)-Math.PI)<g;
+}
+function spawnBoss(){
+  if (!A || A.boss) return;
+  A.phase="boss";
+  A.boss={
+    x:W+180, y:310, hp:18, hpMax:18, ang:0, gap:.62,
+    beamT:2.6, beaming:0, spawnT:1.2, state:"enter", flash:0, crack:0
+  };
+  aToast("MOTHERSHIP!","#b6f23a",W/2,140);
+  try{ sfx.thunder(); }catch(e){}
+}
+function updateAliens(dt){
+  const s=A.ship;
+  for (const al of A.aliens){
+    if (al.dead) continue;
+    al.ph+=dt*(al.kind==="drone"?3.1:2.2);
+    if (al.kind==="saucer"){ al.wx-=al.sp*dt; al.y=clamp(al.y0+Math.sin(al.ph)*20, A_TOP, A_BOT); }
+    else if (al.kind==="drone"){ al.wx-=al.sp*dt; al.y=clamp(al.y0+Math.sin(al.ph)*al.amp, A_TOP, A_BOT); }
+    else {
+      al.wx-=al.sp*dt;
+      if (aX(al.wx)<W-20) al.y=lerp(al.y, s.y, dt*1.8);
+    }
+    const ax=aX(al.wx), ay=al.y;
+    const hitR = al.kind==="saucer"?34: al.kind==="dive"?30:24;
+    for (const sh of A.shots){
+      if (Math.abs(sh.x-ax)<hitR && Math.abs(sh.y-ay)<hitR*.7){
+        al.dead=true; sh.life=0;
+        const pts=A_PTS[al.kind]||A_PTS.saucer;
+        aBurst(ax,ay,"#b6f23a",14,220);
+        sfx.pick("green");
+        aGain(pts,ax,ay,al.kind==="dive"?"dive-bomb!":al.kind,"#9be5ff");
+        A.planes++;
+        break;
+      }
+    }
+    if (!al.dead && Math.abs(ax-s.x)<hitR+8 && Math.abs(ay-s.y)<22){
+      al.dead=true; aBurst(ax,ay,"#ffb347",12,180);
+      airHit(al.kind==="drone"?"drone bump!":"saucer bump!","plane");
+    }
+  }
+  A.aliens=A.aliens.filter(al=>!al.dead && aX(al.wx)>-90);
+}
+function updateBoss(dt){
+  const b=A.boss; if (!b) return;
+  const s=A.ship;
+  b.ang+=dt*1.05;
+  b.flash=Math.max(0,b.flash-dt);
+  if (b.state==="enter"){
+    b.x=lerp(b.x, 678, dt*1.4);
+    if (b.x<700) b.state="fight";
+    return;
+  }
+  if (b.state==="crack"){
+    b.crack+=dt;
+    b.y+=Math.sin(A.t*30)*2;
+    if (b.crack>1.6){ A.running=false; openAirStory("end"); }
+    return;
+  }
+  b.y=clamp(b.y+Math.sin(A.t*1.1)*18*dt, A_TOP+70, A_BOT-70);
+  b.spawnT-=dt;
+  if (b.spawnT<=0){
+    b.spawnT=rand(1.6,2.6);
+    const kind=Math.random()<.5?"drone":"saucer";
+    A.aliens.push({ wx:A.scroll+(b.x-A_X)+20, y:b.y+rand(-40,40), y0:b.y, kind, dead:false, ph:rand(0,6), amp:50, sp:kind==="drone"?110:80 });
+  }
+  b.beamT-=dt;
+  if (b.beaming>0){
+    b.beaming-=dt;
+    const inBeam = s.x>b.x-310 && Math.abs(s.y-b.y)<54;
+    if (inBeam){
+      s.x=clamp(s.x+210*dt, A_XMIN, A_XMAX);
+      s.y=lerp(s.y, b.y, dt*1.2);
+      if (Math.abs(s.x-b.x)<90 && s.inv<=0) airHit("tractor beam!","bump");
+    }
+  } else if (b.beamT<=0){
+    b.beaming=1.15; b.beamT=3.2;
+    aToast("TRACTOR BEAM!","#b6f23a",b.x-80,b.y-70);
+  }
+  for (const sh of A.shots){
+    const dx=sh.x-b.x, dy=sh.y-b.y, d=Math.hypot(dx,dy);
+    if (d>118 || d<8) continue;
+    if (d>62 && !inShieldGap(b,dx,dy)){
+      sh.life=0;
+      aBurst(sh.x,sh.y,"#7cffc6",6,90);
+      continue;
+    }
+    if (d<=62){
+      sh.life=0;
+      b.hp--; b.flash=.18;
+      aBurst(b.x-30,b.y,"#fff6c9",10,160);
+      sfx.bark();
+      if (b.hp<=0){
+        b.hp=0; b.state="crack"; b.crack=0;
+        aBurst(b.x,b.y,"#b6f23a",36,280);
+        aBurst(b.x,b.y,"#fff6c9",24,220);
+        aGain(A_PTS.mothership,b.x,b.y,"RESCUE!","#c9f24d");
+        try{ sfx.win(); }catch(e){}
+      }
+    }
+  }
+}
+function drawAlien(al){
+  const x=aX(al.wx), y=al.y;
+  if (x<-80||x>W+80) return;
+  const key=al.kind==="drone"?"drone": al.kind==="dive"?"diver":"saucer";
+  const sz=al.kind==="drone"?[46,46]: al.kind==="dive"?[70,48]:[78,46];
+  if (!drawSprC(key,x,y,sz[0],sz[1], al.kind==="dive"?Math.atan2(A.ship.y-y,-40)*.4:0)){
+    ctx.fillStyle=al.kind==="drone"?"#7a4ab0":"#8fd11f";
+    ctx.beginPath(); ctx.ellipse(x,y,sz[0]/2,sz[1]/3,0,0,Math.PI*2); ctx.fill();
+  }
+}
+function drawBoss(){
+  const b=A.boss; if (!b) return;
+  if (b.beaming>0){
+    const a=clamp(b.beaming,0,1);
+    ctx.save();
+    const g=ctx.createLinearGradient(b.x,b.y, b.x-320,b.y);
+    g.addColorStop(0,"rgba(180,255,120,"+(.28*a)+")");
+    g.addColorStop(1,"rgba(180,255,120,0)");
+    ctx.fillStyle=g;
+    ctx.beginPath();
+    ctx.moveTo(b.x-20,b.y-12);
+    ctx.lineTo(b.x-300,b.y-58);
+    ctx.lineTo(b.x-300,b.y+58);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  ctx.save();
+  if (b.flash>0) ctx.globalAlpha=.65+b.flash;
+  if (b.state==="crack") ctx.globalAlpha=Math.max(.3,1-b.crack*.5);
+  if (!drawSprC("mothership", b.x, b.y, 248, 168, 0)){
+    ctx.fillStyle="#6fd080"; ctx.beginPath(); ctx.ellipse(b.x,b.y,110,56,0,0,Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+  // rotating shield with two gaps
+  ctx.save();
+  ctx.translate(b.x,b.y); ctx.rotate(b.ang);
+  ctx.strokeStyle="rgba(120,255,190,.9)"; ctx.lineWidth=8; ctx.lineCap="butt";
+  ctx.shadowColor="#7cffc6"; ctx.shadowBlur=12;
+  ctx.beginPath(); ctx.arc(0,0,96, b.gap, Math.PI-b.gap); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0,0,96, Math.PI+b.gap, Math.PI*2-b.gap); ctx.stroke();
+  ctx.restore();
+  // hp
+  const bw=220, bx=W/2-bw/2, by=64;
+  ctx.fillStyle="rgba(6,18,10,.55)"; ctx.beginPath(); ctx.roundRect(bx-6,by-8,bw+12,18,9); ctx.fill();
+  ctx.fillStyle="#3a1a20"; ctx.beginPath(); ctx.roundRect(bx,by-3,bw,8,4); ctx.fill();
+  ctx.fillStyle="#c9f24d"; ctx.beginPath(); ctx.roundRect(bx,by-3,bw*(b.hp/b.hpMax),8,4); ctx.fill();
+  ctx.textAlign="center"; ctx.font="700 11px Fredoka, system-ui, sans-serif";
+  ctx.fillStyle="#fff6c9"; ctx.fillText(b.state==="crack"?"POD OPEN!":"MOTHERSHIP", W/2, by-16);
+}
+
+const AIR_INTRO=[
+  { img:"/art/story-1.jpg", kicker:"Saturday", line:"Nic and Giulia were just playing in the yard." },
+  { img:"/art/story-2.jpg", kicker:"Uh-oh", line:"A UFO scooped them up in a sparkly beam!" },
+  { img:"/art/story-3.jpg", kicker:"Bernard", line:"He grabbed his goggles. Nobody takes his kids." }
+];
+const AIR_END=[
+  { img:"/art/story-end-1.jpg", kicker:"Gotcha", line:"He cracked the pod. Nic and Giulia were free." },
+  { img:"/art/story-end-2.jpg", kicker:"Home", line:"The three of them flew home under the big sky." },
+  { img:"/art/story-end-3.jpg", kicker:"You saved them!", line:"Bernard brought everyone home." }
+];
+let STORY=null;
+function openAirStory(kind){
+  STORY={ kind, i:0 };
+  hideAll();
+  const el=document.getElementById("airstory");
+  el.classList.add("on");
+  renderStory();
+}
+function renderStory(){
+  const pack=STORY.kind==="end"?AIR_END:AIR_INTRO;
+  const p=pack[STORY.i];
+  const shot=document.getElementById("storyShot");
+  shot.style.backgroundImage="url('"+p.img+"')";
+  document.getElementById("storyKicker").textContent=p.kicker;
+  document.getElementById("storyLine").textContent=p.line;
+  const last=STORY.i===pack.length-1;
+  document.getElementById("storyNext").textContent = last ? (STORY.kind==="end"?"You Saved Them!":"Take off") : "Next";
+  const dots=document.getElementById("storyDots");
+  dots.innerHTML=pack.map((_,i)=>"<i"+(i===STORY.i?" class='on'":"")+"></i>").join("");
+}
+function storyAdvance(){
+  if (!STORY) return;
+  const pack=STORY.kind==="end"?AIR_END:AIR_INTRO;
+  if (STORY.i<pack.length-1){ STORY.i++; renderStory(); return; }
+  if (STORY.kind==="intro") beginAirPlay();
+  else finishAirWin();
+}
+function beginAirPlay(){
+  STORY=null;
+  hideAll();
+  if (A){ A.running=true; A.started=false; }
+  MODE="air"; setMark("air");
+  if (!ac) beep(1,.01);
+}
+function finishAirWin(){
+  STORY=null;
+  const newBest=A && A.score>A.best; if (A && newBest){ A.best=A.score; saveABest(A.best); }
+  const over=document.getElementById("gameover");
+  over.classList.remove("won","lost"); over.classList.add("won");
+  document.getElementById("overShot").style.backgroundImage="url('/art/story-end-3.jpg')";
+  document.getElementById("overTitle").textContent="You Saved Them!";
+  document.getElementById("finalLine").textContent =
+    "Nic and Giulia are home. Score "+(A?A.score:0)+": "+(A?A.balls:0)+" balls, "+
+    (A?A.birds:0)+" birds, "+(A?A.planes:0)+" ships"+(A&&A.cats?", "+A.cats+" cat balloons":"")+
+    ". "+(newBest?"New best rescue.":"Best so far: "+(A?A.best:0)+".");
+  hideAll(); over.classList.add("on");
 }
 
 // ---------------------------------------------------------------- loop
@@ -4453,6 +4694,7 @@ function hideAll(){
   homeEl.classList.remove("on"); menuEl.classList.remove("on");
   titaEl.classList.remove("on"); flapEl.classList.remove("on"); padEl.classList.remove("on");
   airEl.classList.remove("on"); pauseEl.classList.remove("on"); PAUSED=false;
+  const storyEl=document.getElementById("airstory"); if (storyEl) storyEl.classList.remove("on");
   overEl.classList.remove("on","won","lost");
   syncHud();
 }
@@ -4556,9 +4798,9 @@ function updateStar(){
 function startAir(){
   const best=A?A.best:0;
   A=newAir(best);
+  A.running=false;
   MODE="air"; setMark("air");
-  hideAll();
-  if (!ac) beep(1,.01);
+  openAirStory("intro");
 }
 // ---- pause / quit, reachable from every game
 function gameRunning(){
@@ -4616,6 +4858,8 @@ document.getElementById("padGiulia").addEventListener("click",()=>setChar("giuli
 document.getElementById("padNic").addEventListener("click",()=>setChar("nic"));
 document.getElementById("pickAir").addEventListener("click",openAir);
 document.getElementById("airStartBtn").addEventListener("click",startAir);
+document.getElementById("storyNext").addEventListener("click",storyAdvance);
+document.getElementById("airstory").addEventListener("click",e=>{ if (e.target.id==="storyNext"||e.target.closest(".play")) return; storyAdvance(); });
 document.getElementById("airBiplane").addEventListener("click",()=>setPlane("biplane"));
 document.getElementById("airBiplane").addEventListener("mouseenter",()=>setPlane("biplane"));
 document.getElementById("airJet").addEventListener("click",()=>setPlane("jet"));
@@ -4737,4 +4981,5 @@ setMark("home");
 refreshBests();
 draw();
 requestAnimationFrame(frame);
+window.__BA={ spawn(){ if(A) spawnBoss(); }, go(n){ if(A){ A.scroll=n; A.started=true; A.running=true; } } };
 })();
