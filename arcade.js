@@ -3,7 +3,7 @@
 "use strict";
 
 const PHOTO_BERNARD="var(--ph-bernard)";
-["art/bernard-pilot-portrait.jpg","art/bernard-jet-portrait.jpg","art/card-air-jet.jpg"].forEach(s=>{const i=new Image(); i.src=s;});
+["/art/bernard-pilot-portrait.jpg","/art/bernard-jet-portrait.jpg","/art/card-air-jet.jpg"].forEach(s=>{const i=new Image(); i.src=s;});
 const PHOTO_TITA="var(--ph-tita)";
 const cv = document.getElementById("cv");
 const ctx = cv.getContext("2d");
@@ -273,8 +273,8 @@ function gpChip(){
   const c=document.getElementById("padChip");
   if (!c) return;
   if (GP.idx===null){
-    c.textContent = lastKeyCode ? ("Key: "+lastKeyCode) : "No controller";
-    c.classList.toggle("live",!!lastKeyCode);
+    c.textContent = "No controller";
+    c.classList.remove("live");
     return;
   }
   c.classList.add("live");
@@ -4441,7 +4441,7 @@ function updateStar(){
   if (img.getAttribute("data-which")===which){ img.style.opacity="1"; return; }
   img.style.opacity="0";
   setTimeout(()=>{
-    img.src=air?(which==="jet"?"art/bernard-jet-portrait.jpg":"art/bernard-pilot-portrait.jpg"):"art/bernard-portrait.jpg";
+    img.src=air?(which==="jet"?"/art/bernard-jet-portrait.jpg":"/art/bernard-pilot-portrait.jpg"):"/art/bernard-portrait.jpg";
     img.setAttribute("data-which",which);
     if (cap) cap.textContent=air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
     img.style.opacity="1";
