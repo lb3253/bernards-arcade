@@ -28,7 +28,11 @@ loadSpr("saucer","/art/spr-saucer.png");
 loadSpr("drone","/art/spr-drone.png");
 loadSpr("diver","/art/spr-diver.png");
 loadSpr("mothership","/art/spr-mothership.png");
-["fly","biplane","jet","bird","enemy","balloon","storm","skyAir","saucer","drone","diver","mothership"].forEach(n=>{ SPR[n].addEventListener("load",()=>{ try{ if(typeof bakeAirSky==="function") bakeAirSky(); if(typeof bakeFlapSky==="function") bakeFlapSky(); }catch(e){} }); });
+loadSpr("disc","/art/spr-disc.png");
+loadSpr("scout","/art/spr-scout.png");
+loadSpr("missile","/art/spr-missile.png");
+loadSpr("plasma","/art/spr-plasma.png");
+["fly","biplane","jet","balloon","storm","skyAir","saucer","drone","diver","mothership","disc","scout","missile","plasma"].forEach(n=>{ SPR[n].addEventListener("load",()=>{ try{ if(typeof bakeAirSky==="function") bakeAirSky(); if(typeof bakeFlapSky==="function") bakeFlapSky(); }catch(e){} }); });
 function sprReady(name){
   const im=SPR[name];
   return !!(im && im.complete && im.naturalWidth>0);
@@ -313,7 +317,14 @@ function uiActivate(){
   uiSync();
   const list=uiList(); if (!list) return;
   UI_FOCUS=true;
-  const el=document.getElementById(list[GP.focus]);
+  const id=list[GP.focus];
+  const sc=gpScreen();
+  if (sc==="airmenu"){
+    if (id==="airBack"){ goHome(); return; }
+    startAir();
+    return;
+  }
+  const el=document.getElementById(id);
   if (el) el.click();
   gpApplyFocus();
 }
@@ -3754,15 +3765,16 @@ const A_TOP   = 70, A_BOT = 556;      // flyable band
 let A = null, abg = null;
 let A_PLANE = "biplane";              // "biplane" | "jet"
 
-const A_PTS = { bird:15, plane:50, balloon:40, cat:200, close:20, saucer:30, drone:25, dive:40, mothership:500 };
+const A_PTS = { balloon:40, cat:200, close:20, saucer:30, drone:25, dive:40, disc:45, scout:20, mothership:500 };
 const A_BOSS_AT = 9200;
 const A_XMIN = 90, A_XMAX = 560;            // how far the plane can roam on screen
 const A_LIVES = 3, A_INV = 1.5;
 const A_WEAPONS = [
-  { name:"basic",  cd:.24, ammo:0  },
-  { name:"double", cd:.22, ammo:28, icon:"bone", col:"#ffcf3a", glow:"255,207,58" },
-  { name:"spread", cd:.22, ammo:24, icon:"paw",  col:"#ff8c2e", glow:"255,140,46" },
-  { name:"rapid",  cd:.09, ammo:40, icon:"ball", col:"#f0472f", glow:"240,71,47" }
+  { name:"basic",   cd:.24 },
+  { name:"double",  cd:.22, icon:"bone",    col:"#ffcf3a", glow:"255,207,58" },
+  { name:"spread",  cd:.22, icon:"paw",     col:"#ff8c2e", glow:"255,140,46" },
+  { name:"rapid",   cd:.09, icon:"ball",    col:"#f0472f", glow:"240,71,47" },
+  { name:"missile", cd:.42, icon:"missile", col:"#ff6a3d", glow:"255,106,61" }
 ];
 
 function newAir(best){
@@ -3826,13 +3838,12 @@ function airFireNow(){
   A.fireCool = w.cd * (A_PLANE==="jet" ? .85 : 1);
   const s=A.ship, x0=s.x+46, y0=s.y+2;
   const mk=(dy,vy)=>A.shots.push({ x:x0, y:y0+dy, vx:640, vy:vy||0, life:1.6 });
-  if (A.weapon===1){ mk(-6); mk(8); }
+  const wname=w.name;
+  if (wname==="missile"){
+    A.shots.push({ x:x0, y:y0, vx:520, vy:0, life:2.2, missile:true });
+  } else if (A.weapon===1){ mk(-6); mk(8); }
   else if (A.weapon===2){ mk(0); mk(-4,-150); mk(4,150); }
   else { mk(0); }
-  if (A.weapon>0){
-    A.ammo--;
-    if (A.ammo<=0){ A.weapon--; A.ammo=A_WEAPONS[A.weapon].ammo; aToast(A.weapon?"back to "+A_WEAPONS[A.weapon].name:"basic shot","#dfe9dc",s.x,s.y-50); }
-  }
   sfx.shot();
   A.particles.push({x:x0+4,y:y0,vx:140,vy:0,life:.12,color:"#fff3b0",r:6});
 }
@@ -3846,7 +3857,7 @@ function airHit(why,kind){
   s.vy=0; s.vx=0;
   comboBreak(A);
   A.squirrel=0;
-  if (A.weapon>0){ A.weapon--; A.ammo=A_WEAPONS[A.weapon].ammo; }
+  if (A.weapon>0){ A.weapon=0; aToast("back to basic shot","#dfe9dc",s.x,s.y-50); }
   if (!REDUCED) A.shake=14;
   sfx.yelp();
   aBurst(s.x,s.y,kind==="bolt"?"#ffffff":"#ffb3a3",kind==="bolt"?26:16,240);
@@ -3864,7 +3875,7 @@ function airCrash(){
   document.getElementById("overTitle").textContent="Out of paws";
   document.getElementById("finalLine").textContent =
     "All three lives gone with "+Math.ceil(A.timeLeft)+"s still on the clock. Final score "+A.score+": "+
-    A.balls+" balls, "+A.birds+" birds, "+A.planes+" planes"+(A.cats?", "+A.cats+" cat balloon"+(A.cats>1?"s":""):"")+
+    A.balls+" balls, "+A.planes+" UFOs"+(A.cats?", "+A.cats+" cat balloon"+(A.cats>1?"s":""):"")+
     ". "+(newBest?"Still a new best.":"Best so far: "+A.best+".");
   over.classList.add("on");
 }
@@ -3879,20 +3890,16 @@ function aSpawnAhead(){
     for(let i=0;i<cnt;i++) A.items.push({ wx:n.item+i*66, y:clamp(y+Math.sin(i*1.2)*22,A_TOP+20,A_BOT-20), kind, taken:false, bob:rand(0,6.3) });
     n.item += cnt*66 + rand(220,380);
   }
-  while (n.bird < R){
-    const cnt=1+Math.floor(rand(0,3)), y=rand(A_TOP+30,A_BOT-30);
-    for(let i=0;i<cnt;i++) A.birdsL.push({ wx:n.bird+i*54, y:y, amp:rand(22,54), ph:rand(0,6.3), sp:rand(60,110), dead:false, flap:rand(0,6.3) });
-    n.bird += rand(360,620);
-  }
   while (n.cloud < R){ A.clouds.push({ wx:n.cloud, y:rand(A_TOP+50,A_BOT-90), w:rand(120,170), h:rand(60,84) }); n.cloud+=rand(900,1500); }
   while (n.storm < R){ A.storms.push({ wx:n.storm, y:rand(A_TOP+20,A_TOP+120), w:150, arm:0, phase:"drift", tmr:rand(.9,1.8), flashed:0, close:false }); n.storm+=rand(1100,1900); }
-  while (n.enemy < R){ A.enemies.push({ wx:n.enemy, y:rand(A_TOP+40,A_BOT-40), vy:0, fire:rand(1.2,2.2), dead:false, ph:rand(0,6.3) }); n.enemy+=rand(1600,2400); }
   while (n.alien < R && A.phase!=="boss"){
     const r=Math.random();
-    const kind = r<.42?"saucer": r<.78?"drone":"dive";
+    const kind = r<.28?"saucer": r<.48?"drone": r<.66?"dive": r<.84?"disc":"scout";
     const y=rand(A_TOP+36,A_BOT-36);
-    A.aliens.push({ wx:n.alien, y, y0:y, kind, dead:false, ph:rand(0,6.3), amp:rand(28,78), sp: kind==="dive"?46: kind==="drone"?96:72 });
-    n.alien += rand(380,640);
+    A.aliens.push({ wx:n.alien, y, y0:y, kind, dead:false, ph:rand(0,6.3), amp:rand(28,78),
+      sp: kind==="scout"?140: kind==="drone"?96: kind==="dive"?50: kind==="disc"?54:72,
+      fire:rand(.4,1.6) });
+    n.alien += rand(300,560);
   }
   while (n.balloon < R){
     const cat = A.scroll > n.cat;
@@ -3902,9 +3909,9 @@ function aSpawnAhead(){
   }
   while (n.gust < R){ A.gusts.push({ wx:n.gust, y:rand(A_TOP+40,A_BOT-40), w:260, h:120, dir: Math.random()<.5?-1:1 }); n.gust+=rand(1800,3000); }
   while (n.weapon < R){
-    const r=Math.random(); const tier = r<.5 ? 1 : r<.85 ? 2 : 3;
+    const r=Math.random(); const tier = r<.28 ? 1 : r<.5 ? 2 : r<.72 ? 3 : 4;
     A.pickups.push({ wx:n.weapon, y:rand(A_TOP+50,A_BOT-50), tier, taken:false, spin:rand(0,6.3) });
-    n.weapon += rand(1500,2600);
+    n.weapon += rand(1300,2200);
   }
   while (n.acorn < R){ A.acorns.push({ wx:n.acorn, y:rand(A_TOP+50,A_BOT-50), taken:false, bob:rand(0,6.3) }); n.acorn+=rand(3400,5600); }
 }
@@ -3961,7 +3968,15 @@ function updateAir(dt){
   if (A.phase!=="boss") aSpawnAhead();
 
   // ---- shots
-  for (const b of A.shots){ b.x+=b.vx*dt; b.y+=(b.vy||0)*dt; b.life-=dt; }
+  for (const b of A.shots){
+    if (b.missile){
+      let ty=null, td=9999;
+      for (const al of A.aliens){ if (al.dead) continue; const ax=aX(al.wx); const d=Math.hypot(ax-b.x, al.y-b.y); if (ax>b.x && d<td){ td=d; ty=al.y; } }
+      if (A.boss && A.boss.state!=="crack"){ const d=Math.hypot(A.boss.x-b.x, A.boss.y-b.y); if (d<td) ty=A.boss.y; }
+      if (ty!=null) b.vy = lerp(b.vy||0, clamp(ty-b.y,-180,180), dt*4);
+    }
+    b.x+=b.vx*dt; b.y+=(b.vy||0)*dt; b.life-=dt;
+  }
   A.shots=A.shots.filter(b=>b.life>0 && b.x<W+40);
   for (const b of A.eshots){ b.x+=b.vx*dt; b.y+=b.vy*dt; b.life-=dt; }
   A.eshots=A.eshots.filter(b=>b.life>0 && b.x>-40);
@@ -3973,29 +3988,7 @@ function updateAir(dt){
     if (Math.abs(cx-s.x)<c.w*.55 && Math.abs(c.y-s.y)<c.h*.6){ A.rain=1; A.dark=.55; }
   }
 
-  // ---- birds
-  for (const b of A.birdsL){
-    if (b.dead) continue;
-    b.wx-=b.sp*dt; b.ph+=dt*2.4; b.flap+=dt*14;
-    const bx=aX(b.wx), by=b.y+Math.sin(b.ph)*b.amp;
-    for (const sh of A.shots){ if (Math.abs(sh.x-bx)<20 && Math.abs(sh.y-by)<16){ b.dead=true; sh.life=0; A.birds++; aFeathers(bx,by,9); sfx.pick("green"); aGain(A_PTS.bird,bx,by,"bird","#e8f0ff"); break; } }
-    if (!b.dead && Math.abs(bx-s.x)<34 && Math.abs(by-s.y)<24){ b.dead=true; aFeathers(bx,by,6); airHit("bird strike!","bird"); }
-  }
-  A.birdsL=A.birdsL.filter(b=>!b.dead && aX(b.wx)>-60);
-
-  // ---- enemy planes
-  for (const e of A.enemies){
-    if (e.dead) continue;
-    e.wx-=70*dt; e.ph+=dt;
-    e.vy=lerp(e.vy,(s.y-e.y)*.9,dt*2); e.y=clamp(e.y+e.vy*dt,A_TOP,A_BOT);
-    const ex=aX(e.wx);
-    e.fire-=dt;
-    if (e.fire<=0 && ex>s.x+140 && ex<W){ e.fire=rand(1.6,2.6); A.eshots.push({x:ex-38,y:e.y+4,vx:-330,vy:(s.y-e.y)*.5,life:2.4}); sfx.shot(); }
-    for (const sh of A.shots){ if (Math.abs(sh.x-ex)<38 && Math.abs(sh.y-e.y)<22){ e.dead=true; sh.life=0; A.planes++; aBurst(ex,e.y,"#ffb347",22,260); aBurst(ex,e.y,"#6b7280",16,180); sfx.bark(); aGain(A_PTS.plane,ex,e.y,"plane!","#ffcf3a"); break; } }
-    if (!e.dead && Math.abs(ex-s.x)<44 && Math.abs(e.y-s.y)<26){ e.dead=true; aBurst(ex,e.y,"#ffb347",18,220); airHit("mid-air bump!","plane"); }
-  }
-  A.enemies=A.enemies.filter(e=>!e.dead && aX(e.wx)>-80);
-  for (const b of A.eshots){ if (Math.abs(b.x-s.x)<30 && Math.abs(b.y-s.y)<20){ b.life=0; airHit("shot down!","plane"); } }
+  for (const b of A.eshots){ if (Math.abs(b.x-s.x)<(b.r||10)+16 && Math.abs(b.y-s.y)<(b.r||10)+10){ b.life=0; airHit("plasma hit!","plane"); } }
 
   // ---- storm clouds: flash, then a bolt drops
   for (const st of A.storms){
@@ -4072,10 +4065,9 @@ function updateAir(dt){
     if (aHit(px,py)){
       pk.taken=true;
       const w=A_WEAPONS[pk.tier];
-      if (pk.tier>=A.weapon){ A.weapon=pk.tier; }
-      A.ammo=A_WEAPONS[A.weapon].ammo;
+      A.weapon=pk.tier;
       sfx.perfect(); aBurst(px,py,w.col,18,200);
-      aToast(w.name.toUpperCase()+" SHOT!",w.col,s.x,s.y-56);
+      aToast(w.name.toUpperCase()+" UNTIL HIT!",w.col,s.x,s.y-56);
     }
   }
   A.pickups=A.pickups.filter(p=>!p.taken && aX(p.wx)>-40);
@@ -4097,7 +4089,7 @@ function airLand(){
   document.getElementById("overTitle").textContent = newBest ? "New best landing!" : "Wheels down";
   document.getElementById("finalLine").textContent =
     "Bernard brought the "+(A_PLANE==="jet"?"jet":"biplane")+" home with "+A.score+" points: "+A.balls+" balls, "+
-    A.birds+" birds, "+A.planes+" planes"+(A.cats?", and "+A.cats+" cat balloon"+(A.cats>1?"s":""):"")+
+    A.planes+" UFOs"+(A.cats?", and "+A.cats+" cat balloon"+(A.cats>1?"s":""):"")+
     ". Hit "+A.hits+(A.hits===1?" time":" times")+". "+(newBest?"Best yet.":"Best so far: "+A.best+".");
   over.classList.add("on");
 }
@@ -4230,6 +4222,11 @@ function drawWeaponIcon(x,y,tier,spin,scale){
     ctx.beginPath(); for(let i=0;i<10;i++){ const a=i*Math.PI/5, r=i%2?11:19; ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r); } ctx.closePath(); ctx.fill();
     orb(ctx,0,4,8,"#ffb060","#b4520c",false);
     for (const [px,py] of [[-8,-6],[-3,-10],[3,-10],[8,-6]]) orb(ctx,px,py,3.4,"#ffb060","#b4520c",false);
+  } else if (w.icon==="missile"){
+    ctx.fillStyle="#ff6a3d";
+    ctx.beginPath(); ctx.moveTo(16,0); ctx.lineTo(-8,-7); ctx.lineTo(-8,7); ctx.closePath(); ctx.fill();
+    ctx.fillStyle="#ffcf3a"; ctx.beginPath(); ctx.moveTo(16,0); ctx.lineTo(6,-4); ctx.lineTo(6,4); ctx.closePath(); ctx.fill();
+    ctx.fillStyle="#7cffc6"; ctx.beginPath(); ctx.moveTo(-8,0); ctx.lineTo(-16,-4); ctx.lineTo(-14,0); ctx.lineTo(-16,4); ctx.closePath(); ctx.fill();
   } else {
     ctx.strokeStyle="rgba(255,200,180,.75)"; ctx.lineWidth=2.5; ctx.lineCap="round";
     for (const dy of [-8,0,8]){ ctx.beginPath(); ctx.moveTo(-14,dy); ctx.lineTo(-26-Math.abs(dy)*.4,dy); ctx.stroke(); }
@@ -4348,12 +4345,24 @@ function drawAir(){
     ctx.fillStyle="#6d4620"; ctx.beginPath(); ctx.ellipse(ax,ay-5,9,5,0,0,Math.PI*2); ctx.fill();
     ctx.fillStyle="#ffb347"; ctx.font="700 11px Fredoka"; ctx.textAlign="center"; ctx.fillText("x2",ax,ay-16); }
   for (const pk of A.pickups){ const px=aX(pk.wx); if (px>-40&&px<W+40) drawWeaponIcon(px,pk.y+Math.sin(A.t*2+pk.spin)*6,pk.tier,pk.spin,1); }
-  for (const b of A.birdsL){ const bx=aX(b.wx); if (bx>-40&&bx<W+40) drawBird(bx,b.y+Math.sin(b.ph)*b.amp,b.flap); }
-  for (const e of A.enemies){ const ex=aX(e.wx); if (ex>-80&&ex<W+80) drawEnemy(ex,e.y); }
   for (const al of A.aliens) drawAlien(al);
   if (A.boss) drawBoss();
-  for (const b of A.eshots){ ctx.fillStyle="#ff6a3d"; ctx.beginPath(); ctx.ellipse(b.x,b.y,8,3,0,0,Math.PI*2); ctx.fill(); }
-  for (const b of A.shots){ ctx.fillStyle=A.weapon?A_WEAPONS[A.weapon].col:"#fff3b0"; ctx.beginPath(); ctx.ellipse(b.x,b.y,10,3,Math.atan2(b.vy||0,b.vx),0,Math.PI*2); ctx.fill(); ctx.fillStyle="rgba(255,220,120,.5)"; ctx.beginPath(); ctx.ellipse(b.x-12,b.y,10,2,0,0,Math.PI*2); ctx.fill(); }
+  for (const b of A.eshots){
+    if (!drawSprC("plasma", b.x, b.y, 22, 22, 0)){
+      ctx.fillStyle="#7cffc6"; ctx.beginPath(); ctx.arc(b.x,b.y,b.r||7,0,Math.PI*2); ctx.fill();
+    }
+  }
+  for (const b of A.shots){
+    if (b.missile){
+      if (!drawSprC("missile", b.x, b.y, 46, 22, Math.atan2(b.vy||0,b.vx))){
+        ctx.fillStyle="#ff6a3d"; ctx.beginPath(); ctx.ellipse(b.x,b.y,16,5,0,0,Math.PI*2); ctx.fill();
+      }
+    } else {
+      ctx.fillStyle=A.weapon?A_WEAPONS[A.weapon].col:"#fff3b0";
+      ctx.beginPath(); ctx.ellipse(b.x,b.y,10,3,Math.atan2(b.vy||0,b.vx),0,Math.PI*2); ctx.fill();
+      ctx.fillStyle="rgba(255,220,120,.5)"; ctx.beginPath(); ctx.ellipse(b.x-12,b.y,10,2,0,0,Math.PI*2); ctx.fill();
+    }
+  }
   for (const f of A.feathers){ ctx.save(); ctx.globalAlpha=clamp(f.life,0,1); ctx.translate(f.x,f.y); ctx.rotate(f.rot); ctx.fillStyle=f.col; ctx.beginPath(); ctx.ellipse(0,0,7,2.5,0,0,Math.PI*2); ctx.fill(); ctx.restore(); }
 
   const s=A.ship;
@@ -4409,23 +4418,21 @@ function drawAirHUD(){
   const wx=W-130, wy=40;
   if (A.weapon>0){
     drawWeaponIcon(wx,wy,A.weapon,A.t*1.4,.62);
-    const amax=A_WEAPONS[A.weapon].ammo, af=clamp(A.ammo/amax,0,1);
-    ctx.fillStyle="rgba(0,0,0,.4)"; ctx.beginPath(); ctx.roundRect(wx+18,wy-7,52,7,4); ctx.fill();
-    ctx.fillStyle=A_WEAPONS[A.weapon].col; ctx.beginPath(); ctx.roundRect(wx+18,wy-7,52*af,7,4); ctx.fill();
     ctx.textAlign="left"; ctx.font="600 9.5px Fredoka, system-ui, sans-serif"; ctx.fillStyle="rgba(255,255,255,.75)";
-    ctx.fillText(A_WEAPONS[A.weapon].name.toUpperCase(),wx+18,wy+9);
+    ctx.fillText(A_WEAPONS[A.weapon].name.toUpperCase(),wx+18,wy-4);
+    ctx.fillStyle="rgba(255,255,255,.5)"; ctx.fillText("until hit",wx+18,wy+10);
   } else {
     ctx.fillStyle="rgba(255,255,255,.28)"; ctx.beginPath(); ctx.ellipse(wx,wy,10,3,0,0,Math.PI*2); ctx.fill();
     ctx.textAlign="left"; ctx.font="600 9.5px Fredoka, system-ui, sans-serif"; ctx.fillStyle="rgba(255,255,255,.55)";
     ctx.fillText("BASIC SHOT",wx+18,wy+3);
   }
   ctx.textAlign="right"; ctx.font="600 9.5px Fredoka, system-ui, sans-serif"; ctx.fillStyle="rgba(255,255,255,.55)";
-  ctx.fillText(A.balls+" balls \u00b7 "+A.birds+" birds \u00b7 "+A.planes+" planes"+(A.cats?" \u00b7 "+A.cats+" cats":"")+(A.squirrel>0?"  \u00b7 x2 "+Math.ceil(A.squirrel)+"s":""), W-24, 74);
+  ctx.fillText(A.balls+" balls \u00b7 "+A.planes+" UFOs"+(A.cats?" \u00b7 "+A.cats+" cats":"")+(A.squirrel>0?"  \u00b7 x2 "+Math.ceil(A.squirrel)+"s":""), W-24, 74);
   if (!A.started){
     const pl=(Math.sin(A.pulse*2.2)+1)/2; ctx.globalAlpha=.6+pl*.4; ctx.textAlign="center";
     chunky(ctx, IS_TOUCH?"TAP TO TAKE OFF":"PRESS TO TAKE OFF",W/2,H-92,26,"#fff6c9","#12405c",700); ctx.globalAlpha=1;
     ctx.font="600 13px Fredoka, system-ui, sans-serif"; ctx.fillStyle="rgba(255,255,255,.85)";
-    ctx.fillText(IS_TOUCH?"left stick to fly  ·  FIRE to shoot":"fly with the d-pad, all four ways · button to shoot · grab bones, paws and balls for better guns", W/2, H-62);
+    ctx.fillText(IS_TOUCH?"stick to fly  ·  FIRE to shoot  ·  grab a missile":"d-pad flies all four ways · button shoots · grab a missile — it lasts until you get hit", W/2, H-62);
   }
 }
 
@@ -4436,46 +4443,69 @@ function inShieldGap(b, dx, dy){
   const g=b.gap;
   return Math.abs(a)<g || Math.abs(Math.abs(a)-Math.PI)<g;
 }
-function spawnBoss(){
-  if (!A || A.boss) return;
-  A.phase="boss";
-  A.boss={
-    x:W+180, y:310, hp:18, hpMax:18, ang:0, gap:.62,
-    beamT:2.6, beaming:0, spawnT:1.2, state:"enter", flash:0, crack:0
-  };
-  aToast("MOTHERSHIP!","#b6f23a",W/2,140);
-  try{ sfx.thunder(); }catch(e){}
-}
 function updateAliens(dt){
   const s=A.ship;
   for (const al of A.aliens){
     if (al.dead) continue;
-    al.ph+=dt*(al.kind==="drone"?3.1:2.2);
+    al.ph+=dt*(al.kind==="drone"||al.kind==="scout"?3.1:2.2);
     if (al.kind==="saucer"){ al.wx-=al.sp*dt; al.y=clamp(al.y0+Math.sin(al.ph)*20, A_TOP, A_BOT); }
     else if (al.kind==="drone"){ al.wx-=al.sp*dt; al.y=clamp(al.y0+Math.sin(al.ph)*al.amp, A_TOP, A_BOT); }
+    else if (al.kind==="disc"){ al.wx-=al.sp*dt; al.y=clamp(al.y0+Math.sin(al.ph*.7)*14, A_TOP, A_BOT); }
+    else if (al.kind==="scout"){ al.wx-=al.sp*dt; al.y=clamp(al.y0+Math.sin(al.ph*2.6)*al.amp*.55, A_TOP, A_BOT); }
     else {
       al.wx-=al.sp*dt;
       if (aX(al.wx)<W-20) al.y=lerp(al.y, s.y, dt*1.8);
     }
     const ax=aX(al.wx), ay=al.y;
-    const hitR = al.kind==="saucer"?34: al.kind==="dive"?30:24;
+    const hitR = al.kind==="disc"?44: al.kind==="saucer"?34: al.kind==="dive"?30: al.kind==="scout"?20:24;
+    al.fire=(al.fire||1.2)-dt;
+    if (al.fire<=0 && ax>s.x+90 && ax<W-20){
+      al.fire = al.kind==="disc"?1.05: al.kind==="drone"?1.3: al.kind==="scout"?1.55: al.kind==="dive"?0.85: 1.85;
+      if (al.kind==="disc"){
+        for (const vy of [-110, 0, 110]) A.eshots.push({ x:ax-20, y:ay, vx:-230, vy, life:2.6, r:8 });
+      } else {
+        A.eshots.push({ x:ax-18, y:ay, vx: al.kind==="scout"?-390:-270, vy:(s.y-ay)*.5, life:2.5, r:7 });
+      }
+      try{ sfx.shot(); }catch(e){}
+    }
     for (const sh of A.shots){
-      if (Math.abs(sh.x-ax)<hitR && Math.abs(sh.y-ay)<hitR*.7){
-        al.dead=true; sh.life=0;
+      const rr = sh.missile ? hitR+18 : hitR;
+      if (Math.abs(sh.x-ax)<rr && Math.abs(sh.y-ay)<rr*.75){
+        al.dead=true;
+        if (!sh.missile) sh.life=0;
         const pts=A_PTS[al.kind]||A_PTS.saucer;
-        aBurst(ax,ay,"#b6f23a",14,220);
+        aBurst(ax,ay,"#b6f23a", sh.missile?20:14, 220);
         sfx.pick("green");
-        aGain(pts,ax,ay,al.kind==="dive"?"dive-bomb!":al.kind,"#9be5ff");
+        aGain(pts,ax,ay,al.kind,"#9be5ff");
         A.planes++;
         break;
       }
     }
     if (!al.dead && Math.abs(ax-s.x)<hitR+8 && Math.abs(ay-s.y)<22){
       al.dead=true; aBurst(ax,ay,"#ffb347",12,180);
-      airHit(al.kind==="drone"?"drone bump!":"saucer bump!","plane");
+      airHit("ufo bump!","plane");
     }
   }
   A.aliens=A.aliens.filter(al=>!al.dead && aX(al.wx)>-90);
+}
+function spawnBoss(){
+  if (!A || A.boss) return;
+  A.phase="boss";
+  A.boss={
+    x:W+180, y:310, hp:18, hpMax:18, ang:0, gap:.62,
+    beamT:0, beaming:0, spawnT:2.2, state:"enter", flash:0, crack:0,
+    mode:"idle", atkT:.8, homeX:678, chargeDir:-1, volley:0
+  };
+  aToast("MOTHERSHIP!","#b6f23a",W/2,140);
+  try{ sfx.thunder(); }catch(e){}
+}
+function bossShoot(b,s){
+  const n=3;
+  for (let i=0;i<n;i++){
+    const spread=(i-(n-1)/2)*70;
+    A.eshots.push({ x:b.x-70, y:b.y+spread*.15, vx:-300, vy:(s.y-b.y)*.5+spread, life:2.8, r:10 });
+  }
+  try{ sfx.shot(); }catch(e){}
 }
 function updateBoss(dt){
   const b=A.boss; if (!b) return;
@@ -4484,7 +4514,7 @@ function updateBoss(dt){
   b.flash=Math.max(0,b.flash-dt);
   if (b.state==="enter"){
     b.x=lerp(b.x, 678, dt*1.4);
-    if (b.x<700) b.state="fight";
+    if (b.x<700){ b.state="fight"; b.mode="idle"; b.atkT=.6; b.homeX=678; }
     return;
   }
   if (b.state==="crack"){
@@ -4493,14 +4523,12 @@ function updateBoss(dt){
     if (b.crack>1.6){ A.running=false; openAirStory("end"); }
     return;
   }
-  b.y=clamp(b.y+Math.sin(A.t*1.1)*18*dt, A_TOP+70, A_BOT-70);
   b.spawnT-=dt;
   if (b.spawnT<=0){
-    b.spawnT=rand(1.6,2.6);
-    const kind=Math.random()<.5?"drone":"saucer";
-    A.aliens.push({ wx:A.scroll+(b.x-A_X)+20, y:b.y+rand(-40,40), y0:b.y, kind, dead:false, ph:rand(0,6), amp:50, sp:kind==="drone"?110:80 });
+    b.spawnT=rand(2.2,3.4);
+    const kind=Math.random()<.5?"drone":"scout";
+    A.aliens.push({ wx:A.scroll+(b.x-A_X)+20, y:b.y+rand(-40,40), y0:b.y, kind, dead:false, ph:rand(0,6), amp:50, sp:kind==="drone"?110:150, fire:.8 });
   }
-  b.beamT-=dt;
   if (b.beaming>0){
     b.beaming-=dt;
     const inBeam = s.x>b.x-310 && Math.abs(s.y-b.y)<54;
@@ -4509,25 +4537,52 @@ function updateBoss(dt){
       s.y=lerp(s.y, b.y, dt*1.2);
       if (Math.abs(s.x-b.x)<90 && s.inv<=0) airHit("tractor beam!","bump");
     }
-  } else if (b.beamT<=0){
-    b.beaming=1.15; b.beamT=3.2;
-    aToast("TRACTOR BEAM!","#b6f23a",b.x-80,b.y-70);
+  }
+  b.atkT-=dt;
+  if (b.mode==="idle"){
+    b.y=clamp(b.y+Math.sin(A.t*1.1)*22*dt, A_TOP+70, A_BOT-70);
+    b.x=lerp(b.x, b.homeX, dt*2);
+    if (b.atkT<=0){
+      const r=Math.random();
+      if (r<.38){ b.mode="shoot"; b.volley=4; b.atkT=.1; aToast("PLASMA!","#7cffc6",b.x-60,b.y-70); }
+      else if (r<.78){ b.mode="charge"; b.chargeDir=-1; b.atkT=1.7; b.volT=.2; aToast("LOOK OUT!","#ffcf3a",W/2,140); }
+      else { b.mode="beam"; b.beaming=1.2; b.atkT=1.25; aToast("TRACTOR BEAM!","#b6f23a",b.x-80,b.y-70); }
+    }
+  } else if (b.mode==="shoot"){
+    b.y=lerp(b.y, s.y, dt*1.6);
+    if (b.atkT<=0){
+      bossShoot(b,s);
+      b.volley--;
+      b.atkT = b.volley>0 ? .28 : 1.1;
+      if (b.volley<=0) b.mode="idle";
+    }
+  } else if (b.mode==="charge"){
+    b.x += b.chargeDir * 440 * dt;
+    b.y=lerp(b.y, s.y, dt*2.4);
+    b.volT=(b.volT||0)-dt;
+    if (b.volT<=0){ bossShoot(b,s); b.volT=.4; }
+    if (b.chargeDir<0 && b.x<48){ b.chargeDir=1; }
+    if (b.chargeDir>0 && b.x>b.homeX-8){ b.x=b.homeX; b.mode="idle"; b.atkT=.6; }
+    if (Math.abs(b.x-s.x)<74 && Math.abs(b.y-s.y)<44 && s.inv<=0) airHit("mothership rush!","plane");
+  } else if (b.mode==="beam"){
+    if (b.atkT<=0){ b.mode="idle"; b.atkT=.8; }
   }
   for (const sh of A.shots){
     const dx=sh.x-b.x, dy=sh.y-b.y, d=Math.hypot(dx,dy);
-    if (d>118 || d<8) continue;
-    if (d>62 && !inShieldGap(b,dx,dy)){
+    const ring=sh.missile?130:118, hull=sh.missile?74:62;
+    if (d>ring || d<8) continue;
+    if (d>hull && !inShieldGap(b,dx,dy)){
       sh.life=0;
       aBurst(sh.x,sh.y,"#7cffc6",6,90);
       continue;
     }
-    if (d<=62){
+    if (d<=hull){
       sh.life=0;
-      b.hp--; b.flash=.18;
+      b.hp -= sh.missile?3:1; b.flash=.18;
       aBurst(b.x-30,b.y,"#fff6c9",10,160);
       sfx.bark();
       if (b.hp<=0){
-        b.hp=0; b.state="crack"; b.crack=0;
+        b.hp=0; b.state="crack"; b.crack=0; b.mode="idle";
         aBurst(b.x,b.y,"#b6f23a",36,280);
         aBurst(b.x,b.y,"#fff6c9",24,220);
         aGain(A_PTS.mothership,b.x,b.y,"RESCUE!","#c9f24d");
@@ -4539,13 +4594,14 @@ function updateBoss(dt){
 function drawAlien(al){
   const x=aX(al.wx), y=al.y;
   if (x<-80||x>W+80) return;
-  const key=al.kind==="drone"?"drone": al.kind==="dive"?"diver":"saucer";
-  const sz=al.kind==="drone"?[46,46]: al.kind==="dive"?[70,48]:[78,46];
+  const key=al.kind==="drone"?"drone": al.kind==="dive"?"diver": al.kind==="disc"?"disc": al.kind==="scout"?"scout":"saucer";
+  const sz=al.kind==="drone"?[46,46]: al.kind==="dive"?[70,48]: al.kind==="disc"?[96,62]: al.kind==="scout"?[36,34]:[78,46];
   if (!drawSprC(key,x,y,sz[0],sz[1], al.kind==="dive"?Math.atan2(A.ship.y-y,-40)*.4:0)){
-    ctx.fillStyle=al.kind==="drone"?"#7a4ab0":"#8fd11f";
+    ctx.fillStyle=al.kind==="drone"?"#7a4ab0": al.kind==="disc"?"#ff8c2e":"#8fd11f";
     ctx.beginPath(); ctx.ellipse(x,y,sz[0]/2,sz[1]/3,0,0,Math.PI*2); ctx.fill();
   }
 }
+
 function drawBoss(){
   const b=A.boss; if (!b) return;
   if (b.beaming>0){
@@ -4639,7 +4695,7 @@ function finishAirWin(){
   document.getElementById("overTitle").textContent="You Saved Them!";
   document.getElementById("finalLine").textContent =
     "Nic and Giulia are home. Score "+(A?A.score:0)+": "+(A?A.balls:0)+" balls, "+
-    (A?A.birds:0)+" birds, "+(A?A.planes:0)+" ships"+(A&&A.cats?", "+A.cats+" cat balloons":"")+
+    (A?A.planes:0)+" UFOs"+(A&&A.cats?", "+A.cats+" cat balloons":"")+
     ". "+(newBest?"New best rescue.":"Best so far: "+(A?A.best:0)+".");
   hideAll(); over.classList.add("on");
 }
@@ -4761,6 +4817,7 @@ function startPaddle(){
 function openAir(){
   hideAll(); airEl.classList.add("on"); setMark("air");
   MODE="air";
+  lastPlanePick="";
   if (!A){ A=newAir(0); loadABest(); }
   A.running=false; drawAir();
 }
@@ -4776,6 +4833,13 @@ function setPlane(t){
     if (shot){ shot.style.opacity="0"; setTimeout(()=>{ shot.style.opacity="1"; }, 70); }
   }
   updateStar();
+}
+let lastPlanePick="";
+function pickPlane(t){
+  const same = lastPlanePick===t && A_PLANE===t;
+  setPlane(t);
+  lastPlanePick=t;
+  if (same) startAir();
 }
 function updateStar(){
   const img=document.getElementById("starPic");
@@ -4860,9 +4924,9 @@ document.getElementById("pickAir").addEventListener("click",openAir);
 document.getElementById("airStartBtn").addEventListener("click",startAir);
 document.getElementById("storyNext").addEventListener("click",storyAdvance);
 document.getElementById("airstory").addEventListener("click",e=>{ if (e.target.id==="storyNext"||e.target.closest(".play")) return; storyAdvance(); });
-document.getElementById("airBiplane").addEventListener("click",()=>setPlane("biplane"));
+document.getElementById("airBiplane").addEventListener("click",()=>pickPlane("biplane"));
 document.getElementById("airBiplane").addEventListener("mouseenter",()=>setPlane("biplane"));
-document.getElementById("airJet").addEventListener("click",()=>setPlane("jet"));
+document.getElementById("airJet").addEventListener("click",()=>pickPlane("jet"));
 document.getElementById("airJet").addEventListener("mouseenter",()=>setPlane("jet"));
 document.getElementById("pauseBtn").addEventListener("click",togglePause);
 document.getElementById("pauseResume").addEventListener("click",resumeGame);
@@ -4981,5 +5045,13 @@ setMark("home");
 refreshBests();
 draw();
 requestAnimationFrame(frame);
-window.__BA={ spawn(){ if(A) spawnBoss(); }, go(n){ if(A){ A.scroll=n; A.started=true; A.running=true; } } };
+window.__BA={
+  spawn(){ if(A) spawnBoss(); },
+  go(n){ if(A){ A.scroll=n; A.started=true; A.running=true; } },
+  plane(){ return A_PLANE; },
+  god(){ if(A&&A.ship){ A.ship.inv=99; A.lives=3; } },
+  setW(n){ if(A) A.weapon=n|0; },
+  hit(){ if(A) airHit("test hit","plane"); },
+  state(){ return A?{weapon:A.weapon,lives:A.lives,phase:A.phase,started:!!A.started,scroll:Math.round(A.scroll),aliens:A.aliens.length,eshots:A.eshots.length,boss:A.boss&&A.boss.mode,hp:A.boss&&A.boss.hp,kinds:(A.aliens||[]).map(a=>a.kind)}:null; }
+};
 })();
