@@ -3137,7 +3137,7 @@ function drawFlapHUD(){
 }
 
 // ================================================================
-//  PADDLE OUT  —  Giulia or Nic, a board, and a dog who won't sit still
+//  PADDLE OUT  —  Giulia or Nick, a board, and a dog who won't sit still
 // ================================================================
 const P_LEN     = 9600;        // stage length before the boat shows up
 const P_TOP     = 210, P_BOT = 616;   // swimmable water band
@@ -3234,7 +3234,7 @@ function pFinish(){
   over.classList.remove("won","lost"); over.classList.add("won");
   document.getElementById("overShot").style.backgroundImage="var(--ph-paddle)";
   document.getElementById("overTitle").textContent="You made the boat!";
-  const who=P_CHAR==="giulia"?"Giulia":"Nic";
+  const who=P_CHAR==="giulia"?"Giulia":"Nick";
   document.getElementById("finalLine").textContent =
     who+" paddled the whole way and brought back "+P.balls+" balls for "+P.score+" points"+
     (P.bumps ? ", fishing Bernard out of the water "+P.bumps+(P.bumps===1?" time":" times") : " without dunking Bernard once")+
@@ -4492,29 +4492,50 @@ function spawnBoss(){
   if (!A || A.boss) return;
   A.phase="boss";
   A.boss={
-    x:W+180, y:310, hp:18, hpMax:18, ang:0, gap:.62,
-    beamT:0, beaming:0, spawnT:2.2, state:"enter", flash:0, crack:0,
-    mode:"idle", atkT:.8, homeX:678, chargeDir:-1, volley:0
+    x:W+180, y:310, hp:22, hpMax:22, ang:0, gap:.62,
+    beamT:0, beaming:0, spawnT:2.6, state:"enter", flash:0, crack:0,
+    mode:"idle", atkT:.8, homeX:678, chargeDir:-1, volley:0, stage:1, volT:0
   };
   aToast("MOTHERSHIP!","#b6f23a",W/2,140);
   try{ sfx.thunder(); }catch(e){}
 }
 function bossShoot(b,s){
-  const n=3;
+  const broken=b.stage===2;
+  const n=broken?1:2;
+  const spd=broken?-150:-210;
   for (let i=0;i<n;i++){
-    const spread=(i-(n-1)/2)*70;
-    A.eshots.push({ x:b.x-70, y:b.y+spread*.15, vx:-300, vy:(s.y-b.y)*.5+spread, life:2.8, r:10 });
+    const spread=n===1?0:(i-(n-1)/2)*48;
+    A.eshots.push({ x:b.x-70, y:b.y+spread*.12, vx:spd, vy:(s.y-b.y)*.22+spread, life:2.4, r:9 });
   }
   try{ sfx.shot(); }catch(e){}
+}
+function bossBreakDown(b){
+  if (b.stage===2 || b.state==="crack") return;
+  b.stage=2;
+  b.mode="idle";
+  b.atkT=1.5;
+  b.beaming=0;
+  b.gap=.88;
+  b.chargeDir=1;
+  aToast("BREAKING DOWN!","#ff8c2e",W/2,140);
+  if (!REDUCED) A.shake=12;
+  aBurst(b.x,b.y,"#ff8c2e",28,240);
+  aBurst(b.x,b.y,"#8a8a8a",18,140);
+  try{ sfx.thunder(); }catch(e){}
 }
 function updateBoss(dt){
   const b=A.boss; if (!b) return;
   const s=A.ship;
-  b.ang+=dt*1.05;
+  const broken=b.stage===2;
+  b.ang+=dt*(broken?.45:1.05);
   b.flash=Math.max(0,b.flash-dt);
+  if (broken && Math.random()<dt*10){
+    A.particles.push({ x:b.x+rand(-50,40), y:b.y+rand(-28,18), vx:rand(-24,16), vy:rand(-70,-12),
+      life:rand(.5,1.1), color:Math.random()<.4?"#ff8c2e":"#7a7a7a", r:rand(3,8) });
+  }
   if (b.state==="enter"){
     b.x=lerp(b.x, 678, dt*1.4);
-    if (b.x<700){ b.state="fight"; b.mode="idle"; b.atkT=.6; b.homeX=678; }
+    if (b.x<700){ b.state="fight"; b.mode="idle"; b.atkT=.8; b.homeX=678; }
     return;
   }
   if (b.state==="crack"){
@@ -4525,47 +4546,52 @@ function updateBoss(dt){
   }
   b.spawnT-=dt;
   if (b.spawnT<=0){
-    b.spawnT=rand(2.2,3.4);
+    b.spawnT=broken?rand(4.2,6):rand(3.2,4.8);
     const kind=Math.random()<.5?"drone":"scout";
-    A.aliens.push({ wx:A.scroll+(b.x-A_X)+20, y:b.y+rand(-40,40), y0:b.y, kind, dead:false, ph:rand(0,6), amp:50, sp:kind==="drone"?110:150, fire:.8 });
+    A.aliens.push({ wx:A.scroll+(b.x-A_X)+20, y:b.y+rand(-40,40), y0:b.y, kind, dead:false, ph:rand(0,6), amp:50, sp:kind==="drone"?80:110, fire:1.2 });
   }
   if (b.beaming>0){
     b.beaming-=dt;
     const inBeam = s.x>b.x-310 && Math.abs(s.y-b.y)<54;
     if (inBeam){
-      s.x=clamp(s.x+210*dt, A_XMIN, A_XMAX);
-      s.y=lerp(s.y, b.y, dt*1.2);
+      s.x=clamp(s.x+(broken?120:180)*dt, A_XMIN, A_XMAX);
+      s.y=lerp(s.y, b.y, dt*(broken?.7:1.1));
       if (Math.abs(s.x-b.x)<90 && s.inv<=0) airHit("tractor beam!","bump");
     }
   }
   b.atkT-=dt;
   if (b.mode==="idle"){
-    b.y=clamp(b.y+Math.sin(A.t*1.1)*22*dt, A_TOP+70, A_BOT-70);
-    b.x=lerp(b.x, b.homeX, dt*2);
+    const bob=broken?8:22;
+    b.y=clamp(b.y+Math.sin(A.t*(broken?.6:1.1))*bob*dt, A_TOP+70, A_BOT-70);
+    b.x=lerp(b.x, b.homeX, dt*(broken?.8:2));
     if (b.atkT<=0){
       const r=Math.random();
-      if (r<.38){ b.mode="shoot"; b.volley=4; b.atkT=.1; aToast("PLASMA!","#7cffc6",b.x-60,b.y-70); }
-      else if (r<.78){ b.mode="charge"; b.chargeDir=-1; b.atkT=1.7; b.volT=.2; aToast("LOOK OUT!","#ffcf3a",W/2,140); }
-      else { b.mode="beam"; b.beaming=1.2; b.atkT=1.25; aToast("TRACTOR BEAM!","#b6f23a",b.x-80,b.y-70); }
+      if (broken){
+        if (r<.7){ b.mode="shoot"; b.volley=1; b.atkT=.2; aToast("PLASMA!","#7cffc6",b.x-60,b.y-70); }
+        else { b.mode="beam"; b.beaming=1.0; b.atkT=1.4; aToast("TRACTOR BEAM!","#b6f23a",b.x-80,b.y-70); }
+      } else {
+        if (r<.46){ b.mode="shoot"; b.volley=2; b.atkT=.18; aToast("PLASMA!","#7cffc6",b.x-60,b.y-70); }
+        else if (r<.8){ b.mode="charge"; b.chargeDir=-1; b.atkT=1.7; aToast("LOOK OUT!","#ffcf3a",W/2,140); }
+        else { b.mode="beam"; b.beaming=1.1; b.atkT=1.3; aToast("TRACTOR BEAM!","#b6f23a",b.x-80,b.y-70); }
+      }
     }
   } else if (b.mode==="shoot"){
-    b.y=lerp(b.y, s.y, dt*1.6);
+    b.y=lerp(b.y, s.y, dt*(broken?.7:1.2));
     if (b.atkT<=0){
       bossShoot(b,s);
       b.volley--;
-      b.atkT = b.volley>0 ? .28 : 1.1;
+      b.atkT = b.volley>0 ? .55 : (broken?1.8:1.35);
       if (b.volley<=0) b.mode="idle";
     }
   } else if (b.mode==="charge"){
-    b.x += b.chargeDir * 440 * dt;
-    b.y=lerp(b.y, s.y, dt*2.4);
-    b.volT=(b.volT||0)-dt;
-    if (b.volT<=0){ bossShoot(b,s); b.volT=.4; }
+    const spd=broken?180:340;
+    b.x += b.chargeDir * spd * dt;
+    b.y=lerp(b.y, s.y, dt*(broken?.9:1.6));
     if (b.chargeDir<0 && b.x<48){ b.chargeDir=1; }
-    if (b.chargeDir>0 && b.x>b.homeX-8){ b.x=b.homeX; b.mode="idle"; b.atkT=.6; }
+    if (b.chargeDir>0 && b.x>b.homeX-8){ b.x=b.homeX; b.mode="idle"; b.atkT=broken?1.4:.9; }
     if (Math.abs(b.x-s.x)<74 && Math.abs(b.y-s.y)<44 && s.inv<=0) airHit("mothership rush!","plane");
   } else if (b.mode==="beam"){
-    if (b.atkT<=0){ b.mode="idle"; b.atkT=.8; }
+    if (b.atkT<=0){ b.mode="idle"; b.atkT=broken?1.2:.9; }
   }
   for (const sh of A.shots){
     const dx=sh.x-b.x, dy=sh.y-b.y, d=Math.hypot(dx,dy);
@@ -4581,6 +4607,7 @@ function updateBoss(dt){
       b.hp -= sh.missile?3:1; b.flash=.18;
       aBurst(b.x-30,b.y,"#fff6c9",10,160);
       sfx.bark();
+      if (b.hp>0 && b.hp<=10) bossBreakDown(b);
       if (b.hp<=0){
         b.hp=0; b.state="crack"; b.crack=0; b.mode="idle";
         aBurst(b.x,b.y,"#b6f23a",36,280);
@@ -4621,15 +4648,25 @@ function drawBoss(){
   ctx.save();
   if (b.flash>0) ctx.globalAlpha=.65+b.flash;
   if (b.state==="crack") ctx.globalAlpha=Math.max(.3,1-b.crack*.5);
+  if (b.stage===2 && b.state!=="crack"){
+    ctx.translate(Math.sin(A.t*11)*2.2, Math.sin(A.t*7)*1.6);
+    ctx.rotate(Math.sin(A.t*3)*.03);
+  }
   if (!drawSprC("mothership", b.x, b.y, 248, 168, 0)){
     ctx.fillStyle="#6fd080"; ctx.beginPath(); ctx.ellipse(b.x,b.y,110,56,0,0,Math.PI*2); ctx.fill();
+  }
+  if (b.stage===2 && b.state!=="crack"){
+    ctx.globalCompositeOperation="multiply";
+    ctx.fillStyle="rgba(90,40,20,.28)";
+    ctx.beginPath(); ctx.ellipse(b.x, b.y, 118, 72, 0, 0, Math.PI*2); ctx.fill();
+    ctx.globalCompositeOperation="source-over";
   }
   ctx.restore();
   // rotating shield with two gaps
   ctx.save();
   ctx.translate(b.x,b.y); ctx.rotate(b.ang);
-  ctx.strokeStyle="rgba(120,255,190,.9)"; ctx.lineWidth=8; ctx.lineCap="butt";
-  ctx.shadowColor="#7cffc6"; ctx.shadowBlur=12;
+  ctx.strokeStyle=b.stage===2?"rgba(255,140,60,.85)":"rgba(120,255,190,.9)"; ctx.lineWidth=b.stage===2?5:8; ctx.lineCap="butt";
+  ctx.shadowColor=b.stage===2?"#ff8c2e":"#7cffc6"; ctx.shadowBlur=12;
   ctx.beginPath(); ctx.arc(0,0,96, b.gap, Math.PI-b.gap); ctx.stroke();
   ctx.beginPath(); ctx.arc(0,0,96, Math.PI+b.gap, Math.PI*2-b.gap); ctx.stroke();
   ctx.restore();
@@ -4639,18 +4676,18 @@ function drawBoss(){
   ctx.fillStyle="#3a1a20"; ctx.beginPath(); ctx.roundRect(bx,by-3,bw,8,4); ctx.fill();
   ctx.fillStyle="#c9f24d"; ctx.beginPath(); ctx.roundRect(bx,by-3,bw*(b.hp/b.hpMax),8,4); ctx.fill();
   ctx.textAlign="center"; ctx.font="700 11px Fredoka, system-ui, sans-serif";
-  ctx.fillStyle="#fff6c9"; ctx.fillText(b.state==="crack"?"POD OPEN!":"MOTHERSHIP", W/2, by-16);
+  ctx.fillStyle="#fff6c9"; ctx.fillText(b.state==="crack"?"POD OPEN!": b.stage===2?"BREAKING DOWN":"MOTHERSHIP", W/2, by-16);
 }
 
 const AIR_INTRO=[
-  { img:"/art/story-1.jpg", kicker:"Saturday", line:"Nic and Giulia were just playing in the yard." },
+  { img:"/art/story-1.jpg", kicker:"Saturday", line:"Nick and Giulia were just playing in the yard." },
   { img:"/art/story-2.jpg", kicker:"Uh-oh", line:"A UFO scooped them up in a sparkly beam!" },
-  { img:"/art/story-3.jpg", kicker:"Bernard", line:"He grabbed his goggles. Nobody takes his kids." }
+  { img:"/art/story-3.jpg", kicker:"Bernard", line:"He grabbed his goggles. Nobody takes his cousins." }
 ];
 const AIR_END=[
-  { img:"/art/story-end-1.jpg", kicker:"Gotcha", line:"He cracked the pod. Nic and Giulia were free." },
+  { img:"/art/story-end-1.jpg", kicker:"Gotcha", line:"He cracked the pod. Nick and Giulia were free." },
   { img:"/art/story-end-2.jpg", kicker:"Home", line:"The three of them flew home under the big sky." },
-  { img:"/art/story-end-3.jpg", kicker:"You saved them!", line:"Bernard brought everyone home." }
+  { img:"/art/story-end-3.jpg", kicker:"You saved them!", line:"Bernard brought his cousins home." }
 ];
 let STORY=null;
 function openAirStory(kind){
@@ -4694,7 +4731,7 @@ function finishAirWin(){
   document.getElementById("overShot").style.backgroundImage="url('/art/story-end-3.jpg')";
   document.getElementById("overTitle").textContent="You Saved Them!";
   document.getElementById("finalLine").textContent =
-    "Nic and Giulia are home. Score "+(A?A.score:0)+": "+(A?A.balls:0)+" balls, "+
+    "Nick and Giulia are home. Score "+(A?A.score:0)+": "+(A?A.balls:0)+" balls, "+
     (A?A.planes:0)+" UFOs"+(A&&A.cats?", "+A.cats+" cat balloons":"")+
     ". "+(newBest?"New best rescue.":"Best so far: "+(A?A.best:0)+".");
   hideAll(); over.classList.add("on");
@@ -4738,7 +4775,7 @@ const MARKS={
   ballies:["Ballies with","BERNARD"],
   tita:  ["Tita","SCOLDER"],
   flap:  ["Bernardy","FLAP"],
-  paddle:["Giulia & Nic","PADDLE"],
+  paddle:["Giulia & Nick","PADDLE"],
   air:   ["Flying with","BERNARD"]
 };
 function setMark(which){
@@ -5052,6 +5089,7 @@ window.__BA={
   god(){ if(A&&A.ship){ A.ship.inv=99; A.lives=3; } },
   setW(n){ if(A) A.weapon=n|0; },
   hit(){ if(A) airHit("test hit","plane"); },
-  state(){ return A?{weapon:A.weapon,lives:A.lives,phase:A.phase,started:!!A.started,scroll:Math.round(A.scroll),aliens:A.aliens.length,eshots:A.eshots.length,boss:A.boss&&A.boss.mode,hp:A.boss&&A.boss.hp,kinds:(A.aliens||[]).map(a=>a.kind)}:null; }
+  hurt(n){ if(A&&A.boss){ A.boss.hp=Math.max(0,A.boss.hp-(n||1)); if(A.boss.hp>0 && A.boss.hp<=10) bossBreakDown(A.boss); if(A.boss.hp<=0){ A.boss.hp=0; A.boss.state="crack"; A.boss.crack=0; } } },
+  state(){ return A?{weapon:A.weapon,lives:A.lives,phase:A.phase,started:!!A.started,scroll:Math.round(A.scroll),aliens:A.aliens.length,eshots:A.eshots.length,boss:A.boss&&A.boss.mode,hp:A.boss&&A.boss.hp,stage:A.boss&&A.boss.stage,kinds:(A.aliens||[]).map(a=>a.kind)}:null; }
 };
 })();
