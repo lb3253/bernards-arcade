@@ -52,6 +52,13 @@ loadSpr("hopNic","/art/spr-hop-nic.png");
 loadSpr("hopGiulia","/art/spr-hop-giulia.png");
 loadSpr("hopBernard","/art/spr-hop-bernard.png");
 loadSpr("hopSwim","/art/spr-hop-swim.png");
+loadSpr("hopNicHop","/art/spr-hop-nic-hop.png");
+loadSpr("hopGiuliaHop","/art/spr-hop-giulia-hop.png");
+loadSpr("hopGrass0","/art/spr-hop-grass0.png");
+loadSpr("hopGrass1","/art/spr-hop-grass1.png");
+loadSpr("hopGrass2","/art/spr-hop-grass2.png");
+loadSpr("hopRoad","/art/spr-hop-road.png");
+loadSpr("hopWater","/art/spr-hop-water.png");
 loadSpr("hopCarRed","/art/spr-hop-car-red.png");
 loadSpr("hopCarYel","/art/spr-hop-car-yel.png");
 loadSpr("hopCarBlu","/art/spr-hop-car-blu.png");
@@ -6976,10 +6983,50 @@ function bakeHopAtlas(){
   H_ATLAS_READY = true;
 }
 
+function hBlitActor(name, x, yFeet, height, flip, sx, sy){
+  if (!sprReady(name)) return false;
+  const im=SPR[name];
+  const hh=height*(sy||1);
+  const ww=hh*(im.naturalWidth/Math.max(1,im.naturalHeight))*(sx||1);
+  drawDrop(x, yFeet+5, Math.max(10, ww*0.28), 6);
+  drawSprC(name, x, yFeet - hh*0.46, ww, hh, 0, flip);
+  return true;
+}
+
 function hDrawTile(c,r,lane){
-  bakeHopAtlas();
   const p=hIso(c,r);
-  let name;
+  const tw=H_TW, th=H_TH-2, sk=H_SKEW;
+  let fill="#5aaa32", fill2="#3e7a20";
+  if (lane.type==="street"){ fill="#5a5a64"; fill2="#2e2e36"; }
+  else if (lane.type==="water"){ fill="#2aa0c8"; fill2="#0e5878"; }
+  else if (lane.type==="yard"){ fill="#6ec43c"; fill2="#3e8a1c"; }
+  ctx.beginPath();
+  ctx.moveTo(p.x-tw/2+sk, p.y-th/2);
+  ctx.lineTo(p.x+tw/2+sk, p.y-th/2);
+  ctx.lineTo(p.x+tw/2,     p.y+th/2);
+  ctx.lineTo(p.x-tw/2,     p.y+th/2);
+  ctx.closePath();
+  ctx.fillStyle=fill; ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(p.x-tw/2, p.y+th/2);
+  ctx.lineTo(p.x+tw/2, p.y+th/2);
+  ctx.lineTo(p.x+tw/2, p.y+th/2+H_LIP);
+  ctx.lineTo(p.x-tw/2, p.y+th/2+H_LIP);
+  ctx.closePath();
+  ctx.fillStyle=fill2; ctx.fill();
+  let name=null;
+  if (lane.type==="street" && sprReady("hopRoad")) name="hopRoad";
+  else if (lane.type==="water" && sprReady("hopWater")) name="hopWater";
+  else if (sprReady("hopGrass0")){
+    const v=((c+r*3)%3+3)%3;
+    name = v===1&&sprReady("hopGrass1") ? "hopGrass1" : v===2&&sprReady("hopGrass2") ? "hopGrass2" : "hopGrass0";
+    if (lane.type==="yard" && sprReady("hopGrass1")) name="hopGrass1";
+  }
+  if (name && sprReady(name)){
+    drawSprC(name, p.x, p.y+8, 188, 136);
+    return;
+  }
+  bakeHopAtlas();
   if (lane.type==="street") name="road_"+(c%2);
   else if (lane.type==="water") name="water_"+(((Math.floor(LH.t*3+r+c))%4+4)%4);
   else if (lane.type==="yard") name="yard_"+(c%2);
@@ -6987,32 +7034,66 @@ function hDrawTile(c,r,lane){
   hBlit(name, p.x, p.y, false);
 }
 function hDrawTree(x,y,variant){
+  if (sprReady("hopTree")){
+    const s = 0.92 + (variant%3)*0.08;
+    drawSprC("hopTree", x, y-58*s, 92*s, 128*s);
+    return;
+  }
   bakeHopAtlas();
   hBlit("tree_"+(variant%3), x, y, false);
 }
 function hDrawSprinklerArt(x,y,on,t,ph){
+  if (sprReady("hopSprinkler")){
+    drawSprC("hopSprinkler", x, y-18, 48, 56);
+    if (on){
+      bakeHopAtlas();
+      hBlit("spray_"+(Math.floor(t*8+ph)%3), x, y-6, false);
+    }
+    return;
+  }
   bakeHopAtlas();
   hBlit("sprinkler", x, y, false);
   if (on) hBlit("spray_"+(Math.floor(t*8+ph)%3), x, y-6, false);
 }
 function hDrawFloatArt(f,x,y){
-  bakeHopAtlas();
   const bob=Math.sin(f.bob)*4;
+  const map={pad:"hopPad", ring:"hopRing", duck:"hopDuck"};
+  const n=map[f.kind]||"hopPad";
+  if (sprReady(n)){
+    const hh = f.kind==="duck"?54:46;
+    const ww = f.kind==="duck"?70:64;
+    drawSprC(n, x, y-10+bob, ww, hh);
+    return;
+  }
+  bakeHopAtlas();
   hBlit("toy_"+(f.kind||"pad"), x, y+bob, false);
 }
 function hDrawCarArt(car,x,y){
+  const names=["hopCarRed","hopCarYel","hopCarBlu","hopCarGrn"];
+  const n=names[(car.palI||0)%names.length];
+  if (sprReady(n)){
+    drawSprC(n, x, y-16, 118, 72, 0, car.dir<0);
+    return;
+  }
   bakeHopAtlas();
   const kind=car.kind||"sedan";
   const pal=car.palI!=null?car.palI:0;
   hBlit("car_"+kind+"_"+pal, x, y+2, car.dir<0);
 }
 function hDrawPickupArt(pk,x,y){
-  bakeHopAtlas();
   const bob=Math.sin(LH.t*4+pk.bob)*5;
+  const n=pk.kind==="ball"?"hopBall":"hopBone";
+  if (sprReady(n)){
+    drawSprC(n, x, y-18+bob, 34, 34);
+    return;
+  }
+  bakeHopAtlas();
   hBlit(pk.kind==="ball"?"ball":"bone", x, y-8+bob, false);
 }
 
 function hDrawBernard(x,y,flip,sx,sy,swim,t){
+  const name = swim && sprReady("hopSwim") ? "hopSwim" : "hopBernard";
+  if (hBlitActor(name, x, y+4, swim?58:72, flip, sx, sy)) return;
   ctx.save();
   ctx.translate(x,y);
   ctx.scale(flip?-1:1, 1);
@@ -7067,6 +7148,11 @@ function hDrawPaw(x,y,s){
   ctx.restore();
 }
 function hDrawKidArt(x,y,flip,sx,sy,girl,hopU){
+  const hopping = hopU>0.12 && hopU<0.88;
+  const name = girl
+    ? (hopping && sprReady("hopGiuliaHop") ? "hopGiuliaHop" : "hopGiulia")
+    : (hopping && sprReady("hopNicHop") ? "hopNicHop" : "hopNic");
+  if (hBlitActor(name, x, y+4, hopping?108:100, flip, sx, sy)) return;
   ctx.save();
   ctx.translate(x,y);
   ctx.scale(flip?-1:1, 1);
