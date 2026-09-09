@@ -231,6 +231,7 @@ function chunky(c,txt,x,y,size,fill,stroke,weight){
 
 // ---------------------------------------------------------------- audio
 let audioOn=true, glare=true, ac=null;
+const ARCADE_FLASH = {flap:false, hop:false, air:false};
 function beep(f,dur,type,vol){
   if (!audioOn) return;
   try{
@@ -259,6 +260,8 @@ const sfx={
   thunder:()=>{beep(70,.28,"sawtooth",.07);setTimeout(()=>beep(52,.4,"sawtooth",.06),120);},
   splash:()=>{beep(180,.16,"sawtooth",.05);setTimeout(()=>beep(120,.22,"sine",.045),80);},
   gate:  ()=>{beep(700,.07,"square",.04);setTimeout(()=>beep(940,.09,"square",.04),70);},
+  carBlip:()=>{ beep(740,.045,"square",.035); setTimeout(()=>beep(980,.05,"square",.03),40); },
+  carGo:()=>{ beep(160,.1,"square",.07); setTimeout(()=>beep(240,.12,"sawtooth",.055),70); setTimeout(()=>beep(420,.16,"square",.045),150); },
   win:   ()=>{ [523,659,784,1047,1319].forEach((f,i)=>setTimeout(()=>beep(f,.26,"square",.05),i*120)); }
 };
 
@@ -328,7 +331,10 @@ function uiList(){ return GP_ITEMS[gpScreen()]||null; }
 // this has to happen for keyboard users too, not just when a pad is plugged in
 function uiSync(){
   const scr=gpScreen();
-  if (scr!==GP.lastScreen){ GP.lastScreen=scr; GP.focus=0; }
+  if (scr!==GP.lastScreen){
+    GP.lastScreen=scr;
+    GP.focus = (scr==="home") ? CAR.index : 0;
+  }
 }
 function gpApplyFocus(){
   uiSync();
@@ -343,6 +349,11 @@ function gpApplyFocus(){
   else if (el && el.id==="airBiplane") setPlane("biplane");
 }
 function uiNav(stepBy){
+  if (gpScreen()==="home"){
+    UI_FOCUS=true;
+    carouselNudge(stepBy>0?1:-1);
+    return;
+  }
   uiSync();
   const list=uiList(); if (!list) return;
   const first=!UI_FOCUS;
@@ -352,6 +363,10 @@ function uiNav(stepBy){
   try{ beep(660,.05,"square",.03); }catch(e){}
 }
 function uiActivate(){
+  if (gpScreen()==="home"){
+    carouselLaunch();
+    return;
+  }
   uiSync();
   const list=uiList(); if (!list) return;
   UI_FOCUS=true;
@@ -374,6 +389,299 @@ function uiActivate(){
   gpApplyFocus();
 }
 function uiBack(){ const sc=gpScreen(); if (sc==="pause") resumeGame(); else if (sc!=="home") goHome(); }
+
+// ---------------------------------------------------------------- lobby carousel
+const CAR = {
+  items:["pickFlap","pickHop","pickAir"],
+  flashKey:{pickFlap:"flap", pickHop:"hop", pickAir:"air"},
+  spill:{pickFlap:"rgba(80,190,255,.32)", pickHop:"rgba(110,220,90,.30)", pickAir:"rgba(255,90,160,.32)"},
+  index:0, pos:0, vel:0, target:0, bounce:0,
+  tiltX:0, tiltY:0, wantTiltX:0, wantTiltY:0,
+  drag:null, lastIdx:-1, chaseT:0, ready:false
+};
+let menuHum=null;
+
+function carouselN(){ return CAR.items.length; }
+function carouselWrapD(i, pos){
+  const n=carouselN();
+  let d=i-pos;
+  d -= n*Math.round(d/n);
+  return d;
+}
+function carouselGo(i, silent){
+  const n=carouselN();
+  if (!n) return;
+  let dest=i;
+  // pick nearest wrapping target from current pos
+  const cur=CAR.pos;
+  let best=dest, bd=1e9;
+  for (const k of [dest-n, dest, dest+n]){
+    const dd=Math.abs(k-cur);
+    if (dd<bd){ bd=dd; best=k; }
+  }
+  CAR.target=best;
+  if (!silent) sfx.carBlip();
+}
+function carouselNudge(dir){
+  CAR.target = Math.round(CAR.target) + dir;
+  sfx.carBlip();
+}
+function carouselLaunch(){
+  const id=CAR.items[CAR.index];
+  if (!id) return;
+  const which=CAR.flashKey[id];
+  if (which) ARCADE_FLASH[which]=false;
+  sfx.carGo();
+  menuHumStop();
+  if (id==="pickFlap") openFlap();
+  else if (id==="pickHop") openHop();
+  else if (id==="pickAir") openAir();
+}
+function carouselOnClick(id){
+  const i=CAR.items.indexOf(id);
+  if (i<0) return;
+  if (CAR.drag && CAR.drag.moved) return;
+  if (i===CAR.index && Math.abs(CAR.pos-CAR.target)<0.12) carouselLaunch();
+  else carouselGo(i);
+}
+function carouselSyncFocus(){
+  const n=carouselN();
+  CAR.index=((Math.round(CAR.pos)%n)+n)%n;
+  GP.focus=CAR.index;
+  UI_FOCUS=true;
+  if (CAR.index!==CAR.lastIdx){
+    CAR.lastIdx=CAR.index;
+    CAR.bounce=1;
+    gpClearFocus();
+    const el=document.getElementById(CAR.items[CAR.index]);
+    if (el) el.classList.add("gp-focus");
+    updateStar();
+    const spill=document.getElementById("homeSpill");
+    if (spill) spill.style.background="radial-gradient(ellipse at center, "+(CAR.spill[CAR.items[CAR.index]]||"rgba(255,80,150,.28)")+" 0%, transparent 68%)";
+    const dots=document.querySelectorAll("#carDots button");
+    dots.forEach((d,k)=>d.classList.toggle("on", k===CAR.index));
+  }
+}
+function carouselLayout(){
+  const track=document.getElementById("carTrack");
+  if (!track) return;
+  const w=track.clientWidth||900;
+  const spacing=Math.max(170, w*0.34);
+  const n=carouselN();
+  for (let i=0;i<n;i++){
+    const el=document.getElementById(CAR.items[i]);
+    if (!el) continue;
+    const d=carouselWrapD(i, CAR.pos);
+    const ad=Math.abs(d);
+    const x=d*spacing;
+    const z=-Math.min(220, ad*110);
+    const ry=d*-32;
+    const sc=1.18 - Math.min(1.15, ad)*0.32 + (ad<0.45 ? CAR.bounce*0.07 : 0);
+    const bright=1 - Math.min(0.45, ad*0.28);
+    const sat=1 - Math.min(0.65, ad*0.38);
+    const nearest=((Math.round(CAR.pos)%n)+n)%n;
+    const center=i===nearest;
+    let rx=0, extraY=0;
+    if (center){
+      extraY=CAR.tiltX*8;
+      rx=CAR.tiltY*7;
+    }
+    el.style.transform="translate(-50%,-50%) translateX("+x+"px) translateZ("+z+"px) rotateY("+ry+"deg) rotateX("+rx+"deg) scale("+sc+")";
+    el.style.filter="brightness("+bright+") saturate("+sat+")";
+    el.style.zIndex=String(40-Math.round(ad*10));
+    el.classList.toggle("is-center", center);
+    el.setAttribute("aria-current", center?"true":"false");
+    el.style.pointerEvents="auto";
+  }
+}
+function tickCarousel(dt){
+  const homeOn=homeEl && homeEl.classList.contains("on");
+  tickChase(dt, homeOn);
+  if (!homeOn) return;
+  // keyboard hold repeat
+  if (CAR.keyDir){
+    CAR.keyT=(CAR.keyT||0)+dt;
+    if (CAR.keyT>0.34){
+      carouselNudge(CAR.keyDir);
+      CAR.keyT-=0.13;
+    }
+  }
+  const spring=16.5, damp=0.82;
+  CAR.vel += (CAR.target-CAR.pos)*dt*spring;
+  CAR.vel *= Math.pow(damp, dt*60);
+  CAR.pos += CAR.vel*dt;
+  if (Math.abs(CAR.target-CAR.pos)<0.002 && Math.abs(CAR.vel)<0.01){
+    CAR.pos=CAR.target;
+    CAR.vel=0;
+    const n=carouselN();
+    if (CAR.pos>=n || CAR.pos<0){
+      CAR.pos=((CAR.pos%n)+n)%n;
+      CAR.target=CAR.pos;
+    }
+  }
+  CAR.bounce=Math.max(0, CAR.bounce-dt*3.2);
+  CAR.tiltX=lerp(CAR.tiltX, CAR.wantTiltX, 1-Math.exp(-dt*8));
+  CAR.tiltY=lerp(CAR.tiltY, CAR.wantTiltY, 1-Math.exp(-dt*8));
+  carouselSyncFocus();
+  carouselLayout();
+}
+function tickChase(dt, homeOn){
+  const host=document.getElementById("chase");
+  if (!host || !host.children.length) return;
+  CAR.chaseT+=dt;
+  const n=host.children.length;
+  const lit=Math.floor(CAR.chaseT*12)%n;
+  for (let i=0;i<n;i++){
+    const on = homeOn && ((i+n-lit)%n < 4 || (i+n-lit)%n > n-3);
+    host.children[i].classList.toggle("on", on);
+  }
+}
+function buildChase(){
+  const host=document.getElementById("chase");
+  if (!host || host.childNodes.length) return;
+  const n=40;
+  for (let i=0;i<n;i++){
+    const b=document.createElement("i");
+    const t=i/n;
+    let x,y;
+    if (t<0.28){ x=(t/0.28)*100; y=1.2; }
+    else if (t<0.5){ x=98.8; y=((t-0.28)/0.22)*100; }
+    else if (t<0.78){ x=100-((t-0.5)/0.28)*100; y=98.6; }
+    else { x=1.2; y=100-((t-0.78)/0.22)*100; }
+    b.style.left=x+"%"; b.style.top=y+"%";
+    host.appendChild(b);
+  }
+}
+function buildMotes(){
+  const host=document.getElementById("homeMotes");
+  if (!host || host.childNodes.length) return;
+  for (let i=0;i<18;i++){
+    const m=document.createElement("i");
+    m.style.left=(6+Math.random()*88)+"%";
+    m.style.top=(20+Math.random()*70)+"%";
+    m.style.animationDuration=(8+Math.random()*8)+"s";
+    m.style.animationDelay=(-Math.random()*10)+"s";
+    m.style.width=m.style.height=(2+Math.random()*2)+"px";
+    host.appendChild(m);
+  }
+}
+function buildDots(){
+  const host=document.getElementById("carDots");
+  if (!host) return;
+  host.innerHTML="";
+  CAR.items.forEach((id,i)=>{
+    const b=document.createElement("button");
+    b.type="button";
+    b.setAttribute("aria-label","Show game "+(i+1));
+    b.addEventListener("click",()=>carouselGo(i));
+    host.appendChild(b);
+  });
+}
+function menuHumStart(){
+  if (!audioOn) return;
+  try{
+    if (!ac) ac=new (window.AudioContext||window.webkitAudioContext)();
+    if (ac.state==="suspended") ac.resume();
+    if (menuHum) return;
+    const o1=ac.createOscillator(), o2=ac.createOscillator(), lfo=ac.createOscillator();
+    const g=ac.createGain(), fg=ac.createGain(), filt=ac.createBiquadFilter();
+    o1.type="sawtooth"; o1.frequency.value=46;
+    o2.type="sawtooth"; o2.frequency.value=69.3;
+    lfo.frequency.value=0.13;
+    fg.gain.value=70;
+    filt.type="lowpass"; filt.frequency.value=220; filt.Q.value=0.7;
+    g.gain.value=0.0001;
+    g.gain.exponentialRampToValueAtTime(0.028, ac.currentTime+0.6);
+    lfo.connect(fg); fg.connect(filt.frequency);
+    o1.connect(filt); o2.connect(filt); filt.connect(g); g.connect(ac.destination);
+    o1.start(); o2.start(); lfo.start();
+    menuHum={o1,o2,lfo,g};
+  }catch(e){}
+}
+function menuHumStop(){
+  if (!menuHum) return;
+  try{
+    const t=ac?ac.currentTime:0;
+    menuHum.g.gain.cancelScheduledValues(t);
+    menuHum.g.gain.exponentialRampToValueAtTime(0.0001, t+0.28);
+    menuHum.o1.stop(t+0.32); menuHum.o2.stop(t+0.32); menuHum.lfo.stop(t+0.32);
+  }catch(e){}
+  menuHum=null;
+}
+function applyNewHighRibbons(){
+  for (const id of CAR.items){
+    const el=document.getElementById(id);
+    const which=CAR.flashKey[id];
+    if (el) el.classList.toggle("new-high", !!(which && ARCADE_FLASH[which]));
+  }
+}
+function initCarousel(){
+  if (CAR.ready) return;
+  buildChase(); buildMotes(); buildDots();
+  const track=document.getElementById("carTrack");
+  const home=document.getElementById("home");
+  if (!track||!home) return;
+  CAR.ready=true;
+  for (const id of CAR.items){
+    const el=document.getElementById(id);
+    if (el) el.tabIndex=-1;
+  }
+  track.addEventListener("pointerdown", e=>{
+    if (e.button && e.button!==0) return;
+    track.setPointerCapture(e.pointerId);
+    CAR.drag={x:e.clientX, pos:CAR.pos, lastX:e.clientX, lastT:performance.now(), vx:0, moved:false};
+  });
+  track.addEventListener("pointermove", e=>{
+    if (!CAR.drag) return;
+    const dx=e.clientX-CAR.drag.x;
+    if (Math.abs(dx)>8) CAR.drag.moved=true;
+    const w=track.clientWidth||900;
+    const spacing=Math.max(170, w*0.34);
+    CAR.pos=CAR.drag.pos - dx/spacing;
+    CAR.target=CAR.pos;
+    const now=performance.now();
+    const dt=Math.max(8, now-CAR.drag.lastT);
+    CAR.drag.vx=(e.clientX-CAR.drag.lastX)/dt;
+    CAR.drag.lastX=e.clientX; CAR.drag.lastT=now;
+  });
+  const endDrag=e=>{
+    if (!CAR.drag) return;
+    const dragged=CAR.drag.moved;
+    const vx=CAR.drag.vx||0;
+    const x0=CAR.drag.x;
+    CAR.drag=null;
+    if (dragged){
+      const n=carouselN();
+      let dest=CAR.pos - vx*80;
+      dest=Math.round(dest);
+      carouselGo(((dest%n)+n)%n, true);
+    } else {
+      const r=track.getBoundingClientRect();
+      const x=(e.clientX!=null?e.clientX:x0) - r.left;
+      const mid=r.width/2;
+      if (x<mid-70) carouselNudge(-1);
+      else if (x>mid+70) carouselNudge(1);
+      else carouselLaunch();
+    }
+  };
+  track.addEventListener("pointerup", endDrag);
+  track.addEventListener("pointercancel", endDrag);
+  home.addEventListener("wheel", e=>{
+    if (!home.classList.contains("on")) return;
+    e.preventDefault();
+    const s=Math.sign(e.deltaX||e.deltaY)||1;
+    carouselNudge(s);
+  }, {passive:false});
+  home.addEventListener("mousemove", e=>{
+    const r=track.getBoundingClientRect();
+    CAR.wantTiltX=((e.clientX-(r.left+r.width/2))/(r.width/2))*0.35;
+    CAR.wantTiltY=((e.clientY-(r.top+r.height/2))/(r.height/2))*0.25;
+  });
+  home.addEventListener("mouseleave", ()=>{ CAR.wantTiltX=0; CAR.wantTiltY=0; });
+  carouselLayout();
+  carouselSyncFocus();
+}
+
 let lastKeyCode="";
 function gpChip(){
   const c=document.getElementById("padChip");
@@ -446,7 +754,7 @@ function pollGamepad(){
   if (pressed!==GP.lastBtn){ GP.lastBtn=pressed; gpChip(); }
 
   const screen=gpScreen();
-  if (screen!==GP.lastScreen){ GP.lastScreen=screen; GP.focus=0; gpApplyFocus(); }
+  if (screen!==GP.lastScreen){ GP.lastScreen=screen; GP.focus = (screen==="home") ? CAR.index : 0; gpApplyFocus(); }
 
   // ================================================ menus
   if (screen!=="play"){
@@ -461,6 +769,23 @@ function pollGamepad(){
     const eSL=gpEdge("navShL",!!(b[4]&&b[4].pressed));
     const eC=gpEdge("confirm",face), eS=gpEdge("startBtn",startB);
     const eB=gpEdge("back",selB);
+
+    if (screen==="home"){
+      const now=performance.now();
+      if (eR||eD||eSR){ carouselNudge(1); GP.holdDir=1; GP.holdAt=now+340; }
+      else if (eL||eU||eSL){ carouselNudge(-1); GP.holdDir=-1; GP.holdAt=now+340; }
+      else if ((right||left||up||down) && GP.holdDir && now>GP.holdAt){
+        carouselNudge(GP.holdDir);
+        GP.holdAt=now+130;
+      }
+      if (!(right||left||up||down)) GP.holdDir=0;
+      if (eC||eS) carouselLaunch();
+      if (eB) uiBack();
+      gpEdge("face",face);
+      gpEdge("pausePlay",startB);
+      gpEdge("selPlay",selB);
+      return;
+    }
 
     if (eR||eD||eSR) uiNav(1);
     else if (eL||eU||eSL) uiNav(-1);
@@ -518,8 +843,17 @@ addEventListener("keydown",e=>{
   lastKeyCode=e.code; gpChip();
   if (gpScreen()!=="play"){
     const c=e.code;
-    if (c==="ArrowRight"||c==="ArrowDown"||c==="KeyD"||c==="KeyS"){ uiNav(1);  e.preventDefault(); return; }
-    if (c==="ArrowLeft" ||c==="ArrowUp"  ||c==="KeyA"||c==="KeyW"){ uiNav(-1); e.preventDefault(); return; }
+    const home=gpScreen()==="home";
+    if (c==="ArrowRight"||c==="ArrowDown"||c==="KeyD"||c==="KeyS"){
+      if (home){ if (!e.repeat){ carouselNudge(1); CAR.keyDir=1; CAR.keyT=0; } }
+      else uiNav(1);
+      e.preventDefault(); return;
+    }
+    if (c==="ArrowLeft" ||c==="ArrowUp"  ||c==="KeyA"||c==="KeyW"){
+      if (home){ if (!e.repeat){ carouselNudge(-1); CAR.keyDir=-1; CAR.keyT=0; } }
+      else uiNav(-1);
+      e.preventDefault(); return;
+    }
     if (c==="Enter"||c==="NumpadEnter"||c==="Space"){ uiActivate(); e.preventDefault(); return; }
     if (c==="Escape"||c==="Backspace"){ uiBack(); e.preventDefault(); return; }
     return;
@@ -529,7 +863,11 @@ addEventListener("keydown",e=>{
   if (e.code==="Space" && !keys.has("Space")) actionDown();
   keys.add(e.code);
 });
-addEventListener("keyup",e=>{ keys.delete(e.code); if (e.code==="Space") actionUp(); });
+addEventListener("keyup",e=>{
+  keys.delete(e.code);
+  if (e.code==="Space") actionUp();
+  if (["ArrowRight","ArrowDown","KeyD","KeyS","ArrowLeft","ArrowUp","KeyA","KeyW"].includes(e.code)) CAR.keyDir=0;
+});
 function canvasPos(e){
   const r=cv.getBoundingClientRect();
   return { x:(e.clientX-r.left)*(W/r.width), y:(e.clientY-r.top)*(H/r.height) };
@@ -2858,7 +3196,7 @@ function fEnd(reason){
   document.getElementById("finalLine").textContent=line;
   over.classList.add("on");
 }
-function saveFlapBest(v){ try{ localStorage.setItem("flap_best",String(v)); }catch(e){} }
+function saveFlapBest(v){ try{ const o=+localStorage.getItem("flap_best")||0; if(v>o) ARCADE_FLASH.flap=true; localStorage.setItem("flap_best",String(v)); }catch(e){} }
 function loadFlapBest(){ try{ const v=+localStorage.getItem("flap_best"); if(v&&F) F.best=v; }catch(e){} }
 
 // ------------------------------------------------------------ update
@@ -3876,7 +4214,7 @@ function newAir(best){
 }
 const aSpeed = () => (A_PLANE==="jet" ? 236 : 198) * (A.rain>0 ? .62 : 1);
 const aTurn  = () => A_PLANE==="jet" ? 300 : 236;
-function saveABest(v){ try{ localStorage.setItem("air_best",String(v)); }catch(e){} }
+function saveABest(v){ try{ const o=+localStorage.getItem("air_best")||0; if(v>o) ARCADE_FLASH.air=true; localStorage.setItem("air_best",String(v)); }catch(e){} }
 function loadABest(){ try{ const v=+localStorage.getItem("air_best"); if(v&&A) A.best=v; }catch(e){} }
 
 function aToast(text,color,x,y){ A.toasts.push({text,color,x:x===undefined?W/2:x,y:y===undefined?220:y,life:1.15}); }
@@ -5675,7 +6013,7 @@ function newHop(best){
     prevKey:{up:true,down:true,left:true,right:true,ferry:true}, stickHeld:true, nextGen:18
   };
 }
-function saveHopBest(v){ try{ localStorage.setItem("hop_best",String(v)); }catch(e){} }
+function saveHopBest(v){ try{ const o=+localStorage.getItem("hop_best")||0; if(v>o) ARCADE_FLASH.hop=true; localStorage.setItem("hop_best",String(v)); }catch(e){} }
 function loadHopBest(){ try{ const v=+localStorage.getItem("hop_best"); if(v&&LH) LH.best=v; }catch(e){} }
 
 function hToast(text,color){
@@ -6952,14 +7290,20 @@ function frame(now){
     const pl = gameRunning() ? "1" : "0";
     if (pl!==lastPlaying){ lastPlaying=pl; document.body.dataset.playing=pl; syncHud(); }
     const d = PAUSED ? 0 : dt;
-    if (PAUSED) pollGamepad();
-    if (MODE==="tita"){ if (T){ if(!PAUSED) updateTita(d); drawTita(); } }
-    else if (MODE==="flap"){ if (F){ if(!PAUSED) updateFlap(d); drawFlap(); } }
-    else if (MODE==="paddle"){ if (P){ if(!PAUSED) updatePaddle(d); drawPaddle(); } }
-    else if (MODE==="air"){ if (A){ if(!PAUSED) updateAir(d); drawAir(); } }
-    else if (MODE==="hop"){ if (LH){ if(!PAUSED) updateHop(d); drawHop(); } }
-    else if (MODE==="jeep"){ if (J){ if(!PAUSED) updateJeep(d); drawJeep(); } }
-    else { if (G){ if(!PAUSED) update(d); draw(); } }
+    const onHome = homeEl && homeEl.classList.contains("on");
+    tickCarousel(dt);
+    if (onHome){
+      pollGamepad();
+    } else {
+      if (PAUSED) pollGamepad();
+      if (MODE==="tita"){ if (T){ if(!PAUSED) updateTita(d); drawTita(); } }
+      else if (MODE==="flap"){ if (F){ if(!PAUSED) updateFlap(d); drawFlap(); } }
+      else if (MODE==="paddle"){ if (P){ if(!PAUSED) updatePaddle(d); drawPaddle(); } }
+      else if (MODE==="air"){ if (A){ if(!PAUSED) updateAir(d); drawAir(); } }
+      else if (MODE==="hop"){ if (LH){ if(!PAUSED) updateHop(d); drawHop(); } }
+      else if (MODE==="jeep"){ if (J){ if(!PAUSED) updateJeep(d); drawJeep(); } }
+      else { if (G){ if(!PAUSED) update(d); draw(); } }
+    }
   }catch(err){
     // never let one bad frame stop the loop — the TV would just freeze
     if (frameErr++ < 3 && window.console) console.error("frame error:",err);
@@ -6994,6 +7338,7 @@ function setMark(which){
   document.body.dataset.screen=which;
 }
 function hideAll(){
+  menuHumStop();
   homeEl.classList.remove("on"); menuEl.classList.remove("on");
   titaEl.classList.remove("on"); flapEl.classList.remove("on"); padEl.classList.remove("on");
   airEl.classList.remove("on");
@@ -7021,6 +7366,11 @@ function goHome(){
   if (A) A.running=false;
   if (LH) LH.running=false;
   if (J) J.running=false;
+  initCarousel();
+  applyNewHighRibbons();
+  carouselSyncFocus();
+  carouselLayout();
+  menuHumStart();
   draw();
 }
 function openBallies(){
@@ -7171,13 +7521,10 @@ document.getElementById("flapStartBtn").addEventListener("click",startFlap);
 document.getElementById("againBtn").addEventListener("click",startCurrent);
 document.getElementById("pickBallies").addEventListener("click",openBallies);
 document.getElementById("pickTita").addEventListener("click",openTita);
-document.getElementById("pickFlap").addEventListener("click",openFlap);
 document.getElementById("pickPaddle").addEventListener("click",openPaddle);
 document.getElementById("padStartBtn").addEventListener("click",startPaddle);
 document.getElementById("padGiulia").addEventListener("click",()=>setChar("giulia"));
 document.getElementById("padNic").addEventListener("click",()=>setChar("nic"));
-document.getElementById("pickAir").addEventListener("click",openAir);
-document.getElementById("pickHop").addEventListener("click",openHop);
 document.getElementById("hopStartBtn").addEventListener("click",startHop);
 document.getElementById("hopGiulia").addEventListener("click",()=>setHopChar("giulia"));
 document.getElementById("hopNic").addEventListener("click",()=>setHopChar("nic"));
@@ -7201,6 +7548,8 @@ document.getElementById("soundBtn").addEventListener("click",e=>{
   audioOn=!audioOn;
   e.target.textContent="Sound: "+(audioOn?"on":"off");
   e.target.setAttribute("aria-pressed",String(audioOn));
+  if (audioOn && homeEl.classList.contains("on")) menuHumStart();
+  else menuHumStop();
 });
 document.getElementById("glareBtn").addEventListener("click",e=>{
   glare=!glare;
@@ -7308,6 +7657,9 @@ makePosters();
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(makePosters);
 setMark("home");
 refreshBests();
+initCarousel();
+applyNewHighRibbons();
+menuHumStart();
 draw();
 requestAnimationFrame(frame);
 window.__BA={
@@ -7323,6 +7675,8 @@ window.__BA={
   jeepGo(n){ if(J){ J.dist=n; J.started=true; J.running=true; J.fuel=100; jSpawnAhead(); } },
   jeepFuel(){ if(J) J.fuel=100; },
   hop(){ return LH?{score:LH.score,best:LH.best,c:+LH.player.c.toFixed(2),r:LH.player.r,started:!!LH.started,running:!!LH.running,ferry:!!LH.ferry,ready:hFerryReady(),cars:LH.cars.length,char:H_CHAR}:null; },
+  car(){ return {i:CAR.index,pos:+CAR.pos.toFixed(2)}; },
+  carNudge(d){ carouselNudge(d||1); },
   hopGo(n){ if(LH){ LH.player.r=n; LH.started=true; LH.running=true; } },
   hopRide(){ hFerry(); }
 };

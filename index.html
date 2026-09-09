@@ -27,48 +27,60 @@
     <span class="stud" style="left:9px;bottom:9px"></span>
     <span class="stud" style="right:9px;bottom:9px"></span>
     <div id="stage">
+      <div class="chase" id="chase" aria-hidden="true"></div>
       <canvas id="cv" width="900" height="680" aria-label="Bernard's Arcade"></canvas>
 
       <div class="overlay on" id="home">
-        <div class="scrim"></div>
+        <div class="scrim">
+          <div class="spill" id="homeSpill"></div>
+          <div class="motes" id="homeMotes"></div>
+        </div>
         <div class="panel">
           <div class="marquee">
-            <span class="bulbs"><i></i><i></i><i></i><i></i></span>
+            <span class="bulbs"><i></i><i></i><i></i><i class="bad"></i></span>
             <span class="t">BERNARD'S <span>ARCADE</span></span>
-            <span class="bulbs"><i></i><i></i><i></i><i></i></span>
+            <span class="bulbs"><i></i><i class="bad"></i><i></i><i></i></span>
           </div>
           <div class="lobby">
             <figure class="star">
               <img id="starPic" src="/art/bernard-portrait.jpg" alt="Bernard" width="112" height="112" data-which="flap">
               <figcaption id="starCap">The proprietor</figcaption>
             </figure>
-            <button class="pick cab" id="pickFlap">
-              <span class="badge">SKY</span><span class="best" id="bestFlap"></span>
-              <span class="thumb"></span>
-              <span class="cab-bezel"></span>
-              <span class="cap">
-                <span class="nm">Flappy Bernard</span>
-                <span class="sub">He found the sky. Flap through the gaps.</span>
-              </span>
-            </button>
-            <button class="pick cab" id="pickHop">
-              <span class="badge">HOP</span><span class="best" id="bestHop"></span>
-              <span class="thumb"></span>
-              <span class="cab-bezel"></span>
-              <span class="cap">
-                <span class="nm">Lane Hoppers with Bernard</span>
-                <span class="sub">Nick or Giulia hop the lanes. Bernard ferries the creeks.</span>
-              </span>
-            </button>
-            <button class="pick cab" id="pickAir">
-              <span class="badge">AIR</span><span class="best" id="bestAir"></span>
-              <span class="thumb"></span>
-              <span class="cab-bezel"></span>
-              <span class="cap">
-                <span class="nm">Flying with Bernard</span>
-                <span class="sub">Goggles on. Rescue Nick and Giulia from the mothership.</span>
-              </span>
-            </button>
+            <div class="carousel" id="carousel">
+              <div class="car-track" id="carTrack">
+                <button class="pick cab" id="pickFlap" type="button">
+                  <span class="badge">SKY</span><span class="best" id="bestFlap"></span>
+                  <span class="ribbon" aria-hidden="true">NEW HIGH SCORE!</span>
+                  <span class="thumb"></span>
+                  <span class="cab-bezel"></span>
+                  <span class="cap">
+                    <span class="nm">Flappy Bernard</span>
+                    <span class="sub">He found the sky. Flap through the gaps.</span>
+                  </span>
+                </button>
+                <button class="pick cab" id="pickHop" type="button">
+                  <span class="badge">HOP</span><span class="best" id="bestHop"></span>
+                  <span class="ribbon" aria-hidden="true">NEW HIGH SCORE!</span>
+                  <span class="thumb"></span>
+                  <span class="cab-bezel"></span>
+                  <span class="cap">
+                    <span class="nm">Lane Hoppers with Bernard</span>
+                    <span class="sub">Nick or Giulia hop the lanes. Bernard ferries the creeks.</span>
+                  </span>
+                </button>
+                <button class="pick cab" id="pickAir" type="button">
+                  <span class="badge">AIR</span><span class="best" id="bestAir"></span>
+                  <span class="ribbon" aria-hidden="true">NEW HIGH SCORE!</span>
+                  <span class="thumb"></span>
+                  <span class="cab-bezel"></span>
+                  <span class="cap">
+                    <span class="nm">Flying with Bernard</span>
+                    <span class="sub">Goggles on. Rescue Nick and Giulia from the mothership.</span>
+                  </span>
+                </button>
+              </div>
+            </div>
+            <div class="car-dots" id="carDots" role="tablist" aria-label="Games"></div>
           </div>
           <div class="parked-wrap" hidden>
             <button class="pick parked" id="pickBallies" tabindex="-1" aria-hidden="true"><span class="best" id="bestBallies"></span><span class="thumb"></span></button>
@@ -76,13 +88,13 @@
             <button class="pick parked" id="pickPaddle" tabindex="-1" aria-hidden="true"><span class="best" id="bestPaddle"></span><span class="thumb"></span></button>
           </div>
           <div class="snesbar" aria-label="SNES controller">
-            <span><span class="k dpad">D-PAD</span> choose</span>
+            <span><span class="k dpad">D-PAD</span> scroll</span>
             <span><span class="k b">B</span> play</span>
             <span><span class="k a">A</span> play</span>
             <span><span class="k start">START</span> pause</span>
             <span><span class="k sel">SELECT</span> back</span>
           </div>
-          <div class="phonebar">Tap a cabinet · tap the screen to flap, hop, or shoot</div>
+          <div class="phonebar">Swipe the cabinets · tap the center one to play</div>
         </div>
       </div>
 
