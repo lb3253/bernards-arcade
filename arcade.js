@@ -354,6 +354,8 @@ function gpApplyFocus(){
   updateStar();
   if (el && el.id==="airJet") setPlane("jet");
   else if (el && el.id==="airBiplane") setPlane("biplane");
+  else if (el && el.id==="hopGiulia") setHopChar("giulia");
+  else if (el && el.id==="hopNic") setHopChar("nic");
 }
 function uiNav(stepBy){
   if (gpScreen()==="home"){
@@ -7339,9 +7341,31 @@ function drawHopHUD(){
 
 function setHopChar(who){
   H_CHAR=who;
+  const girl = who!=="nic";
+  const src = girl ? "/art/spr-hop-giulia.png" : "/art/spr-hop-nic.png";
+  const label = girl ? "Giulia" : "Nick";
   const g=document.getElementById("hopGiulia"), n=document.getElementById("hopNic");
-  if (g) g.classList.toggle("chosen", who==="giulia");
-  if (n) n.classList.toggle("chosen", who==="nic");
+  if (g) g.classList.toggle("chosen", girl);
+  if (n) n.classList.toggle("chosen", !girl);
+  const menu=document.getElementById("hopmenu");
+  if (menu) menu.classList.toggle("nick", !girl);
+  const hero=document.getElementById("hopHero");
+  if (hero){
+    if (hero.getAttribute("data-who")!==who){
+      hero.setAttribute("data-who", who);
+      hero.style.opacity="0";
+      setTimeout(()=>{
+        hero.src=src;
+        hero.alt=label;
+        hero.style.opacity="1";
+      }, 70);
+    } else {
+      hero.alt=label;
+      hero.style.opacity="1";
+    }
+  }
+  const shot=document.querySelector("#hopmenu .shot");
+  if (shot) shot.setAttribute("aria-label", label+" and Bernard hopping the park lanes");
 }
 function openHop(){
   bakeHopAtlas();

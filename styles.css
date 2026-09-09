@@ -520,7 +520,43 @@ body:not([data-screen="home"]) .chase{ display:none }
 #flapmenu .shot{background-image:url("/art/card-flap.jpg")}
 #hopmenu .shot{background-image:url("/art/card-hop.jpg");background-size:cover;background-position:center 38%}
 #hopmenu .scrim{
-  background:linear-gradient(180deg, rgba(8,28,14,0) 0%, rgba(8,28,14,.18) 48%, rgba(6,22,12,.92) 100%);
+  background:linear-gradient(180deg, rgba(8,28,14,.12) 0%, rgba(8,28,14,.28) 42%, rgba(6,22,12,.94) 100%);
+}
+#hopmenu .panel{
+  display:flex !important;
+  flex-direction:column;
+  justify-content:flex-end;
+  align-items:center;
+  padding:16px 18px 18px;
+  grid-template-rows:none !important;
+}
+#hopmenu .hop-hero{
+  position:absolute; left:50%; top:44%;
+  transform:translate(-50%,-58%);
+  z-index:2;
+  pointer-events:none;
+  height:min(56%, 390px);
+  display:flex; align-items:flex-end; justify-content:center; gap:6px;
+  filter:drop-shadow(0 16px 22px rgba(0,0,0,.55));
+}
+#hopmenu .hop-hero img{
+  height:100%; width:auto; object-fit:contain;
+  transition:opacity .16s ease, transform .16s ease;
+}
+#hopmenu .hop-hero #hopHeroDog{
+  height:62%;
+  margin-right:-10px;
+  transform:scaleX(-1);
+}
+#hopmenu .hop-hero #hopHero{ height:100%; }
+#hopmenu.nick .hop-hero #hopHero{ transform:none; }
+.who-pic{
+  width:28px; height:28px; object-fit:contain; display:inline-block;
+  margin-right:8px; vertical-align:middle;
+  filter:drop-shadow(0 1px 0 rgba(0,0,0,.35));
+}
+#hopGiulia.who, #hopNic.who{
+  display:inline-flex; align-items:center; justify-content:center;
 }
 .snesbar{
   display:flex;gap:12px 18px;justify-content:center;align-items:center;flex-wrap:wrap;
