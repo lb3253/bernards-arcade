@@ -296,8 +296,8 @@ body{
 }
 .lobby{
   display:grid;
-  grid-template-columns:auto 1fr 1fr;
-  grid-template-rows:1fr;
+  grid-template-columns:1fr 1fr 1fr;
+  grid-template-rows:auto 1fr;
   align-items:end;
   gap:12px;
   flex:1 1 auto;
@@ -308,12 +308,11 @@ body{
 .star{
   margin:0;
   text-align:center;
-  width:auto;
-  max-width:140px;
+  width:100%;
+  max-width:none;
   flex:0 0 auto;
-  grid-column:auto;
+  grid-column:1 / -1;
   justify-self:center;
-  align-self:center;
 }
 .star img{
   width:108px !important;
@@ -353,9 +352,14 @@ body{
 }
 #pickFlap .thumb{background-image:url("/art/card-flap.jpg") !important;background-position:center 35% !important}
 #pickAir .thumb{background-image:url("/art/card-air.jpg") !important;background-position:center 42% !important}
+#pickHop .thumb{background-image:url("/art/card-hop.jpg") !important;background-position:center 40% !important}
 #airmenu .shot{background-image:url("/art/card-air.jpg");background-size:cover;background-position:center;transition:opacity .18s ease}
 #airmenu.jet .shot{background-image:url("/art/card-air-jet.jpg")}
 #flapmenu .shot{background-image:url("/art/card-flap.jpg")}
+#hopmenu .shot{background-image:url("/art/card-hop.jpg");background-size:cover;background-position:center 38%}
+#hopmenu .scrim{
+  background:linear-gradient(180deg, rgba(8,28,14,0) 0%, rgba(8,28,14,.18) 48%, rgba(6,22,12,.92) 100%);
+}
 .snesbar{
   display:flex;gap:12px 18px;justify-content:center;align-items:center;flex-wrap:wrap;
   font-size:12px;font-weight:600;color:#e8dce8;letter-spacing:.04em;
@@ -455,7 +459,7 @@ footer{color:#b8b8c8}
   footer > span:first-of-type{display:none}
   .lobby{
     grid-template-columns:1fr 1fr !important;
-    grid-template-rows:auto 1fr !important;
+    grid-template-rows:auto 1fr 1fr !important;
     align-items:stretch !important;
     gap:10px;
   }
@@ -473,6 +477,7 @@ footer{color:#b8b8c8}
     max-height:none !important;
     width:100% !important;
   }
+  #pickHop{grid-column:1 / -1}
   .pick .sub{display:none}
   .pick .nm{font-size:15px}
 }
@@ -480,10 +485,11 @@ footer{color:#b8b8c8}
 @media (max-height:480px) and (orientation:landscape){
   .star{display:none}
   .lobby{
-    grid-template-columns:auto 1fr 1fr !important;
+    grid-template-columns:1fr 1fr 1fr !important;
     grid-template-rows:1fr !important;
   }
   .lobby > .pick.cab{height:100% !important;min-height:0 !important;max-height:none !important}
+  #pickHop{grid-column:auto}
   .phonebar,.snesbar{display:none}
   .marquee{padding:4px 12px}
   footer{display:none}
@@ -520,7 +526,7 @@ footer{color:#b8b8c8}
   background:radial-gradient(circle at 32% 28%,#ff8a7a,#d94a3a 55%,#8a2218);
   box-shadow:0 6px 0 #5a1410, 0 12px 18px rgba(0,0,0,.4);
 }
-#hudFire:active{transform:translateY(4px);box-shadow:0 2px 0 #5a1410}
+body[data-screen="hop"] #hudFire{font-size:13px}
 
 @media (min-width:821px){
   #hudpad.on{display:none}

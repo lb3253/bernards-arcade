@@ -51,6 +51,15 @@
                 <span class="sub">He found the sky. Flap through the gaps.</span>
               </span>
             </button>
+            <button class="pick cab" id="pickHop">
+              <span class="badge">HOP</span><span class="best" id="bestHop"></span>
+              <span class="thumb"></span>
+              <span class="cab-bezel"></span>
+              <span class="cap">
+                <span class="nm">Lane Hoppers with Bernard</span>
+                <span class="sub">Nic or Giulia hop the lanes. Bernard ferries the creeks.</span>
+              </span>
+            </button>
             <button class="pick cab" id="pickAir">
               <span class="badge">AIR</span><span class="best" id="bestAir"></span>
               <span class="thumb"></span>
@@ -73,7 +82,25 @@
             <span><span class="k start">START</span> pause</span>
             <span><span class="k sel">SELECT</span> back</span>
           </div>
-          <div class="phonebar">Tap a cabinet · tap the screen to flap or shoot</div>
+          <div class="phonebar">Tap a cabinet · tap the screen to flap, hop, or shoot</div>
+        </div>
+      </div>
+
+      <div class="overlay" id="hopmenu">
+        <div class="shot" role="img" aria-label="Nic, Giulia and Bernard hopping the park lanes"></div>
+        <div class="scrim"></div>
+        <button class="backBtn" id="hopBack">&larr; Games</button>
+        <div class="panel">
+          <div class="menubar">
+            <div class="kicker">Bernard never races you</div>
+            <div class="tagline">Hop the streets, yards and creeks. Cars and sprinklers send you back with a boop. When Bernard glows, press A or B and he ferries you across the water.</div>
+            <div class="chooser">
+              <button class="who chosen" id="hopGiulia">Giulia</button>
+              <button class="who" id="hopNic">Nick</button>
+            </div>
+            <button class="play" id="hopStartBtn">Hop along</button>
+            <div class="hint">D-pad hops &middot; A / B rides Bernard &middot; bones and balls are extra points</div>
+          </div>
         </div>
       </div>
 

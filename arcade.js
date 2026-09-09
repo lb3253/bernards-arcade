@@ -48,6 +48,22 @@ loadSpr("jramp","/art/spr-jramp.png");
 loadSpr("jstop","/art/spr-jstop.png");
 loadSpr("jscrub","/art/spr-jscrub.png");
 loadSpr("skyJeep","/art/sky-jeep.jpg");
+loadSpr("hopNic","/art/spr-hop-nic.png");
+loadSpr("hopGiulia","/art/spr-hop-giulia.png");
+loadSpr("hopBernard","/art/spr-hop-bernard.png");
+loadSpr("hopSwim","/art/spr-hop-swim.png");
+loadSpr("hopCarRed","/art/spr-hop-car-red.png");
+loadSpr("hopCarYel","/art/spr-hop-car-yel.png");
+loadSpr("hopCarBlu","/art/spr-hop-car-blu.png");
+loadSpr("hopCarGrn","/art/spr-hop-car-grn.png");
+loadSpr("hopPad","/art/spr-hop-pad.png");
+loadSpr("hopRing","/art/spr-hop-ring.png");
+loadSpr("hopDuck","/art/spr-hop-duck.png");
+loadSpr("hopTube","/art/spr-hop-tube.png");
+loadSpr("hopSprinkler","/art/spr-hop-sprinkler.png");
+loadSpr("hopTree","/art/spr-hop-tree.png");
+loadSpr("hopBall","/art/spr-hop-ball.png");
+loadSpr("hopBone","/art/spr-hop-bone.png");
 ["fly","biplane","jet","balloon","storm","skyAir","saucer","drone","diver","mothership","disc","scout","missile","plasma","boom","shot","muzzle","hills","jeep","skyJeep","jtrail","jpalm","jramp","jstop","jscrub"].forEach(n=>{ SPR[n].addEventListener("load",()=>{ try{ if(typeof bakeAirSky==="function") bakeAirSky(); if(typeof bakeFlapSky==="function") bakeFlapSky(); if(typeof bakeJeepSky==="function") bakeJeepSky(); }catch(e){} }); });
 function sprReady(name){
   const im=SPR[name];
@@ -275,12 +291,13 @@ let pointer={down:false,x:0,y:0};
 const GP = { idx:null, id:"", prev:{}, focus:0, lastScreen:"", navHold:0, lastBtn:"" };
 
 const GP_ITEMS = {
-  home:     ["pickFlap","pickAir"],
+  home:     ["pickFlap","pickHop","pickAir"],
   menu:     ["startBtn","menuBack"],
   titamenu: ["titaStartBtn","titaBack"],
   flapmenu: ["flapStartBtn","flapBack"],
   paddlemenu: ["padGiulia","padNic","padStartBtn","padBack"],
   airmenu: ["airBiplane","airJet","airStartBtn","airBack"],
+  hopmenu: ["hopGiulia","hopNic","hopStartBtn","hopBack"],
   airstory: ["storyNext"],
   pause: ["pauseResume","pauseSound","pauseQuit"],
   over:     ["againBtn","overHome"]
@@ -294,6 +311,7 @@ function gpScreen(){
   if (on("pause")) return "pause";
   if (on("paddlemenu")) return "paddlemenu";
   if (on("airmenu")) return "airmenu";
+  if (on("hopmenu")) return "hopmenu";
   if (on("airstory")) return "airstory";
   if (on("gameover")) return "over";
   return "play";
@@ -342,6 +360,13 @@ function uiActivate(){
   if (sc==="airmenu"){
     if (id==="airBack"){ goHome(); return; }
     startAir();
+    return;
+  }
+  if (sc==="hopmenu"){
+    if (id==="hopBack"){ goHome(); return; }
+    if (id==="hopGiulia") setHopChar("giulia");
+    if (id==="hopNic") setHopChar("nic");
+    startHop();
     return;
   }
   const el=document.getElementById(id);
@@ -513,6 +538,7 @@ cv.addEventListener("pointerdown",e=>{
   e.preventDefault(); cv.setPointerCapture(e.pointerId);
   const p=canvasPos(e);
   if (MODE==="flap"||MODE==="paddle"||MODE==="air"||MODE==="jeep"){ actionDown(); return; }
+  if (MODE==="hop"){ hCanvasTap(p); return; }
   if (MODE==="tita"){ pointer={down:true,x:p.x,y:p.y}; actionDown(); return; }
   if (G && G.carry.length && Math.hypot(p.x-THROW_BTN.x,p.y-THROW_BTN.y)<THROW_BTN.r){
     pointer={down:false,x:p.x,y:p.y}; startCharge(); return;
@@ -529,11 +555,12 @@ const STICK = {x:0, y:0};
 function syncHud(){
   const hud=document.getElementById("hudpad");
   if (!hud) return;
-  const play = IS_TOUCH && MODE==="air" && A && A.running && !PAUSED;
+  const hopOn = MODE==="hop" && LH && LH.running && !PAUSED;
+  const play = IS_TOUCH && ((MODE==="air" && A && A.running && !PAUSED) || hopOn);
   hud.classList.toggle("on", !!play);
   hud.setAttribute("aria-hidden", play ? "false" : "true");
   const fire=document.getElementById("hudFire");
-  if (fire) fire.textContent = "FIRE";
+  if (fire) fire.textContent = MODE==="hop" ? "RIDE" : "FIRE";
 }
 (function setupTouchHud(){
   const stick=document.getElementById("stick");
@@ -577,6 +604,7 @@ function actionDown(){
   else if (MODE==="flap") flapJump();
   else if (MODE==="paddle") pStroke();
   else if (MODE==="air") airFire();
+  else if (MODE==="hop") hFerry();
   else if (MODE==="jeep"){ if (J) J.touchGas=true; }
   else startCharge();
 }
@@ -5574,6 +5602,779 @@ function startJeep(){
   syncHud();
 }
 
+// ================================================================
+//  LANE HOPPERS WITH BERNARD  —  Nic or Giulia, Bernard the ferry
+//  Glossy 3/4 isometric endless hopper. Companion, never a rival.
+// ================================================================
+const H_COLS = 9;
+const H_PLAY0 = 1, H_PLAY1 = 7;
+const H_TW = 96, H_TH = 54;
+const H_ORIGIN = 500;
+const H_FERRY_CD = 6;
+const H_HOP_DUR = 0.15;
+const H_CAR_SPR = ["hopCarRed","hopCarYel","hopCarBlu","hopCarGrn"];
+const H_FLOAT_SPR = ["hopPad","hopRing","hopDuck","hopTube"];
+
+let LH = null;
+let H_CHAR = "giulia";
+let H_LAST_CHAR = "";
+
+function hMulberry(s){
+  return function(){
+    s |= 0; s = s + 0x6D2B79F5 | 0;
+    let t = Math.imul(s ^ s >>> 15, 1 | s);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function newHop(best){
+  const seed = (Math.random()*1e9)|0;
+  return {
+    t:0, pulse:0, running:true, started:false,
+    score:0, rowScore:0, best:best||0, bonus:0,
+    rng: hMulberry(seed),
+    lanes: [],
+    seq: [],
+    player:{ c:4, r:2, face:1, hop:null, ride:null, squash:0, bob:0 },
+    dog:{ c:4, r:0, face:1, hop:null, squash:0, glow:0 },
+    path: [{c:4,r:2}],
+    cars: [], floats: [], pickups: [],
+    particles: [], toasts: [], ripples: [],
+    camC:4, camR:1.2,
+    ferry:null, sinceFerry: H_FERRY_CD,
+    booping:0, shake:0, flash:0, flashCol:"80,180,255",
+    prevKey:{up:true,down:true,left:true,right:true,ferry:true}, stickHeld:true, nextGen:18
+  };
+}
+function saveHopBest(v){ try{ localStorage.setItem("hop_best",String(v)); }catch(e){} }
+function loadHopBest(){ try{ const v=+localStorage.getItem("hop_best"); if(v&&LH) LH.best=v; }catch(e){} }
+
+function hToast(text,color){
+  LH.toasts.push({text,color:color||"#fff6c9",x:W/2,y:210,life:1.15});
+}
+function hPuff(x,y,col,n){
+  for(let i=0;i<n;i++){
+    const a=rand(0,6.28), s=rand(40,140);
+    LH.particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-30,life:rand(.25,.55),color:col,r:rand(2,5)});
+  }
+}
+
+function hLane(row){
+  row = Math.round(+row||0);
+  if (row<0) return {type:"grass", row:-1};
+  while (LH.lanes.length <= row) hBuildLane(LH.lanes.length);
+  return LH.lanes[row] || {type:"grass", row};
+}
+
+function hBuildLane(row){
+  const rnd = LH.rng;
+  let type = "grass";
+  if (row <= 2) type = "grass";
+  else {
+    const prev = (row>0 && LH.lanes[row-1]) ? LH.lanes[row-1].type : "grass";
+    const roll = rnd();
+    if (prev==="street") type = (rnd()<0.55 ? "street" : "grass");
+    else if (prev==="water") type = (rnd()<0.45 ? "water" : "grass");
+    else if (prev==="yard") type = (rnd()<0.4 ? "yard" : "grass");
+    else {
+      if (roll<0.34) type="street";
+      else if (roll<0.58) type="water";
+      else if (roll<0.78) type="yard";
+      else type="grass";
+    }
+  }
+  const lane = { type, row, dir: rnd()<0.5 ? -1 : 1, phase: rnd()*6.28, trees:[0,8] };
+  if (type==="yard"){
+    lane.sprinklers = [];
+    const n = 2 + (rnd()<0.5?1:0);
+    const used={};
+    for(let i=0;i<n;i++){
+      const c = H_PLAY0 + ((rnd()* (H_PLAY1-H_PLAY0+1))|0);
+      if (used[c]) continue;
+      used[c]=1;
+      lane.sprinklers.push({c, phase: rnd()*4, period: 2.4 + rnd()*1.1});
+    }
+  }
+  if (type==="grass" && row>3 && rnd()<0.55){
+    const extra = 1 + ((rnd()*2)|0);
+    for(let i=0;i<extra;i++){
+      const c = rnd()<0.5 ? 0 : 8;
+      if (lane.trees.indexOf(c)<0) lane.trees.push(c);
+    }
+  }
+  LH.lanes[row] = lane;
+  if (type==="street") hSpawnCars(lane);
+  if (type==="water") hSpawnFloats(lane);
+  if ((type==="grass"||type==="yard") && row>3 && rnd()<0.38) hSpawnPickup(row);
+  return lane;
+}
+function hSpawnCars(lane){
+  const dist = Math.max(0, lane.row-4);
+  const speed = 1.55 + dist*0.07 + LH.rng()*0.4;
+  const gap = Math.max(2.6, 4.6 - dist*0.05);
+  let col = LH.rng()*gap;
+  const dir = lane.dir;
+  while (col < H_COLS+4){
+    LH.cars.push({
+      row: lane.row, col: dir>0 ? col-2 : H_COLS+2-col,
+      dir, speed, w: 1.35 + LH.rng()*0.25,
+      spr: H_CAR_SPR[(LH.rng()*H_CAR_SPR.length)|0]
+    });
+    col += gap + LH.rng()*1.2;
+  }
+}
+function hSpawnFloats(lane){
+  const dist = Math.max(0, lane.row-4);
+  const n = Math.max(3, 5 - (dist>20?1:0));
+  const dir = lane.dir;
+  const speed = 0.7 + dist*0.02 + LH.rng()*0.25;
+  for(let i=0;i<n;i++){
+    LH.floats.push({
+      row: lane.row,
+      col: (i+0.4)*((H_COLS)/(n)) + LH.rng()*0.4,
+      dir, speed,
+      spr: H_FLOAT_SPR[(LH.rng()*H_FLOAT_SPR.length)|0],
+      bob: LH.rng()*6.28
+    });
+  }
+}
+function hSpawnPickup(row){
+  const c = H_PLAY0 + ((LH.rng()*(H_PLAY1-H_PLAY0+1))|0);
+  const kind = LH.rng()<0.55 ? "ball" : "bone";
+  LH.pickups.push({row, c, kind, taken:false, bob:LH.rng()*4});
+}
+
+function hIso(c, r){
+  const dc = c - LH.camC, dr = r - LH.camR;
+  return {
+    x: W/2 + (dc - dr) * (H_TW/2),
+    y: H_ORIGIN - (dc + dr) * (H_TH/2)
+  };
+}
+function hDepth(c,r){ return c + r; }
+
+function hSprayOn(sp, t){
+  const u = (t + sp.phase) % sp.period;
+  return u < sp.period * 0.42;
+}
+function hCarHits(c, r){
+  for (const car of LH.cars){
+    if (car.row!==r) continue;
+    if (Math.abs(car.col - c) < car.w*0.55 + 0.28) return car;
+  }
+  return null;
+}
+function hPadAt(c, r, slop){
+  slop = slop==null ? 0.55 : slop;
+  let best=null, bd=9;
+  for (const f of LH.floats){
+    if (f.row!==r) continue;
+    const d=Math.abs(f.col - c);
+    if (d<slop && d<bd){ bd=d; best=f; }
+  }
+  return best;
+}
+function hCanStand(c, r){
+  if (c < H_PLAY0-0.2 || c > H_PLAY1+0.2) return false;
+  if (r < 0) return false;
+  const lane = hLane(r);
+  if (lane.type==="street") return !hCarHits(c,r);
+  if (lane.type==="water") return !!hPadAt(c,r,0.62);
+  if (lane.type==="yard"){
+    for (const sp of (lane.sprinklers||[])){
+      if (sp.c===Math.round(c) && hSprayOn(sp, LH.t)) return false;
+    }
+  }
+  return true;
+}
+
+function hTryHop(dc, dr){
+  if (!LH || !LH.running || LH.booping>0 || LH.ferry) return;
+  const p=LH.player;
+  if (p.hop) return;
+  let nc = (p.ride ? p.ride.col : p.c) + dc;
+  let nr = p.r + dr;
+  if (dr===0) nc = Math.round(nc);
+  if (nr < 0) return;
+  if (nc < H_PLAY0) nc = H_PLAY0;
+  if (nc > H_PLAY1) nc = H_PLAY1;
+  const lane = hLane(nr);
+  if (lane.type==="water"){
+    const pad = hPadAt(nc, nr, 0.72);
+    if (pad) nc = pad.col;
+  } else nc = Math.round(nc);
+  LH.started = true;
+  p.hop = { fc:p.c, fr:p.r, tc:nc, tr:nr, t:0 };
+  p.face = dc===0 ? p.face : (dc>0?1:-1);
+  p.squash = 1;
+  const from = hIso(p.c, p.r);
+  hPuff(from.x, from.y+8, "rgba(255,255,255,.7)", 6);
+  sfx.flap();
+}
+
+function hLand(){
+  const p=LH.player;
+  const hop=p.hop; if (!hop) return;
+  p.c = hop.tc; p.r = hop.tr; p.hop=null; p.squash=1;
+  p.ride = null;
+  const lane = hLane(p.r);
+  if (lane.type==="water"){
+    const pad = hPadAt(p.c, p.r, 0.75);
+    if (pad){ p.ride=pad; p.c=pad.col; }
+  }
+  if (!hCanStand(p.c, p.r)){
+    hBoop(lane.type==="water" ? "Splash!" : lane.type==="street" ? "Watch the cars!" : "Sprinkler!");
+    return;
+  }
+  LH.path.push({c:Math.round(p.c), r:p.r});
+  if (LH.path.length>24) LH.path.shift();
+  const rows = Math.max(0, p.r - 2);
+  if (rows > LH.rowScore){
+    const add = rows - LH.rowScore;
+    LH.rowScore = rows;
+    LH.sinceFerry += add;
+  }
+  for (const pk of LH.pickups){
+    if (pk.taken) continue;
+    if (pk.row===p.r && Math.abs(pk.c - p.c)<0.55){
+      pk.taken=true;
+      const pts = pk.kind==="ball"?25:10;
+      LH.bonus += pts;
+      const pos=hIso(pk.c, pk.row);
+      hPuff(pos.x, pos.y-20, pk.kind==="ball"?"#b6f23a":"#ffe29a", 12);
+      hToast("+"+pts, pk.kind==="ball"?"#b6f23a":"#ffe29a");
+      sfx.pick(pk.kind==="ball"?"gold":"green");
+    }
+  }
+  LH.score = LH.rowScore + LH.bonus;
+  if (LH.score > LH.best){ LH.best=LH.score; saveHopBest(LH.best); }
+  hNudgeDog();
+  const land = hIso(p.c, p.r);
+  hPuff(land.x, land.y+6, "rgba(255,255,255,.55)", 5);
+}
+
+function hNudgeDog(){
+  const d=LH.dog;
+  if (d.hop || LH.ferry) return;
+  const target = LH.path[Math.max(0, LH.path.length-3)];
+  if (!target) return;
+  if (target.r===d.r && Math.abs(target.c-d.c)<0.2) return;
+  d.hop = { fc:d.c, fr:d.r, tc:target.c, tr:target.r, t:0 };
+  d.face = target.c>=d.c ? 1 : -1;
+  d.squash = 1;
+}
+
+function hFerryReady(){
+  if (!LH || LH.ferry || LH.booping>0) return false;
+  if (LH.sinceFerry < H_FERRY_CD) return false;
+  const r = LH.player.r;
+  const here = hLane(r).type==="water";
+  const next = hLane(r+1).type==="water";
+  return here || next;
+}
+function hFerry(){
+  if (!LH || !LH.running || LH.booping>0) return;
+  if (!hFerryReady()){
+    if (LH.sinceFerry < H_FERRY_CD) hToast("Bernard's resting — "+(H_FERRY_CD-LH.sinceFerry)+" more", "#c9e7ff");
+    else hToast("Need a creek for a ride", "#c9e7ff");
+    return;
+  }
+  const p=LH.player;
+  let start = p.r;
+  if (hLane(start).type!=="water") start = p.r+1;
+  let end = start;
+  while (hLane(end+1).type==="water") end++;
+  const bank = end+1;
+  const col = clamp(Math.round(p.c), H_PLAY0, H_PLAY1);
+  p.hop=null; p.ride=null;
+  LH.dog.hop=null;
+  LH.ferry = { t:0, dur:0.82, fromR:p.r, toR:bank, c:col, fromC:p.c, dogFromR:LH.dog.r, dogFromC:LH.dog.c };
+  LH.sinceFerry = 0;
+  sfx.splash();
+  hToast("Hop on, Bernard!", "#b6f23a");
+}
+
+function hBoop(why){
+  if (LH.booping>0) return;
+  LH.booping = 0.7;
+  LH.flash=1; LH.shake=12; LH.flashCol="120,200,255";
+  sfx.squish();
+  hToast(why||"Boop!", "#9ee7ff");
+  const pos=hIso(LH.player.c, LH.player.r);
+  hPuff(pos.x, pos.y, "rgba(180,230,255,.9)", 18);
+}
+
+function hAfterBoop(){
+  const best=LH.best, char=H_CHAR;
+  LH=newHop(best);
+  H_CHAR=char;
+  LH.running=true;
+  LH.started=true;
+  hLane(16);
+}
+
+function hInputEdges(){
+  const now = {
+    up: keys.has("ArrowUp")||keys.has("KeyW"),
+    down: keys.has("ArrowDown")||keys.has("KeyS"),
+    left: keys.has("ArrowLeft")||keys.has("KeyA"),
+    right: keys.has("ArrowRight")||keys.has("KeyD"),
+    ferry: keys.has("Space")||keys.has("KeyX")||keys.has("KeyZ")
+  };
+  const prev = LH.prevKey;
+  if (now.up && !prev.up) hTryHop(0,1);
+  if (now.down && !prev.down) hTryHop(0,-1);
+  if (now.left && !prev.left) hTryHop(-1,0);
+  if (now.right && !prev.right) hTryHop(1,0);
+  if (now.ferry && !prev.ferry) hFerry();
+  LH.prevKey = now;
+
+  const sx=STICK.x, sy=STICK.y, mag=Math.hypot(sx,sy);
+  if (mag>0.55){
+    if (!LH.stickHeld){
+      LH.stickHeld=true;
+      if (Math.abs(sy)>=Math.abs(sx)) hTryHop(0, sy<0?1:-1);
+      else hTryHop(sx<0?-1:1, 0);
+    }
+  } else LH.stickHeld=false;
+}
+
+function hCanvasTap(p){
+  if (!LH || !LH.running) return;
+  if (LH.booping>0) return;
+  if (!LH.started){ hTryHop(0,1); return; }
+  const dpos = hIso(LH.dog.c, LH.dog.r);
+  if (Math.hypot(p.x-dpos.x, p.y-(dpos.y-36)) < 56){ hFerry(); return; }
+  const pos = hIso(LH.player.c, LH.player.r);
+  const dx=p.x-pos.x, dy=p.y-pos.y;
+  const dc = dx/(H_TW/2) - dy/(H_TH/2);
+  const dr = -dx/(H_TW/2) - dy/(H_TH/2);
+  if (Math.abs(dr)>=Math.abs(dc)) hTryHop(0, dr>0?1:-1);
+  else hTryHop(dc>0?1:-1, 0);
+}
+
+function hAnim(ent, dt, dur){
+  if (!ent.hop) return false;
+  ent.hop.t += dt / (dur||H_HOP_DUR);
+  const u = Math.min(1, ent.hop.t);
+  const s = u*u*(3-2*u);
+  ent.c = ent.hop.fc + (ent.hop.tc-ent.hop.fc)*s;
+  ent.r = ent.hop.fr + (ent.hop.tr-ent.hop.fr)*s;
+  return ent.hop.t>=1;
+}
+
+function updateHop(dt){
+  if (!LH) return;
+  pollGamepad();
+  LH.t+=dt; LH.pulse+=dt*3.2;
+  LH.shake=Math.max(0,LH.shake-dt*28);
+  LH.flash=Math.max(0,LH.flash-dt*2.4);
+  LH.player.squash=Math.max(0,LH.player.squash-dt*5);
+  LH.dog.squash=Math.max(0,LH.dog.squash-dt*5);
+  LH.dog.glow = lerp(LH.dog.glow, hFerryReady()?1:0, dt*6);
+  for (const p of LH.particles){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=180*dt; p.life-=dt; }
+  LH.particles=LH.particles.filter(p=>p.life>0);
+  for (const s of LH.toasts){ s.y-=28*dt; s.life-=dt; }
+  LH.toasts=LH.toasts.filter(s=>s.life>0);
+  for (const r of LH.ripples){ r.life-=dt; r.r+=28*dt; }
+  LH.ripples=LH.ripples.filter(r=>r.life>0);
+
+  if (LH.booping>0){
+    LH.booping-=dt;
+    if (LH.booping<=0) hAfterBoop();
+    return;
+  }
+  if (!LH.running) return;
+
+  const dist = Math.max(0, LH.player.r-2);
+  const spdMul = 1 + dist*0.018;
+
+  for (const car of LH.cars){
+    car.col += car.dir * car.speed * spdMul * dt;
+    if (car.dir>0 && car.col > H_COLS+3) car.col = -2.5;
+    if (car.dir<0 && car.col < -3) car.col = H_COLS+2.5;
+  }
+  for (const f of LH.floats){
+    f.col += f.dir * f.speed * dt;
+    f.bob += dt*3;
+    if (f.dir>0 && f.col > H_COLS+1.5) f.col = -1.2;
+    if (f.dir<0 && f.col < -1.5) f.col = H_COLS+1.2;
+    if (LH.rng()<0.02){
+      const p=hIso(f.col,f.row);
+      LH.ripples.push({x:p.x,y:p.y+6,r:6,life:.5});
+    }
+  }
+
+  if (LH.ferry){
+    const F=LH.ferry;
+    F.t += dt/F.dur;
+    const u = Math.min(1, F.t);
+    const s = u*u*(3-2*u);
+    LH.player.c = F.fromC + (F.c-F.fromC)*s;
+    LH.player.r = F.fromR + (F.toR-F.fromR)*s;
+    LH.dog.c = F.dogFromC + (F.c-F.dogFromC)*s;
+    LH.dog.r = F.dogFromR + (F.toR-F.dogFromR)*s;
+    LH.player.ride=null;
+    if (LH.t%0.08<dt){
+      const p=hIso(LH.dog.c,LH.dog.r);
+      LH.ripples.push({x:p.x,y:p.y+10,r:8,life:.55});
+      hPuff(p.x, p.y+8, "rgba(200,240,255,.8)", 3);
+    }
+    if (u>=1){
+      LH.player.c=F.c; LH.player.r=F.toR; LH.player.hop=null;
+      LH.dog.c=F.c; LH.dog.r=F.toR-1; LH.dog.hop=null;
+      LH.path.push({c:F.c,r:F.toR});
+      const rows=Math.max(0,F.toR-2);
+      if (rows>LH.rowScore){ LH.sinceFerry += rows-LH.rowScore; LH.rowScore=rows; }
+      LH.score = LH.rowScore + LH.bonus;
+      if (LH.score>LH.best){ LH.best=LH.score; saveHopBest(LH.best); }
+      LH.sinceFerry = 0;
+      LH.ferry=null;
+      LH.player.squash=1; LH.dog.squash=1;
+      sfx.bank(1);
+    }
+  } else {
+    if (hAnim(LH.player, dt, H_HOP_DUR)) hLand();
+    if (hAnim(LH.dog, dt, H_HOP_DUR+0.04)){
+      LH.dog.c = LH.dog.hop.tc; LH.dog.r = LH.dog.hop.tr; LH.dog.hop=null;
+    }
+    if (LH.player.ride){
+      LH.player.c = LH.player.ride.col;
+      if (LH.player.c < H_PLAY0-0.35 || LH.player.c > H_PLAY1+0.35){
+        hBoop("Swept away!");
+      }
+    }
+    if (!LH.player.hop && !LH.player.ride && hLane(LH.player.r).type==="street" && hCarHits(LH.player.c, LH.player.r)){
+      hBoop("Watch the cars!");
+    }
+    if (!LH.player.hop && hLane(LH.player.r).type==="yard"){
+      const lane=hLane(LH.player.r);
+      for (const sp of (lane.sprinklers||[])){
+        if (sp.c===Math.round(LH.player.c) && hSprayOn(sp,LH.t)){ hBoop("Sprinkler!"); break; }
+      }
+    }
+  }
+
+  hInputEdges();
+
+  const wantC = LH.player.c, wantR = LH.player.r - 0.35;
+  LH.camC = lerp(LH.camC, wantC, 1-Math.exp(-dt*5.5));
+  LH.camR = lerp(LH.camR, wantR, 1-Math.exp(-dt*5.5));
+
+  while (LH.lanes.length < LH.player.r + 14) hBuildLane(LH.lanes.length);
+  const minR = LH.player.r - 8;
+  if (minR>2){
+    LH.cars = LH.cars.filter(c=>c.row>=minR);
+    LH.floats = LH.floats.filter(f=>f.row>=minR);
+    LH.pickups = LH.pickups.filter(p=>p.row>=minR);
+  }
+}
+
+function hTilePoly(x,y,tw,th){
+  ctx.beginPath();
+  ctx.moveTo(x, y-th/2);
+  ctx.lineTo(x+tw/2, y);
+  ctx.lineTo(x, y+th/2);
+  ctx.lineTo(x-tw/2, y);
+  ctx.closePath();
+}
+function hDrawTile(c,r,lane){
+  const p=hIso(c,r);
+  const tw=H_TW-2, th=H_TH-2;
+  let top, left, right, stroke;
+  if (lane.type==="street"){
+    top="#5a5a66"; left="#3a3a44"; right="#2e2e36"; stroke="rgba(0,0,0,.18)";
+  } else if (lane.type==="water"){
+    const wob=0.5+0.5*Math.sin(LH.t*2.2 + c*0.7 + r);
+    top = wob>0.55 ? "#4ec6e6" : "#3aaed4";
+    left="#1e7fa3"; right="#166888"; stroke="rgba(255,255,255,.18)";
+  } else if (lane.type==="yard"){
+    top = (c+r)%2 ? "#8ee05a" : "#7ed64c";
+    left="#4ea32c"; right="#3d8a22"; stroke="rgba(40,90,20,.2)";
+  } else {
+    top = (c+r)%2 ? "#9aea62" : "#86dc52";
+    left="#57ad32"; right="#458c26"; stroke="rgba(40,90,20,.18)";
+  }
+  ctx.save();
+  hTilePoly(p.x, p.y+8, tw, th);
+  ctx.fillStyle="rgba(20,40,18,.28)";
+  ctx.fill();
+  // chunky side faces
+  ctx.beginPath();
+  ctx.moveTo(p.x-tw/2, p.y);
+  ctx.lineTo(p.x, p.y+th/2);
+  ctx.lineTo(p.x, p.y+th/2+8);
+  ctx.lineTo(p.x-tw/2, p.y+8);
+  ctx.closePath();
+  ctx.fillStyle=left; ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(p.x+tw/2, p.y);
+  ctx.lineTo(p.x, p.y+th/2);
+  ctx.lineTo(p.x, p.y+th/2+8);
+  ctx.lineTo(p.x+tw/2, p.y+8);
+  ctx.closePath();
+  ctx.fillStyle=right; ctx.fill();
+  hTilePoly(p.x, p.y, tw, th);
+  const g=ctx.createLinearGradient(p.x, p.y-th/2, p.x, p.y+th/2);
+  g.addColorStop(0, top); g.addColorStop(1, left);
+  ctx.fillStyle=g; ctx.fill();
+  ctx.strokeStyle=stroke; ctx.lineWidth=1.4; ctx.stroke();
+  if (lane.type==="street"){
+    ctx.strokeStyle="rgba(255,214,80,.75)"; ctx.lineWidth=2; ctx.setLineDash([8,10]);
+    ctx.beginPath(); ctx.moveTo(p.x-tw*0.28,p.y); ctx.lineTo(p.x+tw*0.28,p.y); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  if (lane.type==="water"){
+    ctx.strokeStyle="rgba(255,255,255,"+(0.18+0.1*Math.sin(LH.t*3+c))+")";
+    ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(p.x-18,p.y+2); ctx.quadraticCurveTo(p.x,p.y-4,p.x+18,p.y+2); ctx.stroke();
+  }
+  if (lane.type==="grass" || lane.type==="yard"){
+    ctx.fillStyle="rgba(255,255,255,.22)";
+    ctx.beginPath(); ctx.ellipse(p.x-10, p.y-th*0.18, 10, 4, -0.6, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function hDrawSprFeet(name,x,y,w,h,flip,sqx,sqy){
+  ctx.save();
+  ctx.translate(x,y);
+  if (flip) ctx.scale(-1,1);
+  ctx.scale(sqx||1, sqy||1);
+  if (!drawSprC(name, 0, -h/2, w, h, 0, false)){
+    ctx.fillStyle="#d9a06a";
+    ctx.beginPath(); ctx.ellipse(0,-h*0.35,w*0.28,h*0.38,0,0,Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function hActorPos(ent){
+  let c=ent.c, r=ent.r, air=0;
+  if (ent.hop){
+    const u=Math.min(1,ent.hop.t);
+    air = Math.sin(u*Math.PI) * 26;
+  }
+  if (LH.ferry && ent===LH.player) air = 10 + Math.sin(LH.ferry.t*Math.PI)*8;
+  const p=hIso(c,r);
+  return {x:p.x, y:p.y-air, air};
+}
+
+function drawHop(){
+  if (!LH) return;
+  ctx.save();
+  if (LH.shake){ ctx.translate((Math.random()-0.5)*LH.shake,(Math.random()-0.5)*LH.shake); }
+
+  const sky=ctx.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,"#8fd4ff"); sky.addColorStop(.42,"#c8ecff"); sky.addColorStop(1,"#8ecf5a");
+  ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle="rgba(255,255,255,.55)";
+  for (let i=0;i<5;i++){
+    const cx=((i*187 + LH.t*12)%(W+160))-80;
+    const cy=50+i*18;
+    ctx.beginPath(); ctx.ellipse(cx,cy,60,18,0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx+30,cy+6,44,14,0,0,Math.PI*2); ctx.fill();
+  }
+
+  const r0 = Math.max(0, Math.floor(LH.camR-6));
+  const r1 = Math.floor(LH.camR+12);
+  const drawables=[];
+
+  for (let r=r0;r<=r1;r++){
+    const lane=hLane(r);
+    for (let c=0;c<H_COLS;c++){
+      hDrawTile(c,r,lane);
+    }
+  }
+
+  for (const rp of LH.ripples){
+    ctx.strokeStyle="rgba(255,255,255,"+(rp.life*0.55)+")";
+    ctx.lineWidth=2;
+    ctx.beginPath(); ctx.ellipse(rp.x,rp.y, rp.r, rp.r*0.45, 0,0,Math.PI*2); ctx.stroke();
+  }
+
+  for (let r=r0;r<=r1;r++){
+    const lane=hLane(r);
+    for (const tcol of (lane.trees||[])){
+      drawables.push({z:hDepth(tcol,r)+0.2, kind:"tree", c:tcol, r});
+    }
+    if (lane.sprinklers){
+      for (const sp of lane.sprinklers){
+        drawables.push({z:hDepth(sp.c,r)+0.15, kind:"sp", sp, r});
+      }
+    }
+  }
+  for (const car of LH.cars){
+    if (car.row<r0-1||car.row>r1+1) continue;
+    drawables.push({z:hDepth(car.col, car.row)+0.4, kind:"car", car});
+  }
+  for (const f of LH.floats){
+    if (f.row<r0-1||f.row>r1+1) continue;
+    drawables.push({z:hDepth(f.col,f.row)+0.25, kind:"float", f});
+  }
+  for (const pk of LH.pickups){
+    if (pk.taken) continue;
+    if (pk.row<r0||pk.row>r1) continue;
+    drawables.push({z:hDepth(pk.c,pk.row)+0.3, kind:"pick", pk});
+  }
+  const dogP = hActorPos(LH.dog);
+  const plP = hActorPos(LH.player);
+  drawables.push({z:hDepth(LH.dog.c,LH.dog.r)+0.55, kind:"dog", p:dogP});
+  drawables.push({z:hDepth(LH.player.c,LH.player.r)+0.6, kind:"kid", p:plP});
+
+  drawables.sort((a,b)=>a.z-b.z);
+  for (const d of drawables){
+    if (d.kind==="tree"){
+      const p=hIso(d.c,d.r);
+      hDrawSprFeet("hopTree", p.x, p.y+6, 78, 96, false, 1,1);
+    } else if (d.kind==="sp"){
+      const p=hIso(d.sp.c, d.r);
+      hDrawSprFeet("hopSprinkler", p.x, p.y+4, 36, 44, false,1,1);
+      if (hSprayOn(d.sp, LH.t)){
+        ctx.save();
+        ctx.translate(p.x, p.y-28);
+        const on = 0.6+0.4*Math.sin(LH.t*14+d.sp.phase);
+        ctx.globalAlpha=0.45*on;
+        ctx.fillStyle="#b8f0ff";
+        for (let i=0;i<10;i++){
+          const a=-Math.PI/2 + (i-4.5)*0.18;
+          const len=18+10*Math.sin(LH.t*10+i);
+          ctx.beginPath(); ctx.ellipse(Math.cos(a)*len, Math.sin(a)*len, 3, 6, a, 0, Math.PI*2); ctx.fill();
+        }
+        ctx.restore();
+        ctx.globalAlpha=1;
+      }
+    } else if (d.kind==="car"){
+      const car=d.car;
+      const p=hIso(car.col, car.row);
+      const flip = car.dir<0;
+      hDrawSprFeet(car.spr, p.x, p.y+4, 118, 72, flip, 1,1);
+    } else if (d.kind==="float"){
+      const f=d.f;
+      const p=hIso(f.col, f.row);
+      const bob=Math.sin(f.bob)*3;
+      const sz = f.spr==="hopPad" ? 64 : 58;
+      hDrawSprFeet(f.spr, p.x, p.y+4+bob, sz, sz*0.72, false,1,1);
+    } else if (d.kind==="pick"){
+      const pk=d.pk;
+      const p=hIso(pk.c, pk.row);
+      const bob=Math.sin(LH.t*4+pk.bob)*5;
+      hDrawSprFeet(pk.kind==="ball"?"hopBall":"hopBone", p.x, p.y-10+bob, 28, 28, false,1,1);
+    } else if (d.kind==="dog"){
+      const p=d.p;
+      const sq = LH.dog.squash>0 ? {x:1.12,y:0.86} : {x:1,y:1};
+      if (LH.dog.hop){ const u=LH.dog.hop.t; sq.x=1-0.08*Math.sin(u*Math.PI); sq.y=1+0.14*Math.sin(u*Math.PI); }
+      ctx.save();
+      ctx.fillStyle="rgba(16,32,20,.28)";
+      ctx.beginPath(); ctx.ellipse(p.x, hIso(LH.dog.c,LH.dog.r).y+8, 22, 10, 0,0,Math.PI*2); ctx.fill();
+      if (LH.dog.glow>0.05){
+        ctx.globalAlpha=0.35+0.35*LH.dog.glow*Math.sin(LH.pulse);
+        ctx.strokeStyle="#ffe56a"; ctx.lineWidth=4;
+        ctx.beginPath(); ctx.ellipse(p.x, p.y-18, 28, 34, 0,0,Math.PI*2); ctx.stroke();
+        ctx.globalAlpha=1;
+      }
+      const swim = !!LH.ferry;
+      hDrawSprFeet(swim?"hopSwim":"hopBernard", p.x, p.y+4, swim?92:78, swim?56:70, LH.dog.face<0, sq.x, sq.y);
+      ctx.restore();
+    } else if (d.kind==="kid"){
+      const p=d.p;
+      let sx=1, sy=1;
+      if (LH.player.squash>0){ sx=1.14; sy=0.84; }
+      if (LH.player.hop){ const u=LH.player.hop.t; sx=1-0.1*Math.sin(u*Math.PI); sy=1+0.16*Math.sin(u*Math.PI); }
+      ctx.fillStyle="rgba(16,32,20,.28)";
+      ctx.beginPath(); ctx.ellipse(p.x, hIso(LH.player.c,LH.player.r).y+8, 16, 8, 0,0,Math.PI*2); ctx.fill();
+      const who = H_CHAR==="nic" ? "hopNic" : "hopGiulia";
+      hDrawSprFeet(who, p.x, p.y+2, 52, 92, LH.player.face<0, sx, sy);
+    }
+  }
+
+  for (const p of LH.particles){
+    ctx.globalAlpha=Math.max(0,p.life*2);
+    ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  if (LH.flash>0){
+    ctx.fillStyle="rgba("+LH.flashCol+","+(LH.flash*0.28)+")";
+    ctx.fillRect(0,0,W,H);
+  }
+  ctx.restore();
+
+  if (!POSTER) drawHopHUD();
+}
+
+function drawHopHUD(){
+  goldPanel(ctx, 16, 12, 168, 64, 14);
+  ctx.textAlign="left";
+  ctx.font="600 11px Fredoka, system-ui, sans-serif";
+  ctx.fillStyle="#ffe9b0";
+  ctx.fillText("ROWS", 30, 32);
+  chunky(ctx, String(LH.score), 30, 58, 26, "#fff6c9", "#4a2408");
+  goldPanel(ctx, W-176, 12, 160, 64, 14);
+  ctx.textAlign="left";
+  ctx.font="600 11px Fredoka, system-ui, sans-serif";
+  ctx.fillStyle="#ffe9b0";
+  ctx.fillText("BEST", W-162, 32);
+  chunky(ctx, String(LH.best), W-162, 58, 26, "#fff6c9", "#4a2408");
+
+  const ready = hFerryReady();
+  goldPanel(ctx, W/2-150, H-78, 300, 58, 14);
+  ctx.textAlign="center";
+  ctx.font="700 16px Fredoka, system-ui, sans-serif";
+  if (ready){
+    ctx.fillStyle="#b6f23a";
+    ctx.fillText("Bernard is ready  ·  A / B  ride", W/2, H-44);
+  } else {
+    const left = Math.max(0, H_FERRY_CD - LH.sinceFerry);
+    ctx.fillStyle="#ffe9b0";
+    ctx.fillText(LH.ferry ? "Crossing the creek…" : ("Bernard resting  ·  "+left+" rows"), W/2, H-44);
+  }
+
+  for (const s of LH.toasts){
+    ctx.globalAlpha=Math.max(0, s.life);
+    chunky(ctx, s.text, s.x, s.y, 22, s.color, "#2a1810");
+  }
+  ctx.globalAlpha=1;
+
+  if (!LH.started){
+    const pl=(Math.sin(LH.pulse)+1)/2;
+    ctx.globalAlpha=.65+pl*.35;
+    chunky(ctx,"HOP TO START",W/2,H/2+88,26,"#fff6c9","#4a1f08",700);
+    ctx.globalAlpha=1;
+    ctx.font="600 13px Fredoka, system-ui, sans-serif";
+    ctx.fillStyle="rgba(255,255,255,.85)";
+    ctx.textAlign="center";
+    ctx.fillText("d-pad hops  ·  A / B  Bernard ferry  ·  tap to hop", W/2, H/2+118);
+  }
+}
+
+function setHopChar(who){
+  H_CHAR=who;
+  const g=document.getElementById("hopGiulia"), n=document.getElementById("hopNic");
+  if (g) g.classList.toggle("chosen", who==="giulia");
+  if (n) n.classList.toggle("chosen", who==="nic");
+}
+function openHop(){
+  hideAll();
+  const el=document.getElementById("hopmenu");
+  if (el) el.classList.add("on");
+  setMark("hop");
+  MODE="hop";
+  setHopChar(H_CHAR);
+  if (!LH){ LH=newHop(0); loadHopBest(); }
+  LH.running=false; drawHop();
+}
+function startHop(){
+  const best=LH?LH.best:0;
+  LH=newHop(best);
+  MODE="hop"; setMark("hop");
+  hideAll();
+  hLane(16);
+  if (!ac) beep(1,.01);
+  syncHud();
+}
+
 // ---------------------------------------------------------------- loop
 let last=performance.now();
 let frameErr=0;
@@ -5590,6 +6391,7 @@ function frame(now){
     else if (MODE==="flap"){ if (F){ if(!PAUSED) updateFlap(d); drawFlap(); } }
     else if (MODE==="paddle"){ if (P){ if(!PAUSED) updatePaddle(d); drawPaddle(); } }
     else if (MODE==="air"){ if (A){ if(!PAUSED) updateAir(d); drawAir(); } }
+    else if (MODE==="hop"){ if (LH){ if(!PAUSED) updateHop(d); drawHop(); } }
     else if (MODE==="jeep"){ if (J){ if(!PAUSED) updateJeep(d); drawJeep(); } }
     else { if (G){ if(!PAUSED) update(d); draw(); } }
   }catch(err){
@@ -5605,6 +6407,7 @@ const titaEl=document.getElementById("titamenu");
 const flapEl=document.getElementById("flapmenu");
 const padEl=document.getElementById("paddlemenu");
 const airEl=document.getElementById("airmenu");
+const hopEl=document.getElementById("hopmenu");
 const jeepEl=document.getElementById("jeepmenu");
 const pauseEl=document.getElementById("pause");
 const overEl=document.getElementById("gameover");
@@ -5616,6 +6419,7 @@ const MARKS={
   flap:  ["Bernardy","FLAP"],
   paddle:["Giulia & Nick","PADDLE"],
   air:   ["Flying with","BERNARD"],
+  hop:   ["Lane Hoppers","BERNARD"],
   jeep:  ["Bernard Goes","OFF ROAD"]
 };
 function setMark(which){
@@ -5627,6 +6431,7 @@ function hideAll(){
   homeEl.classList.remove("on"); menuEl.classList.remove("on");
   titaEl.classList.remove("on"); flapEl.classList.remove("on"); padEl.classList.remove("on");
   airEl.classList.remove("on");
+  if (hopEl) hopEl.classList.remove("on");
   if (jeepEl) jeepEl.classList.remove("on");
   pauseEl.classList.remove("on"); PAUSED=false;
   const storyEl=document.getElementById("airstory"); if (storyEl) storyEl.classList.remove("on");
@@ -5637,7 +6442,7 @@ function refreshBests(){
   const get=k=>{ try{ return +localStorage.getItem(k)||0; }catch(e){ return 0; } };
   const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent = v ? "\u2605 "+v : ""; };
   set("bestBallies",get("ballies_best")); set("bestTita",get("tita_best")); set("bestFlap",get("flap_best"));
-  set("bestPaddle",get("paddle_best")); set("bestAir",get("air_best")); set("bestJeep",get("jeep_best"));
+  set("bestPaddle",get("paddle_best")); set("bestAir",get("air_best")); set("bestHop",get("hop_best")); set("bestJeep",get("jeep_best"));
 }
 function goHome(){
   refreshBests();
@@ -5648,6 +6453,7 @@ function goHome(){
   if (F) F.running=false;
   if (P) P.running=false;
   if (A) A.running=false;
+  if (LH) LH.running=false;
   if (J) J.running=false;
   draw();
 }
@@ -5729,13 +6535,14 @@ function updateStar(){
   if (!on("home")) return;
   const id=(GP_ITEMS.home||[])[GP.focus]||"pickFlap";
   const air=id==="pickAir";
-  const which=air?(A_PLANE==="jet"?"jet":"air"):"flap";
+  const hop=id==="pickHop";
+  const which=hop?"hop":air?(A_PLANE==="jet"?"jet":"air"):"flap";
   if (img.getAttribute("data-which")===which){ img.style.opacity="1"; return; }
   img.style.opacity="0";
   setTimeout(()=>{
-    img.src=air?(which==="jet"?"/art/bernard-jet-portrait.jpg":"/art/bernard-pilot-portrait.jpg"):"/art/bernard-portrait.jpg";
+    img.src=hop?"/art/bernard-portrait.jpg":air?(which==="jet"?"/art/bernard-jet-portrait.jpg":"/art/bernard-pilot-portrait.jpg"):"/art/bernard-portrait.jpg";
     img.setAttribute("data-which",which);
-    if (cap) cap.textContent=air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
+    if (cap) cap.textContent=hop?"The hoppers":air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
     img.style.opacity="1";
   },90);
 }
@@ -5750,7 +6557,7 @@ function startAir(){
 function gameRunning(){
   return (MODE==="tita"&&T&&T.running)||(MODE==="flap"&&F&&F.running)||
          (MODE==="paddle"&&P&&P.running)||(MODE==="air"&&A&&A.running)||
-         (MODE==="jeep"&&J&&J.running)||(MODE==="ballies"&&G&&G.running);
+         (MODE==="hop"&&LH&&LH.running)||(MODE==="jeep"&&J&&J.running)||(MODE==="ballies"&&G&&G.running);
 }
 function togglePause(){
   if (!gameRunning()) return;
@@ -5767,6 +6574,7 @@ function quitToArcade(){
     if (MODE==="flap"&&F&&F.score>F.best){ F.best=F.score; saveFlapBest(F.best); }
     if (MODE==="paddle"&&P&&P.score>P.best){ P.best=P.score; saveP(P.best); }
     if (MODE==="air"&&A&&A.score>A.best){ A.best=A.score; saveABest(A.best); }
+    if (MODE==="hop"&&LH&&LH.score>LH.best){ LH.best=LH.score; saveHopBest(LH.best); }
     if (MODE==="jeep"&&J&&J.score>J.best){ J.best=J.score; saveJeepBest(J.best); }
     if (MODE==="ballies"&&G&&G.score>G.best){ G.best=G.score; saveBest(G.best); }
   }catch(e){}
@@ -5787,7 +6595,7 @@ function startTita(){
   hideAll();
   if (!ac) beep(1,.01);
 }
-function startCurrent(){ if (MODE==="tita") startTita(); else if (MODE==="flap") startFlap(); else if (MODE==="paddle") startPaddle(); else if (MODE==="air") startAir(); else if (MODE==="jeep") startJeep(); else start(); }
+function startCurrent(){ if (MODE==="tita") startTita(); else if (MODE==="flap") startFlap(); else if (MODE==="paddle") startPaddle(); else if (MODE==="air") startAir(); else if (MODE==="hop") startHop(); else if (MODE==="jeep") startJeep(); else start(); }
 
 document.getElementById("goalNum").textContent=WIN_SCORE;
 document.getElementById("titaGoal").textContent=T_WIN;
@@ -5803,6 +6611,12 @@ document.getElementById("padStartBtn").addEventListener("click",startPaddle);
 document.getElementById("padGiulia").addEventListener("click",()=>setChar("giulia"));
 document.getElementById("padNic").addEventListener("click",()=>setChar("nic"));
 document.getElementById("pickAir").addEventListener("click",openAir);
+document.getElementById("pickHop").addEventListener("click",openHop);
+document.getElementById("hopStartBtn").addEventListener("click",startHop);
+document.getElementById("hopGiulia").addEventListener("click",()=>setHopChar("giulia"));
+document.getElementById("hopNic").addEventListener("click",()=>setHopChar("nic"));
+document.getElementById("hopGiulia").addEventListener("mouseenter",()=>setHopChar("giulia"));
+document.getElementById("hopNic").addEventListener("mouseenter",()=>setHopChar("nic"));
 document.getElementById("airStartBtn").addEventListener("click",startAir);
 document.getElementById("storyNext").addEventListener("click",storyAdvance);
 document.getElementById("airstory").addEventListener("click",e=>{ if (e.target.id==="storyNext"||e.target.closest(".play")) return; storyAdvance(); });
@@ -5867,7 +6681,8 @@ F=newFlap(0); F.running=false;
 P=newPaddle(0); P.running=false;
 A=newAir(0); A.running=false;
 J=newJeep(0); J.running=false;
-loadBest(); loadTitaBest(); loadFlapBest(); loadPBest(); loadABest(); loadJeepBest();
+LH=newHop(0); LH.running=false;
+loadBest(); loadTitaBest(); loadFlapBest(); loadPBest(); loadABest(); loadJeepBest(); loadHopBest();
 
 // Bernardy Flap's card art, rendered from a posed frame of the game
 function makeFlapPoster(){
@@ -5940,11 +6755,14 @@ window.__BA={
   state(){ return A?{weapon:A.weapon,lives:A.lives,phase:A.phase,started:!!A.started,scroll:Math.round(A.scroll),aliens:A.aliens.length,eshots:A.eshots.length,boss:A.boss&&A.boss.mode,hp:A.boss&&A.boss.hp,stage:A.boss&&A.boss.stage,kinds:(A.aliens||[]).map(a=>a.kind)}:null; },
   jeep(){ return J?{speed:Math.round(J.speed),x:Math.round(J.jeep.x),lane:+J.jeep.lane.toFixed(2),air:Math.round(J.air),fuel:Math.round(J.fuel),dist:Math.round(J.dist),started:!!J.started,running:!!J.running,yell:J.yell.text,cars:(J.cars||[]).length,cross:J.crosses.length}:null; },
   jeepGo(n){ if(J){ J.dist=n; J.started=true; J.running=true; J.fuel=100; jSpawnAhead(); } },
-  jeepFuel(){ if(J) J.fuel=100; }
+  jeepFuel(){ if(J) J.fuel=100; },
+  hop(){ return LH?{score:LH.score,best:LH.best,c:+LH.player.c.toFixed(2),r:LH.player.r,started:!!LH.started,running:!!LH.running,ferry:!!LH.ferry,ready:hFerryReady(),cars:LH.cars.length,char:H_CHAR}:null; },
+  hopGo(n){ if(LH){ LH.player.r=n; LH.started=true; LH.running=true; } },
+  hopRide(){ hFerry(); }
 };
 window.__controlsTest={
-  getYaw(){ return (MODE==="jeep"&&J) ? J.jeep.x : (MODE==="air"&&A&&A.ship) ? A.ship.x : 0; },
-  getSpeed(){ return (MODE==="jeep"&&J) ? J.speed : (MODE==="air"&&A&&A.started) ? 1 : 0; },
+  getYaw(){ return (MODE==="hop"&&LH) ? LH.player.c : (MODE==="jeep"&&J) ? J.jeep.x : (MODE==="air"&&A&&A.ship) ? A.ship.x : 0; },
+  getSpeed(){ return (MODE==="hop"&&LH) ? LH.player.r : (MODE==="jeep"&&J) ? J.speed : (MODE==="air"&&A&&A.started) ? 1 : 0; },
   setKeys(codes){
     keys.clear();
     STICK.x=0; STICK.y=0;
