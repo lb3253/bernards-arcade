@@ -3807,7 +3807,7 @@ function drawPaddleHUD(){
   ctx.beginPath(); ctx.roundRect(gx,gy,Math.max(5,gw*gf),9,5); ctx.fill();
   ctx.textAlign="center"; ctx.font="600 10px Fredoka, system-ui, sans-serif";
   ctx.fillStyle="rgba(255,255,255,.72)";
-  ctx.fillText((P_CHAR==="giulia"?"GIULIA":"NIC")+"  \u00b7  "+P.balls+" balls  \u00b7  "+Math.round(gf*100)+"% to the boat", W/2, gy+26);
+  ctx.fillText((P_CHAR==="giulia"?"GIULIA":"NICK")+"  \u00b7  "+P.balls+" balls  \u00b7  "+Math.round(gf*100)+"% to the boat", W/2, gy+26);
 
   // paddle prompt
   ctx.textAlign="center";
@@ -5603,7 +5603,7 @@ function startJeep(){
 }
 
 // ================================================================
-//  LANE HOPPERS WITH BERNARD  —  Nic or Giulia, Bernard the ferry
+//  LANE HOPPERS WITH BERNARD  —  Nick or Giulia, Bernard the ferry
 //  Glossy 3/4 isometric endless hopper. Companion, never a rival.
 // ================================================================
 const H_COLS = 9;
