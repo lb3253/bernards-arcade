@@ -296,10 +296,10 @@ body{
 }
 .lobby{
   display:grid;
-  grid-template-columns:1fr minmax(96px,128px) 1fr;
-  grid-template-rows:1fr;
+  grid-template-columns:1fr 1fr 1fr;
+  grid-template-rows:auto 1fr;
   align-items:end;
-  gap:14px;
+  gap:12px;
   flex:1 1 auto;
   min-height:0;
   width:100%;
@@ -309,16 +309,16 @@ body{
   margin:0;
   text-align:center;
   width:100%;
-  max-width:128px;
+  max-width:none;
   flex:0 0 auto;
-  align-self:center;
+  grid-column:1 / -1;
   justify-self:center;
 }
 .star img{
-  width:112px !important;
-  height:112px !important;
-  max-width:112px;
-  max-height:112px;
+  width:92px !important;
+  height:92px !important;
+  max-width:92px;
+  max-height:92px;
   aspect-ratio:1 / 1;
   object-fit:cover;
   object-position:58% 12%;
@@ -330,18 +330,19 @@ body{
   transition:opacity .18s ease;
 }
 .star img[data-which="air"],.star img[data-which="jet"]{object-position:50% 38%}
+.star img[data-which="jeep"]{object-position:50% 28%}
 .star figcaption{
   margin-top:6px;font-size:10px;font-weight:700;letter-spacing:.28em;text-indent:.28em;
   color:#ffe9b0;text-transform:uppercase;text-shadow:0 2px 8px rgba(0,0,0,.9);
 }
 .picks,.picks-two{display:contents}
 .lobby > .pick.cab{
-  height:68% !important;
-  max-height:420px;
-  min-height:180px;
+  height:100% !important;
+  max-height:380px;
+  min-height:160px;
   display:flex;
   flex-direction:column;
-  align-self:end;
+  align-self:stretch;
 }
 .lobby > .pick.cab .thumb{
   flex:1 1 auto;
@@ -352,9 +353,14 @@ body{
 }
 #pickFlap .thumb{background-image:url("/art/card-flap.jpg") !important;background-position:center 35% !important}
 #pickAir .thumb{background-image:url("/art/card-air.jpg") !important;background-position:center 42% !important}
+#pickJeep .thumb{background-image:url("/art/card-jeep.jpg") !important;background-position:center 42% !important}
 #airmenu .shot{background-image:url("/art/card-air.jpg");background-size:cover;background-position:center;transition:opacity .18s ease}
 #airmenu.jet .shot{background-image:url("/art/card-air-jet.jpg")}
 #flapmenu .shot{background-image:url("/art/card-flap.jpg")}
+#jeepmenu .shot{background-image:url("/art/card-jeep.jpg");background-size:cover;background-position:center 40%}
+#jeepmenu .scrim{
+  background:linear-gradient(180deg, rgba(8,20,12,0) 0%, rgba(8,20,12,.2) 48%, rgba(6,16,10,.92) 100%);
+}
 .snesbar{
   display:flex;gap:12px 18px;justify-content:center;align-items:center;flex-wrap:wrap;
   font-size:12px;font-weight:600;color:#e8dce8;letter-spacing:.04em;
@@ -454,7 +460,7 @@ footer{color:#b8b8c8}
   footer > span:first-of-type{display:none}
   .lobby{
     grid-template-columns:1fr 1fr !important;
-    grid-template-rows:auto 1fr !important;
+    grid-template-rows:auto 1fr 1fr !important;
     align-items:stretch !important;
     gap:10px;
   }
@@ -468,21 +474,23 @@ footer{color:#b8b8c8}
   .star figcaption{display:none}
   .lobby > .pick.cab{
     height:100% !important;
-    min-height:160px !important;
+    min-height:140px !important;
     max-height:none !important;
     width:100% !important;
   }
+  #pickJeep{grid-column:1 / -1}
   .pick .sub{display:none}
-  .pick .nm{font-size:16px}
+  .pick .nm{font-size:15px}
 }
 
 @media (max-height:480px) and (orientation:landscape){
   .star{display:none}
   .lobby{
-    grid-template-columns:1fr 1fr !important;
+    grid-template-columns:1fr 1fr 1fr !important;
     grid-template-rows:1fr !important;
   }
   .lobby > .pick.cab{height:100% !important;min-height:0 !important;max-height:none !important}
+  #pickJeep{grid-column:auto}
   .phonebar,.snesbar{display:none}
   .marquee{padding:4px 12px}
   footer{display:none}
@@ -498,7 +506,7 @@ footer{color:#b8b8c8}
   background:linear-gradient(180deg, transparent, rgba(0,0,0,.35));
 }
 #hudpad.on{display:flex}
-#hudpad .stick, #hudpad #hudFire{pointer-events:auto;touch-action:none}
+#hudpad .stick, #hudpad #hudFire, #hudpad #hudBrake{pointer-events:auto;touch-action:none}
 #hudpad .stick{
   width:118px;height:118px;border-radius:50%;
   background:rgba(10,10,16,.45);
@@ -520,6 +528,20 @@ footer{color:#b8b8c8}
   box-shadow:0 6px 0 #5a1410, 0 12px 18px rgba(0,0,0,.4);
 }
 #hudFire:active{transform:translateY(4px);box-shadow:0 2px 0 #5a1410}
+#hudpad .btns{
+  display:flex;flex-direction:column;gap:10px;align-items:center;
+}
+#hudBrake{
+  display:none;
+  width:72px;height:72px;border-radius:50%;
+  font-family:inherit;font-weight:800;font-size:11px;letter-spacing:.1em;
+  color:#fff;border:3px solid #3e2160;
+  background:radial-gradient(circle at 32% 28%,#c9a0ea,#7a4ab0 55%,#3e2160);
+  box-shadow:0 6px 0 #2a1640, 0 12px 18px rgba(0,0,0,.4);
+}
+#hudBrake:active{transform:translateY(4px);box-shadow:0 2px 0 #2a1640}
+body[data-screen="jeep"] #hudFire{font-size:13px}
+body[data-screen="jeep"] #hudBrake{display:block}
 
 @media (min-width:821px){
   #hudpad.on{display:none}

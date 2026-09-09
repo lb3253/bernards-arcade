@@ -32,7 +32,14 @@ loadSpr("disc","/art/spr-disc.png");
 loadSpr("scout","/art/spr-scout.png");
 loadSpr("missile","/art/spr-missile.png");
 loadSpr("plasma","/art/spr-plasma.png");
-["fly","biplane","jet","balloon","storm","skyAir","saucer","drone","diver","mothership","disc","scout","missile","plasma"].forEach(n=>{ SPR[n].addEventListener("load",()=>{ try{ if(typeof bakeAirSky==="function") bakeAirSky(); if(typeof bakeFlapSky==="function") bakeFlapSky(); }catch(e){} }); });
+loadSpr("jeep","/art/spr-jeep.png");
+loadSpr("traffic","/art/spr-traffic.png");
+loadSpr("traffic2","/art/spr-traffic2.png");
+loadSpr("jrock","/art/spr-jrock.png");
+loadSpr("jfuel","/art/spr-jfuel.png");
+loadSpr("mud","/art/spr-mud.png");
+loadSpr("skyJeep","/art/sky-jeep.jpg");
+["fly","biplane","jet","balloon","storm","skyAir","saucer","drone","diver","mothership","disc","scout","missile","plasma","jeep","skyJeep"].forEach(n=>{ SPR[n].addEventListener("load",()=>{ try{ if(typeof bakeAirSky==="function") bakeAirSky(); if(typeof bakeFlapSky==="function") bakeFlapSky(); if(typeof bakeJeepSky==="function") bakeJeepSky(); }catch(e){} }); });
 function sprReady(name){
   const im=SPR[name];
   return !!(im && im.complete && im.naturalWidth>0);
@@ -255,12 +262,13 @@ let pointer={down:false,x:0,y:0};
 const GP = { idx:null, id:"", prev:{}, focus:0, lastScreen:"", navHold:0, lastBtn:"" };
 
 const GP_ITEMS = {
-  home:     ["pickFlap","pickAir"],
+  home:     ["pickFlap","pickJeep","pickAir"],
   menu:     ["startBtn","menuBack"],
   titamenu: ["titaStartBtn","titaBack"],
   flapmenu: ["flapStartBtn","flapBack"],
   paddlemenu: ["padGiulia","padNic","padStartBtn","padBack"],
   airmenu: ["airBiplane","airJet","airStartBtn","airBack"],
+  jeepmenu: ["jeepStartBtn","jeepBack"],
   airstory: ["storyNext"],
   pause: ["pauseResume","pauseSound","pauseQuit"],
   over:     ["againBtn","overHome"]
@@ -274,6 +282,7 @@ function gpScreen(){
   if (on("pause")) return "pause";
   if (on("paddlemenu")) return "paddlemenu";
   if (on("airmenu")) return "airmenu";
+  if (on("jeepmenu")) return "jeepmenu";
   if (on("airstory")) return "airstory";
   if (on("gameover")) return "over";
   return "play";
@@ -434,9 +443,18 @@ function pollGamepad(){
   if (left)  keys.add("ArrowLeft");  else keys.delete("ArrowLeft");
   if (right) keys.add("ArrowRight"); else keys.delete("ArrowRight");
 
-  if (face && !GP.prev.face) actionDown();
-  if (!face && GP.prev.face) actionUp();
-  GP.prev.face=face;
+  // Jeep: B (0/2) is held GAS, A (1/3) is held BRAKE — not edge-fired face buttons
+  if (MODE==="jeep"){
+    const gasB = !!(b[0]&&b[0].pressed)||!!(b[2]&&b[2].pressed);
+    const brkB = !!(b[1]&&b[1].pressed)||!!(b[3]&&b[3].pressed);
+    if (gasB) keys.add("KeyX"); else keys.delete("KeyX");
+    if (brkB) keys.add("ShiftLeft"); else keys.delete("ShiftLeft");
+    GP.prev.face=face;
+  } else {
+    if (face && !GP.prev.face) actionDown();
+    if (!face && GP.prev.face) actionUp();
+    GP.prev.face=face;
+  }
 
   if (gpEdge("pausePlay",startB)) togglePause();
   if (gpEdge("selPlay",selB)){
@@ -471,7 +489,7 @@ addEventListener("keydown",e=>{
     return;
   }
   if (e.code==="Escape"||e.code==="KeyP"||e.code==="Backspace"){ togglePause(); e.preventDefault(); return; }
-  if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code)) e.preventDefault();
+  if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","KeyX","KeyZ","ShiftLeft","ShiftRight"].includes(e.code)) e.preventDefault();
   if (e.code==="Space" && !keys.has("Space")) actionDown();
   keys.add(e.code);
 });
@@ -483,7 +501,7 @@ function canvasPos(e){
 cv.addEventListener("pointerdown",e=>{
   e.preventDefault(); cv.setPointerCapture(e.pointerId);
   const p=canvasPos(e);
-  if (MODE==="flap"||MODE==="paddle"||MODE==="air"){ actionDown(); return; }
+  if (MODE==="flap"||MODE==="paddle"||MODE==="air"||MODE==="jeep"){ actionDown(); return; }
   if (MODE==="tita"){ pointer={down:true,x:p.x,y:p.y}; actionDown(); return; }
   if (G && G.carry.length && Math.hypot(p.x-THROW_BTN.x,p.y-THROW_BTN.y)<THROW_BTN.r){
     pointer={down:false,x:p.x,y:p.y}; startCharge(); return;
@@ -500,14 +518,18 @@ const STICK = {x:0, y:0};
 function syncHud(){
   const hud=document.getElementById("hudpad");
   if (!hud) return;
-  const play = IS_TOUCH && MODE==="air" && A && A.running && !PAUSED;
+  const jeepOn = MODE==="jeep" && J && J.running && !PAUSED;
+  const play = IS_TOUCH && ((MODE==="air" && A && A.running && !PAUSED) || jeepOn);
   hud.classList.toggle("on", !!play);
   hud.setAttribute("aria-hidden", play ? "false" : "true");
+  const fire=document.getElementById("hudFire");
+  if (fire) fire.textContent = MODE==="jeep" ? "GAS" : "FIRE";
 }
 (function setupTouchHud(){
   const stick=document.getElementById("stick");
   const knob=document.getElementById("knob");
   const fire=document.getElementById("hudFire");
+  const brake=document.getElementById("hudBrake");
   if (!stick || !knob || !fire) return;
   let sid=null;
   function at(e){
@@ -529,6 +551,14 @@ function syncHud(){
   fire.addEventListener("pointerdown",e=>{ e.preventDefault(); e.stopPropagation(); fire.setPointerCapture(e.pointerId); actionDown(); });
   fire.addEventListener("pointerup",e=>{ e.preventDefault(); actionUp(); });
   fire.addEventListener("pointercancel",()=>actionUp());
+  if (brake){
+    brake.addEventListener("pointerdown",e=>{
+      e.preventDefault(); e.stopPropagation(); brake.setPointerCapture(e.pointerId);
+      if (J) J.touchBrake=true;
+    });
+    brake.addEventListener("pointerup",e=>{ e.preventDefault(); if (J) J.touchBrake=false; });
+    brake.addEventListener("pointercancel",()=>{ if (J) J.touchBrake=false; });
+  }
 })();
 
 let MODE="ballies";
@@ -537,9 +567,14 @@ function actionDown(){
   else if (MODE==="flap") flapJump();
   else if (MODE==="paddle") pStroke();
   else if (MODE==="air") airFire();
+  else if (MODE==="jeep"){ if (J) J.touchGas=true; }
   else startCharge();
 }
-function actionUp(){ if (MODE==="ballies") releaseCharge(); else if (MODE==="air" && A) A.firing=false; }
+function actionUp(){
+  if (MODE==="ballies") releaseCharge();
+  else if (MODE==="air" && A) A.firing=false;
+  else if (MODE==="jeep" && J) J.touchGas=false;
+}
 
 function startCharge(){
   if (!G || !G.running || !G.carry.length) return;
@@ -4737,6 +4772,613 @@ function finishAirWin(){
   hideAll(); over.classList.add("on");
 }
 
+// ================================================================
+//  BERNARD GOES OFF ROAD!  —  white Jeep, Tita riding shotgun
+// ================================================================
+const J_GOAL = 10800;
+const J_MAXV = 286;
+const J_ACCEL = 210;
+const J_BRAKE = 420;
+const J_DRAG = 38;
+const J_XMIN = 118, J_XMAX = 470;
+const J_FUEL0 = 100;
+let J = null, jbg = null;
+
+function jGround(wx){
+  return 448
+    + Math.sin(wx*0.0037)*34
+    + Math.sin(wx*0.0091+1.2)*18
+    + Math.sin(wx*0.021+0.4)*9
+    + Math.sin(wx*0.041)*4;
+}
+function jLaneY(lane, wx){
+  return jGround(wx) - 62 + lane*128;
+}
+function jWorldX(){ return J.dist + J.jeep.x; }
+function jSX(wx){ return wx - J.dist; }
+
+function newJeep(best){
+  return {
+    t:0, pulse:0, running:true, started:false, over:false, won:false,
+    score:0, best:best||0, balls:0, cans:0, bumps:0,
+    dist:0, speed:0, fuel:J_FUEL0,
+    jeep:{ x:210, lane:0.48, vy:0, tilt:0, inv:0, blink:0, flash:0 },
+    air:0, airV:0,
+    items:[], hazards:[], crosses:[], cars:[],
+    nextItem:520, nextCross:1680,
+    particles:[], toasts:[], confetti:[], dust:[],
+    shake:0, flash:0, flashCol:"224,58,47",
+    yell:{ text:"", life:0, cool:0 },
+    touchGas:false, touchBrake:false,
+    winFx:0
+  };
+}
+function jToast(text,color,x,y){
+  J.toasts.push({text,color,x:x===undefined?W/2:x,y:y===undefined?220:y,life:1.15});
+}
+function jBurst(x,y,color,n,spd){
+  spd=spd||180;
+  for(let i=0;i<n;i++){
+    const a=rand(0,6.28), s=rand(40,spd);
+    J.particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-40,life:rand(.25,.65),color,r:rand(2,5)});
+  }
+}
+function titaYell(msg, force){
+  if (!J) return;
+  if (!force && J.yell.cool>0) return;
+  J.yell={ text:msg, life:1.7, cool: force?1.1:2.4 };
+  try{ sfx.bark(); }catch(e){}
+}
+function saveJeepBest(v){ try{ localStorage.setItem("jeep_best",String(v)); }catch(e){} }
+function loadJeepBest(){ try{ const v=+localStorage.getItem("jeep_best"); if(v&&J) J.best=v; }catch(e){} }
+
+function jOnCross(wx){
+  for (const c of J.crosses) if (wx>c.wx-30 && wx<c.wx+c.w+30) return c;
+  return null;
+}
+function jSpawnCross(wx){
+  const w=rand(280,360);
+  J.crosses.push({wx, w});
+  const n=3+Math.floor(rand(0,3));
+  for (let i=0;i<n;i++){
+    const fromTop=Math.random()<.5;
+    J.cars.push({
+      wx: wx + 36 + i*((w-72)/Math.max(n-1,1)) + rand(-10,10),
+      y: fromTop ? rand(-80,-20) : rand(H+20,H+90),
+      vy: (fromTop?1:-1)*rand(150,240),
+      kind: Math.random()<.5?0:1,
+      hit:false,
+      born: wx
+    });
+  }
+}
+function jSpawnAhead(){
+  const R=J.dist+W+240;
+  while (J.nextItem<R){
+    const wx=J.nextItem;
+    J.nextItem += rand(220,360);
+    if (jOnCross(wx)) continue;
+    const lane=rand(0.16,0.84);
+    const roll=Math.random();
+    if (roll<.44) J.items.push({wx, lane, kind: Math.random()<.18?"gold":"green", taken:false, bob:rand(0,6)});
+    else if (roll<.68) J.items.push({wx, lane, kind:"fuel", taken:false, bob:rand(0,6)});
+    else if (roll<.84) J.hazards.push({wx, lane, type:"rock", hit:false});
+    else J.hazards.push({wx, lane, type:"mud", hit:false, w:rand(78,120)});
+  }
+  while (J.nextCross<R && J.nextCross<J_GOAL-700){
+    jSpawnCross(J.nextCross);
+    J.nextCross += rand(1550,2300);
+  }
+}
+
+function jBump(kind){
+  const jp=J.jeep;
+  if (jp.inv>0) return;
+  jp.inv=1.05; jp.flash=.28; jp.blink=0;
+  J.bumps++;
+  J.flash=.45; J.flashCol="255,120,80";
+  if (!REDUCED) J.shake=12;
+  J.speed *= kind==="car"?0.34:0.58;
+  jp.x = Math.max(J_XMIN, jp.x - (kind==="car"?54:22));
+  if (kind==="car"){
+    titaYell("Watch the cars!", true);
+    jToast("Watch it!","#ff9ec4", jp.x, jLaneY(jp.lane, jWorldX())-70);
+    try{ sfx.yelp(); }catch(e){}
+  } else if (kind==="rock"){
+    titaYell("Watch it!", true);
+    J.airV = Math.min(J.airV, -160);
+    J.air = Math.max(J.air, 8);
+    try{ sfx.squish(); }catch(e){}
+  } else {
+    titaYell("Slow down Bernard!", true);
+    try{ sfx.splash(); }catch(e){}
+  }
+  jBurst(jp.x, jLaneY(jp.lane, jWorldX())-J.air, "#e8d2a0", 12, 160);
+}
+
+function jEnd(why){
+  if (!J.running) return;
+  J.running=false; J.over=true;
+  const newBest=J.score>J.best && J.score>0;
+  if (newBest){ J.best=J.score; saveJeepBest(J.best); }
+  const won=why==="trail";
+  J.won=won;
+  if (won){
+    try{ sfx.win(); }catch(e){}
+    const cols=["#ffcf3a","#b6f23a","#ff8fc4","#6fd0ff","#fff6c9"];
+    for(let i=0;i<110;i++)
+      J.confetti.push({ x:rand(0,W), y:rand(-250,-10), vx:rand(-46,46), vy:rand(70,230),
+        sz:rand(6,13), rot:rand(0,6.3), vr:rand(-7,7),
+        col:cols[Math.floor(rand(0,cols.length))], life:rand(2.4,4.6) });
+    J.winFx=1.4;
+  } else {
+    try{ sfx.over(); }catch(e){}
+    titaYell("We need gas!", true);
+  }
+  const over=document.getElementById("gameover");
+  over.classList.remove("won","lost"); over.classList.add(won?"won":"lost");
+  document.getElementById("overShot").style.backgroundImage="url('/art/card-jeep.jpg')";
+  document.getElementById("overTitle").textContent = won ? "End of the trail!" : "Out of gas";
+  document.getElementById("finalLine").textContent = won
+    ? ("Bernard and Tita made it. "+J.balls+" balls, "+J.cans+" fuel cans, "+J.score+" points"
+      +(J.bumps? ", and "+J.bumps+" close call"+(J.bumps===1?"":"s") : " — Tita barely yelled")
+      +". "+(newBest?"New best run.":"Best so far: "+J.best+"."))
+    : ("The Jeep coughed to a stop after "+Math.round(J.dist/J_GOAL*100)+"% of the trail. "
+      +J.score+" points, "+J.balls+" balls. Tita packed snacks — next time pack more gas. "
+      +(newBest?"Still a new best.":"Best so far: "+J.best+"."));
+  over.classList.add("on");
+}
+
+function jGasHeld(){
+  return keys.has("Space")||keys.has("KeyX")||(J&&J.touchGas);
+}
+function jBrakeHeld(){
+  return keys.has("ShiftLeft")||keys.has("ShiftRight")||keys.has("KeyZ")||keys.has("KeyC")||(J&&J.touchBrake);
+}
+
+function updateJeep(dt){
+  if (!J) return;
+  pollGamepad();
+  J.t+=dt; J.pulse+=dt*3.4;
+  J.shake=Math.max(0,J.shake-dt*28); J.flash=Math.max(0,J.flash-dt*2.2);
+  J.winFx=Math.max(0,J.winFx-dt);
+  const jp=J.jeep;
+  jp.inv=Math.max(0,jp.inv-dt); jp.flash=Math.max(0,jp.flash-dt); jp.blink+=dt*16;
+  J.yell.life=Math.max(0,J.yell.life-dt); J.yell.cool=Math.max(0,J.yell.cool-dt);
+  for (const p of J.particles){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=140*dt; p.life-=dt; }
+  J.particles=J.particles.filter(p=>p.life>0);
+  for (const s of J.toasts){ s.y-=28*dt; s.life-=dt; }
+  J.toasts=J.toasts.filter(s=>s.life>0);
+  for (const c of J.confetti){ c.x+=c.vx*dt; c.y+=c.vy*dt; c.vy+=52*dt; c.rot+=c.vr*dt; c.life-=dt; }
+  J.confetti=J.confetti.filter(c=>c.life>0&&c.y<H+40);
+  for (const d of J.dust){ d.x+=d.vx*dt; d.y+=d.vy*dt; d.life-=dt; d.r+=12*dt; }
+  J.dust=J.dust.filter(d=>d.life>0);
+  if (!J.running) return;
+
+  if (!J.started){
+    if (jGasHeld()) J.started=true;
+    else {
+      jp.x=210+Math.sin(J.t*1.6)*6;
+      jp.tilt=Math.sin(J.t*1.6)*.04;
+      return;
+    }
+  }
+
+  // ---- steer: A/left = left on screen, D/right = right; W/up S/down = trail lane
+  let mx=0, my=0;
+  if (keys.has("ArrowLeft")||keys.has("KeyA")||STICK.x<-.28) mx-=1;
+  if (keys.has("ArrowRight")||keys.has("KeyD")||STICK.x>.28) mx+=1;
+  if (keys.has("ArrowUp")||keys.has("KeyW")||STICK.y<-.28) my-=1;
+  if (keys.has("ArrowDown")||keys.has("KeyS")||STICK.y>.28) my+=1;
+  const steerScale = 0.35 + 0.65*clamp(J.speed/J_MAXV,0,1);
+  jp.x = clamp(jp.x + mx*240*steerScale*dt, J_XMIN, J_XMAX);
+  jp.vy = lerp(jp.vy, my*1.15, 1-Math.pow(.04,dt));
+  jp.lane = clamp(jp.lane + jp.vy*dt, 0.08, 0.92);
+
+  const gas=jGasHeld(), brk=jBrakeHeld();
+  if (brk) J.speed = Math.max(0, J.speed - J_BRAKE*dt);
+  else if (gas) J.speed = Math.min(J_MAXV, J.speed + J_ACCEL*dt);
+  else J.speed = Math.max(0, J.speed - J_DRAG*dt);
+
+  const wx=jWorldX();
+  const g0=jGround(wx), g1=jGround(wx+36);
+  const slope=(g1-g0)/36;
+  if (slope>0.22) J.speed = Math.max(0, J.speed - slope*90*dt);
+  if (slope<-0.12 && J.speed>40) J.speed = Math.min(J_MAXV+20, J.speed - slope*40*dt);
+
+  // catch air off a crest
+  const rise = jGround(wx-48) - g0;
+  if (J.air<=0 && J.speed>155 && rise>11){
+    J.airV = -(140 + J.speed*0.85 + rise*4);
+    J.air = 4;
+    titaYell("Hold on!");
+    jBurst(jp.x-20, jLaneY(jp.lane,wx)+18, "rgba(232,210,160,.9)", 8, 120);
+  }
+  if (J.air>0 || J.airV<0){
+    J.airV += 900*dt;
+    J.air -= J.airV * dt;
+    if (J.air>150){ J.air=150; J.airV=Math.max(0,J.airV); }
+    if (J.air<=0){ J.air=0; J.airV=0; }
+  }
+  jp.tilt = lerp(jp.tilt, clamp(slope*0.85 + (J.air>0?J.airV*0.0007:0) + mx*0.08, -0.42, 0.42), dt*8);
+
+  J.dist += J.speed*dt;
+  J.fuel -= (1.55 + J.speed*0.0064)*dt;
+  if (J.fuel<=0){ J.fuel=0; jEnd("fuel"); return; }
+  if (J.dist>=J_GOAL){ J.dist=J_GOAL; jEnd("trail"); return; }
+
+  jSpawnAhead();
+
+  const visY=jLaneY(jp.lane, wx) - J.air;
+  const jhw=78, jhh=34;
+
+  // mud drag
+  let inMud=false;
+  for (const h of J.hazards){
+    const hx=jSX(h.wx);
+    if (hx<-80||hx>W+80) continue;
+    const hy=jLaneY(h.lane, h.wx);
+    if (h.type==="mud"){
+      const hw=h.w||90;
+      if (Math.abs(hx-jp.x)<(hw+jhw)/2 && Math.abs(hy-visY)<48 && J.air<18){
+        inMud=true;
+        J.speed = Math.max(0, J.speed - 160*dt);
+      }
+    } else if (h.type==="rock" && !h.hit){
+      if (Math.abs(hx-jp.x)<(52+jhw)/2 && Math.abs(hy-visY)<(30+jhh)/2 && J.air<22){
+        h.hit=true;
+        jBump("rock");
+      }
+    }
+  }
+
+  // cars (Frogger cross-traffic)
+  let nearCar=false;
+  for (const c of J.cars){
+    c.y += c.vy*dt;
+    if (c.y>H+90 && c.vy>0){ c.y=-70; c.hit=false; }
+    if (c.y<-90 && c.vy<0){ c.y=H+70; c.hit=false; }
+    const cx=jSX(c.wx);
+    if (cx>-80 && cx<W+80 && Math.abs(c.y-visY)<160) nearCar=true;
+    if (c.hit) continue;
+    if (Math.abs(cx-jp.x)<(58+jhw)/2 && Math.abs(c.y-visY)<(28+jhh)/2 && J.air<36){
+      c.hit=true;
+      jBump("car");
+    }
+  }
+  J.cars=J.cars.filter(c=> jSX(c.wx)<W+240);
+
+  // pickups
+  for (const it of J.items){
+    if (it.taken) continue;
+    const ix=jSX(it.wx), iy=jLaneY(it.lane, it.wx)+Math.sin(J.t*2.2+it.bob)*6;
+    if (Math.abs(ix-jp.x)<(30+jhw)/2 && Math.abs(iy-visY)<(28+jhh)/2 + Math.min(J.air,22)){
+      it.taken=true;
+      if (it.kind==="fuel"){
+        J.fuel=Math.min(100, J.fuel+32);
+        J.cans++; J.score+=15;
+        jToast("+FUEL","#b6f23a", ix, iy-28);
+        try{ sfx.bank(1); }catch(e){}
+      } else {
+        const val=it.kind==="gold"?40:25;
+        J.balls++; J.score+=val;
+        jToast("+"+val, it.kind==="gold"?"#ffcf3a":"#b6f23a", ix, iy-28);
+        try{ sfx.pick(it.kind); }catch(e){}
+      }
+      jBurst(ix, iy, it.kind==="fuel"?"#b6f23a":"#fff6c9", 10, 140);
+    }
+  }
+  J.items=J.items.filter(it=>!it.taken && jSX(it.wx)<W+160);
+  J.hazards=J.hazards.filter(h=>jSX(h.wx)<W+160);
+  J.crosses=J.crosses.filter(c=>jSX(c.wx+c.w)<W+80);
+
+  // dust
+  if (J.air<=0 && J.speed>50 && Math.random()<dt*18){
+    J.dust.push({ x:jp.x-60+rand(-8,8), y:visY+28+rand(-4,6), vx:rand(-80,-20), vy:rand(-18,10),
+      life:rand(.25,.5), r:rand(4,9), col: inMud?"rgba(90,70,40,.45)":"rgba(210,180,120,.4)" });
+  }
+
+  // Tita looking out for him
+  if (J.yell.life<=0){
+    if (J.fuel<20) titaYell("We need gas!");
+    else if (nearCar && J.speed>90) titaYell("Watch the cars!");
+    else if (J.speed>250) titaYell("Slow down Bernard!");
+    else if (J.speed<28 && J.t>4) titaYell("Go! Go!");
+  }
+
+  J.score = Math.max(J.score, Math.floor(J.dist/20) + J.balls*25 + J.cans*15);
+}
+
+function bakeJeepSky(){
+  jbg=document.createElement("canvas"); jbg.width=W; jbg.height=H;
+  const b=jbg.getContext("2d");
+  const sky=b.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,"#6ec4f0"); sky.addColorStop(.42,"#c5e38a"); sky.addColorStop(1,"#d9c07a");
+  b.fillStyle=sky; b.fillRect(0,0,W,H);
+  if (sprReady("skyJeep")){
+    const im=SPR.skyJeep;
+    const sh=im.naturalHeight*0.40;
+    b.drawImage(im, 0, 0, im.naturalWidth, sh, 0, 0, W, H*0.42);
+    const fade=b.createLinearGradient(0,H*0.38,0,H*0.56);
+    fade.addColorStop(0,"rgba(197,227,138,0)");
+    fade.addColorStop(1,"#c5e38a");
+    b.fillStyle=fade; b.fillRect(0, H*0.38, W, H*0.22);
+  }
+}
+
+function drawJeepTrail(){
+  // far palmettos / bushes
+  ctx.fillStyle="rgba(46,92,48,.55)";
+  for(let i=0;i<14;i++){
+    const x=((i*130 - J.dist*.28)%(W+130)+W+130)%(W+130)-50;
+    const y=318+Math.sin(i*1.7)*18;
+    ctx.beginPath(); ctx.ellipse(x,y,18,42,0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x-16,y+8,14,32,-.3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x+16,y+8,14,32,.3,0,Math.PI*2); ctx.fill();
+  }
+  // paved intersections
+  for (const c of J.crosses){
+    const x0=jSX(c.wx), x1=x0+c.w;
+    if (x1<0||x0>W) continue;
+    ctx.fillStyle="#5a5c62";
+    ctx.fillRect(x0, 0, c.w, H);
+    ctx.fillStyle="#6e7076";
+    ctx.fillRect(x0+8, 0, c.w-16, H);
+    ctx.strokeStyle="rgba(255,255,255,.75)"; ctx.lineWidth=4; ctx.setLineDash([18,16]);
+    ctx.beginPath(); ctx.moveTo(x0+c.w/2, 0); ctx.lineTo(x0+c.w/2, H); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle="#e8c84a";
+    ctx.fillRect(x0,0,8,H); ctx.fillRect(x1-8,0,8,H);
+  }
+  // dirt band
+  ctx.beginPath();
+  ctx.moveTo(0,H);
+  for (let x=0;x<=W;x+=8){
+    const wx=J.dist+x;
+    ctx.lineTo(x, jGround(wx)+92);
+  }
+  ctx.lineTo(W,H); ctx.closePath();
+  const dirt=ctx.createLinearGradient(0,400,0,H);
+  dirt.addColorStop(0,"#c9a15a"); dirt.addColorStop(.45,"#8a6230"); dirt.addColorStop(1,"#4a3218");
+  ctx.fillStyle=dirt; ctx.fill();
+  ctx.beginPath();
+  for (let x=0;x<=W;x+=8){
+    const wx=J.dist+x;
+    const y=jGround(wx);
+    if (x===0) ctx.moveTo(x,y-78);
+    else ctx.lineTo(x,y-78);
+  }
+  for (let x=W;x>=0;x-=8){
+    ctx.lineTo(x, jGround(J.dist+x)+88);
+  }
+  ctx.closePath();
+  const trail=ctx.createLinearGradient(0,300,0,560);
+  trail.addColorStop(0,"#e6c882"); trail.addColorStop(.5,"#c4964a"); trail.addColorStop(1,"#8d5e28");
+  ctx.fillStyle=trail; ctx.fill();
+  // ruts
+  ctx.strokeStyle="rgba(90,56,20,.28)"; ctx.lineWidth=3;
+  for (const off of [-28, 18]){
+    ctx.beginPath();
+    for (let x=0;x<=W;x+=10){
+      const y=jGround(J.dist+x)+off+Math.sin((J.dist+x)*0.05)*2;
+      if (x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+  // finish banner
+  const fx=jSX(J_GOAL);
+  if (fx>-40 && fx<W+40){
+    ctx.fillStyle="#c9f24d";
+    ctx.fillRect(fx-6, 80, 12, H-160);
+    ctx.fillStyle="#3a1f08";
+    ctx.fillRect(fx-70, 86, 140, 36);
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    chunky(ctx,"FINISH", fx, 104, 18, "#fff6c9", "#3a1f08", 700);
+  }
+}
+
+function drawTitaBubble(x,y){
+  if (!J.yell.life) return;
+  const a=clamp(J.yell.life*1.6,0,1);
+  const msg=J.yell.text;
+  ctx.save();
+  ctx.globalAlpha=a;
+  ctx.font="700 15px Fredoka, system-ui, sans-serif";
+  const tw=Math.max(90, ctx.measureText(msg).width+28);
+  const bx=clamp(x+70, tw/2+8, W-tw/2-8), by=y-78;
+  ctx.fillStyle="#fff6e8";
+  ctx.beginPath(); ctx.roundRect(bx-tw/2, by-20, tw, 36, 14); ctx.fill();
+  ctx.strokeStyle="#c46a8a"; ctx.lineWidth=2.5; ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x+36, y-40); ctx.lineTo(bx-18, by+14); ctx.lineTo(bx-6, by+14);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle="#7a2a48"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillText(msg, bx, by-1);
+  ctx.restore();
+}
+
+function drawJeep(){
+  if (!jbg) bakeJeepSky();
+  ctx.save();
+  if (J.shake>.4){ const s=J.shake*.45; ctx.translate(rand(-s,s),rand(-s,s)); }
+  if (jbg){
+    ctx.drawImage(jbg, 0, 0, W, H);
+  } else {
+    ctx.fillStyle="#7ec8ef"; ctx.fillRect(0,0,W,H);
+  }
+  drawJeepTrail();
+
+  for (const h of J.hazards){
+    const hx=jSX(h.wx); if (hx<-90||hx>W+90) continue;
+    const hy=jLaneY(h.lane, h.wx);
+    if (h.type==="mud"){
+      const hw=h.w||90;
+      if (!drawSprC("mud", hx, hy+16, hw, 48, 0)){
+        ctx.fillStyle="rgba(70,48,24,.55)";
+        ctx.beginPath(); ctx.ellipse(hx,hy+18,hw/2,18,0,0,Math.PI*2); ctx.fill();
+      }
+    } else {
+      ctx.globalAlpha=h.hit?0.45:1;
+      if (!drawSprC("jrock", hx, hy, 54, 46, 0)){
+        ctx.fillStyle="#6a5a4a";
+        ctx.beginPath(); ctx.ellipse(hx,hy,22,16,0,0,Math.PI*2); ctx.fill();
+      }
+      ctx.globalAlpha=1;
+    }
+  }
+  for (const it of J.items){
+    const ix=jSX(it.wx); if (ix<-50||ix>W+50) continue;
+    const iy=jLaneY(it.lane, it.wx)+Math.sin(J.t*2.2+it.bob)*6;
+    if (it.kind==="fuel"){
+      if (!drawSprC("jfuel", ix, iy, 36, 52, Math.sin(J.t*2+it.bob)*.08)){
+        ctx.fillStyle="#c9f24d"; ctx.fillRect(ix-10,iy-16,20,32);
+        ctx.fillStyle="#3a1f08"; ctx.font="700 11px Fredoka, system-ui, sans-serif";
+        ctx.textAlign="center"; ctx.fillText("GAS", ix, iy+24);
+      }
+    } else {
+      const k=KINDS[it.kind]||KINDS.green;
+      ctx.fillStyle="rgba(255,255,255,.28)"; ctx.beginPath(); ctx.arc(ix,iy,16,0,Math.PI*2); ctx.fill();
+      orb(ctx,ix,iy,11,k.light,k.dark);
+    }
+  }
+  for (const c of J.cars){
+    const cx=jSX(c.wx); if (cx<-80||cx>W+80) continue;
+    const key=c.kind? "traffic2":"traffic";
+    ctx.globalAlpha=c.hit?0.5:1;
+    if (!drawSprC(key, cx, c.y, 100, 56, 0)){
+      ctx.fillStyle=c.kind?"#d94a3a":"#3a6ad9";
+      ctx.beginPath(); ctx.roundRect(cx-36,c.y-16,72,32,8); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+
+  const jp=J.jeep;
+  const wx=jWorldX();
+  const visY=jLaneY(jp.lane, wx) - J.air;
+  // shadow
+  ctx.fillStyle="rgba(40,24,8,"+(J.air>0?0.18:0.32)+")";
+  ctx.beginPath(); ctx.ellipse(jp.x-6, jLaneY(jp.lane,wx)+32, 70+J.air*0.15, 12+J.air*0.04, 0,0,Math.PI*2); ctx.fill();
+  const blinkOff = jp.inv>0 && Math.floor(jp.blink)%2===1;
+  if (!blinkOff){
+    ctx.save();
+    if (jp.flash>0){ ctx.globalAlpha=0.7+jp.flash; }
+    if (!drawSprC("jeep", jp.x, visY, 220, 124, jp.tilt)){
+      ctx.fillStyle="#f4f1ea";
+      ctx.beginPath(); ctx.roundRect(jp.x-90, visY-36, 180, 72, 16); ctx.fill();
+    }
+    ctx.restore();
+  }
+  if (jp.flash>0){
+    ctx.save(); ctx.globalAlpha=jp.flash*1.8; ctx.globalCompositeOperation="lighter";
+    ctx.fillStyle="#ffffff"; ctx.beginPath(); ctx.ellipse(jp.x, visY, 100, 40, jp.tilt, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  for (const d of J.dust){
+    ctx.globalAlpha=clamp(d.life*1.8,0,1);
+    ctx.fillStyle=d.col; ctx.beginPath(); ctx.arc(d.x,d.y,d.r,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  for (const p of J.particles){
+    ctx.globalAlpha=clamp(p.life*1.7,0,1);
+    ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  for (const c of J.confetti){
+    ctx.globalAlpha=clamp(c.life,0,1);
+    ctx.save(); ctx.translate(c.x,c.y); ctx.rotate(c.rot);
+    ctx.fillStyle=c.col; ctx.fillRect(-c.sz/2,-c.sz/3,c.sz,c.sz*.66);
+    ctx.restore();
+  }
+  ctx.globalAlpha=1;
+
+  drawTitaBubble(jp.x, visY);
+
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  for (const t of J.toasts){
+    ctx.globalAlpha=clamp(t.life*1.5,0,1);
+    chunky(ctx,t.text,t.x,t.y,17,t.color,"#231206",700);
+  }
+  ctx.globalAlpha=1;
+  if (!POSTER) drawJeepHUD();
+  ctx.restore();
+  drawGlass();
+  if (J.flash>0){ ctx.fillStyle="rgba("+J.flashCol+","+(J.flash*.28)+")"; ctx.fillRect(0,0,W,H); }
+}
+
+function drawJeepHUD(){
+  goldPanel(ctx,16,14,178,52,13);
+  ctx.textAlign="left"; ctx.textBaseline="middle";
+  chunky(ctx,String(J.score),30,38,26,"#fff6c9","#4a1f08",700);
+  ctx.textAlign="right";
+  ctx.font="600 11px Fredoka, system-ui, sans-serif";
+  ctx.fillStyle="rgba(255,255,255,.5)"; ctx.fillText("BEST "+J.best,182,30);
+
+  const gw=300,gx=W/2-gw/2,gy=26,gf=clamp(J.dist/J_GOAL,0,1);
+  ctx.fillStyle="rgba(20,28,12,.55)";
+  ctx.beginPath(); ctx.roundRect(gx-6,gy-7,gw+12,22,11); ctx.fill();
+  ctx.fillStyle="rgba(0,0,0,.35)";
+  ctx.beginPath(); ctx.roundRect(gx,gy,gw,9,5); ctx.fill();
+  const gg=ctx.createLinearGradient(0,gy,0,gy+9);
+  gg.addColorStop(0,"#e2c36a"); gg.addColorStop(1,"#b07a22");
+  ctx.fillStyle=gg;
+  ctx.beginPath(); ctx.roundRect(gx,gy,Math.max(5,gw*gf),9,5); ctx.fill();
+  ctx.textAlign="center"; ctx.font="600 10px Fredoka, system-ui, sans-serif";
+  ctx.fillStyle="rgba(255,255,255,.78)";
+  ctx.fillText(Math.round(gf*100)+"%  ·  "+J.balls+" balls  ·  trail", W/2, gy+26);
+
+  // fuel
+  goldPanel(ctx,W-236,14,220,52,13);
+  ctx.textAlign="left";
+  ctx.font="700 11px Fredoka, system-ui, sans-serif";
+  ctx.fillStyle="#ffe9b0"; ctx.fillText("FUEL", W-220, 32);
+  const fw=168, fx=W-220, fy=40, ff=clamp(J.fuel/100,0,1);
+  ctx.fillStyle="#1a1008"; ctx.beginPath(); ctx.roundRect(fx,fy,fw,10,5); ctx.fill();
+  const fg=ctx.createLinearGradient(fx,0,fx+fw,0);
+  fg.addColorStop(0, ff<.25?"#ff6a5e":"#c9f24d");
+  fg.addColorStop(1, ff<.25?"#c4211a":"#6ba712");
+  ctx.fillStyle=fg;
+  ctx.beginPath(); ctx.roundRect(fx,fy,Math.max(4,fw*ff),10,5); ctx.fill();
+
+  // speed pips
+  const sp=clamp(J.speed/J_MAXV,0,1);
+  ctx.fillStyle="rgba(20,28,12,.5)";
+  ctx.beginPath(); ctx.roundRect(W-118,H-46,102,26,13); ctx.fill();
+  for(let i=0;i<6;i++){
+    ctx.fillStyle = sp*6>i ? (i>=5?"#ff6a5e":"#b6f23a") : "rgba(255,255,255,.2)";
+    ctx.beginPath(); ctx.arc(W-104+i*16,H-33,5,0,Math.PI*2); ctx.fill();
+  }
+
+  if (!J.started){
+    const pl=(Math.sin(J.pulse*2.2)+1)/2;
+    ctx.globalAlpha=.6+pl*.4;
+    chunky(ctx,"HOLD GAS",W/2,H-92,26,"#fff6c9","#3a1f08",700);
+    ctx.globalAlpha=1;
+    ctx.font="600 13px Fredoka, system-ui, sans-serif";
+    ctx.fillStyle="rgba(255,255,255,.88)";
+    ctx.textAlign="center";
+    ctx.fillText("d-pad steers  ·  B gas  ·  A brake  ·  watch the cars", W/2, H-62);
+  }
+}
+
+function openJeep(){
+  hideAll();
+  const el=document.getElementById("jeepmenu");
+  if (el) el.classList.add("on");
+  setMark("jeep");
+  MODE="jeep";
+  if (!J){ J=newJeep(0); loadJeepBest(); }
+  J.running=false; drawJeep();
+}
+function startJeep(){
+  const best=J?J.best:0;
+  J=newJeep(best);
+  MODE="jeep"; setMark("jeep");
+  hideAll();
+  if (!ac) beep(1,.01);
+  syncHud();
+}
+
 // ---------------------------------------------------------------- loop
 let last=performance.now();
 let frameErr=0;
@@ -4753,6 +5395,7 @@ function frame(now){
     else if (MODE==="flap"){ if (F){ if(!PAUSED) updateFlap(d); drawFlap(); } }
     else if (MODE==="paddle"){ if (P){ if(!PAUSED) updatePaddle(d); drawPaddle(); } }
     else if (MODE==="air"){ if (A){ if(!PAUSED) updateAir(d); drawAir(); } }
+    else if (MODE==="jeep"){ if (J){ if(!PAUSED) updateJeep(d); drawJeep(); } }
     else { if (G){ if(!PAUSED) update(d); draw(); } }
   }catch(err){
     // never let one bad frame stop the loop — the TV would just freeze
@@ -4767,6 +5410,7 @@ const titaEl=document.getElementById("titamenu");
 const flapEl=document.getElementById("flapmenu");
 const padEl=document.getElementById("paddlemenu");
 const airEl=document.getElementById("airmenu");
+const jeepEl=document.getElementById("jeepmenu");
 const pauseEl=document.getElementById("pause");
 const overEl=document.getElementById("gameover");
 
@@ -4776,7 +5420,8 @@ const MARKS={
   tita:  ["Tita","SCOLDER"],
   flap:  ["Bernardy","FLAP"],
   paddle:["Giulia & Nick","PADDLE"],
-  air:   ["Flying with","BERNARD"]
+  air:   ["Flying with","BERNARD"],
+  jeep:  ["Bernard Goes","OFF ROAD"]
 };
 function setMark(which){
   document.querySelector(".mark .eyebrow").textContent=MARKS[which][0];
@@ -4786,7 +5431,9 @@ function setMark(which){
 function hideAll(){
   homeEl.classList.remove("on"); menuEl.classList.remove("on");
   titaEl.classList.remove("on"); flapEl.classList.remove("on"); padEl.classList.remove("on");
-  airEl.classList.remove("on"); pauseEl.classList.remove("on"); PAUSED=false;
+  airEl.classList.remove("on");
+  if (jeepEl) jeepEl.classList.remove("on");
+  pauseEl.classList.remove("on"); PAUSED=false;
   const storyEl=document.getElementById("airstory"); if (storyEl) storyEl.classList.remove("on");
   overEl.classList.remove("on","won","lost");
   syncHud();
@@ -4795,7 +5442,7 @@ function refreshBests(){
   const get=k=>{ try{ return +localStorage.getItem(k)||0; }catch(e){ return 0; } };
   const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent = v ? "\u2605 "+v : ""; };
   set("bestBallies",get("ballies_best")); set("bestTita",get("tita_best")); set("bestFlap",get("flap_best"));
-  set("bestPaddle",get("paddle_best")); set("bestAir",get("air_best"));
+  set("bestPaddle",get("paddle_best")); set("bestAir",get("air_best")); set("bestJeep",get("jeep_best"));
 }
 function goHome(){
   refreshBests();
@@ -4806,6 +5453,7 @@ function goHome(){
   if (F) F.running=false;
   if (P) P.running=false;
   if (A) A.running=false;
+  if (J) J.running=false;
   draw();
 }
 function openBallies(){
@@ -4886,13 +5534,14 @@ function updateStar(){
   if (!on("home")) return;
   const id=(GP_ITEMS.home||[])[GP.focus]||"pickFlap";
   const air=id==="pickAir";
-  const which=air?(A_PLANE==="jet"?"jet":"air"):"flap";
+  const jeep=id==="pickJeep";
+  const which=jeep?"jeep":air?(A_PLANE==="jet"?"jet":"air"):"flap";
   if (img.getAttribute("data-which")===which){ img.style.opacity="1"; return; }
   img.style.opacity="0";
   setTimeout(()=>{
-    img.src=air?(which==="jet"?"/art/bernard-jet-portrait.jpg":"/art/bernard-pilot-portrait.jpg"):"/art/bernard-portrait.jpg";
+    img.src=jeep?"/art/tita-portrait.jpg":air?(which==="jet"?"/art/bernard-jet-portrait.jpg":"/art/bernard-pilot-portrait.jpg"):"/art/bernard-portrait.jpg";
     img.setAttribute("data-which",which);
-    if (cap) cap.textContent=air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
+    if (cap) cap.textContent=jeep?"Tita":air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
     img.style.opacity="1";
   },90);
 }
@@ -4906,7 +5555,8 @@ function startAir(){
 // ---- pause / quit, reachable from every game
 function gameRunning(){
   return (MODE==="tita"&&T&&T.running)||(MODE==="flap"&&F&&F.running)||
-         (MODE==="paddle"&&P&&P.running)||(MODE==="air"&&A&&A.running)||(MODE==="ballies"&&G&&G.running);
+         (MODE==="paddle"&&P&&P.running)||(MODE==="air"&&A&&A.running)||
+         (MODE==="jeep"&&J&&J.running)||(MODE==="ballies"&&G&&G.running);
 }
 function togglePause(){
   if (!gameRunning()) return;
@@ -4923,6 +5573,7 @@ function quitToArcade(){
     if (MODE==="flap"&&F&&F.score>F.best){ F.best=F.score; saveFlapBest(F.best); }
     if (MODE==="paddle"&&P&&P.score>P.best){ P.best=P.score; saveP(P.best); }
     if (MODE==="air"&&A&&A.score>A.best){ A.best=A.score; saveABest(A.best); }
+    if (MODE==="jeep"&&J&&J.score>J.best){ J.best=J.score; saveJeepBest(J.best); }
     if (MODE==="ballies"&&G&&G.score>G.best){ G.best=G.score; saveBest(G.best); }
   }catch(e){}
   PAUSED=false; goHome();
@@ -4942,7 +5593,7 @@ function startTita(){
   hideAll();
   if (!ac) beep(1,.01);
 }
-function startCurrent(){ if (MODE==="tita") startTita(); else if (MODE==="flap") startFlap(); else if (MODE==="paddle") startPaddle(); else if (MODE==="air") startAir(); else start(); }
+function startCurrent(){ if (MODE==="tita") startTita(); else if (MODE==="flap") startFlap(); else if (MODE==="paddle") startPaddle(); else if (MODE==="air") startAir(); else if (MODE==="jeep") startJeep(); else start(); }
 
 document.getElementById("goalNum").textContent=WIN_SCORE;
 document.getElementById("titaGoal").textContent=T_WIN;
@@ -4958,6 +5609,8 @@ document.getElementById("padStartBtn").addEventListener("click",startPaddle);
 document.getElementById("padGiulia").addEventListener("click",()=>setChar("giulia"));
 document.getElementById("padNic").addEventListener("click",()=>setChar("nic"));
 document.getElementById("pickAir").addEventListener("click",openAir);
+document.getElementById("pickJeep").addEventListener("click",openJeep);
+document.getElementById("jeepStartBtn").addEventListener("click",startJeep);
 document.getElementById("airStartBtn").addEventListener("click",startAir);
 document.getElementById("storyNext").addEventListener("click",storyAdvance);
 document.getElementById("airstory").addEventListener("click",e=>{ if (e.target.id==="storyNext"||e.target.closest(".play")) return; storyAdvance(); });
@@ -4989,6 +5642,7 @@ bakeTitaRoom();
 bakeFlapSky();
 bakePaddleSea();
 bakeAirSky();
+bakeJeepSky();
 
 // Tita Scolder's menu art is rendered from the game's own scene — a posed
 // frame of the living room, grabbed off the canvas at load.
@@ -5020,7 +5674,8 @@ T=newTita(0); T.running=false;
 F=newFlap(0); F.running=false;
 P=newPaddle(0); P.running=false;
 A=newAir(0); A.running=false;
-loadBest(); loadTitaBest(); loadFlapBest(); loadPBest(); loadABest();
+J=newJeep(0); J.running=false;
+loadBest(); loadTitaBest(); loadFlapBest(); loadPBest(); loadABest(); loadJeepBest();
 
 // Bernardy Flap's card art, rendered from a posed frame of the game
 function makeFlapPoster(){
@@ -5090,6 +5745,23 @@ window.__BA={
   setW(n){ if(A) A.weapon=n|0; },
   hit(){ if(A) airHit("test hit","plane"); },
   hurt(n){ if(A&&A.boss){ A.boss.hp=Math.max(0,A.boss.hp-(n||1)); if(A.boss.hp>0 && A.boss.hp<=10) bossBreakDown(A.boss); if(A.boss.hp<=0){ A.boss.hp=0; A.boss.state="crack"; A.boss.crack=0; } } },
-  state(){ return A?{weapon:A.weapon,lives:A.lives,phase:A.phase,started:!!A.started,scroll:Math.round(A.scroll),aliens:A.aliens.length,eshots:A.eshots.length,boss:A.boss&&A.boss.mode,hp:A.boss&&A.boss.hp,stage:A.boss&&A.boss.stage,kinds:(A.aliens||[]).map(a=>a.kind)}:null; }
+  state(){ return A?{weapon:A.weapon,lives:A.lives,phase:A.phase,started:!!A.started,scroll:Math.round(A.scroll),aliens:A.aliens.length,eshots:A.eshots.length,boss:A.boss&&A.boss.mode,hp:A.boss&&A.boss.hp,stage:A.boss&&A.boss.stage,kinds:(A.aliens||[]).map(a=>a.kind)}:null; },
+  jeep(){ return J?{speed:Math.round(J.speed),x:Math.round(J.jeep.x),lane:+J.jeep.lane.toFixed(2),air:Math.round(J.air),fuel:Math.round(J.fuel),dist:Math.round(J.dist),started:!!J.started,running:!!J.running,yell:J.yell.text,cars:(J.cars||[]).length,cross:J.crosses.length}:null; },
+  jeepGo(n){ if(J){ J.dist=n; J.started=true; J.running=true; J.fuel=100; jSpawnAhead(); } },
+  jeepFuel(){ if(J) J.fuel=100; }
+};
+window.__controlsTest={
+  getYaw(){ return (MODE==="jeep"&&J) ? J.jeep.x : (MODE==="air"&&A&&A.ship) ? A.ship.x : 0; },
+  getSpeed(){ return (MODE==="jeep"&&J) ? J.speed : (MODE==="air"&&A&&A.started) ? 1 : 0; },
+  setKeys(codes){
+    keys.clear();
+    STICK.x=0; STICK.y=0;
+    if (J){ J.touchGas=false; J.touchBrake=false; }
+    for (const c of (codes||[])){
+      keys.add(c);
+      if ((c==="Space"||c==="KeyX") && J) J.touchGas=true;
+      if ((c==="ShiftLeft"||c==="KeyZ") && J) J.touchBrake=true;
+    }
+  }
 };
 })();
