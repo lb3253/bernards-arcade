@@ -275,13 +275,12 @@ let pointer={down:false,x:0,y:0};
 const GP = { idx:null, id:"", prev:{}, focus:0, lastScreen:"", navHold:0, lastBtn:"" };
 
 const GP_ITEMS = {
-  home:     ["pickFlap","pickJeep","pickAir"],
+  home:     ["pickFlap","pickAir"],
   menu:     ["startBtn","menuBack"],
   titamenu: ["titaStartBtn","titaBack"],
   flapmenu: ["flapStartBtn","flapBack"],
   paddlemenu: ["padGiulia","padNic","padStartBtn","padBack"],
   airmenu: ["airBiplane","airJet","airStartBtn","airBack"],
-  jeepmenu: ["jeepStartBtn","jeepBack"],
   airstory: ["storyNext"],
   pause: ["pauseResume","pauseSound","pauseQuit"],
   over:     ["againBtn","overHome"]
@@ -295,7 +294,6 @@ function gpScreen(){
   if (on("pause")) return "pause";
   if (on("paddlemenu")) return "paddlemenu";
   if (on("airmenu")) return "airmenu";
-  if (on("jeepmenu")) return "jeepmenu";
   if (on("airstory")) return "airstory";
   if (on("gameover")) return "over";
   return "play";
@@ -531,12 +529,11 @@ const STICK = {x:0, y:0};
 function syncHud(){
   const hud=document.getElementById("hudpad");
   if (!hud) return;
-  const jeepOn = MODE==="jeep" && J && J.running && !PAUSED;
-  const play = IS_TOUCH && ((MODE==="air" && A && A.running && !PAUSED) || jeepOn);
+  const play = IS_TOUCH && MODE==="air" && A && A.running && !PAUSED;
   hud.classList.toggle("on", !!play);
   hud.setAttribute("aria-hidden", play ? "false" : "true");
   const fire=document.getElementById("hudFire");
-  if (fire) fire.textContent = MODE==="jeep" ? "GAS" : "FIRE";
+  if (fire) fire.textContent = "FIRE";
 }
 (function setupTouchHud(){
   const stick=document.getElementById("stick");
@@ -5732,14 +5729,13 @@ function updateStar(){
   if (!on("home")) return;
   const id=(GP_ITEMS.home||[])[GP.focus]||"pickFlap";
   const air=id==="pickAir";
-  const jeep=id==="pickJeep";
-  const which=jeep?"jeep":air?(A_PLANE==="jet"?"jet":"air"):"flap";
+  const which=air?(A_PLANE==="jet"?"jet":"air"):"flap";
   if (img.getAttribute("data-which")===which){ img.style.opacity="1"; return; }
   img.style.opacity="0";
   setTimeout(()=>{
-    img.src=jeep?"/art/tita-portrait.jpg":air?(which==="jet"?"/art/bernard-jet-portrait.jpg":"/art/bernard-pilot-portrait.jpg"):"/art/bernard-portrait.jpg";
+    img.src=air?(which==="jet"?"/art/bernard-jet-portrait.jpg":"/art/bernard-pilot-portrait.jpg"):"/art/bernard-portrait.jpg";
     img.setAttribute("data-which",which);
-    if (cap) cap.textContent=jeep?"Tita":air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
+    if (cap) cap.textContent=air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
     img.style.opacity="1";
   },90);
 }
@@ -5807,8 +5803,6 @@ document.getElementById("padStartBtn").addEventListener("click",startPaddle);
 document.getElementById("padGiulia").addEventListener("click",()=>setChar("giulia"));
 document.getElementById("padNic").addEventListener("click",()=>setChar("nic"));
 document.getElementById("pickAir").addEventListener("click",openAir);
-document.getElementById("pickJeep").addEventListener("click",openJeep);
-document.getElementById("jeepStartBtn").addEventListener("click",startJeep);
 document.getElementById("airStartBtn").addEventListener("click",startAir);
 document.getElementById("storyNext").addEventListener("click",storyAdvance);
 document.getElementById("airstory").addEventListener("click",e=>{ if (e.target.id==="storyNext"||e.target.closest(".play")) return; storyAdvance(); });
