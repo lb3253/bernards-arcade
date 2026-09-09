@@ -62,6 +62,9 @@ loadSpr("hopCarRed","/art/spr-hop-car-red.png");
 loadSpr("hopCarYel","/art/spr-hop-car-yel.png");
 loadSpr("hopCarBlu","/art/spr-hop-car-blu.png");
 loadSpr("hopCarGrn","/art/spr-hop-car-grn.png");
+loadSpr("hopTrain","/art/spr-hop-train.png");
+loadSpr("hopTracks","/art/spr-hop-tracks.png");
+loadSpr("hopSignal","/art/spr-hop-signal.png");
 loadSpr("hopPad","/art/spr-hop-pad.png");
 loadSpr("hopRing","/art/spr-hop-ring.png");
 loadSpr("hopDuck","/art/spr-hop-duck.png");
@@ -6045,25 +6048,29 @@ function hBuildLane(row){
   const rnd = LH.rng;
   let type = "grass";
   const prev = (row>0 && LH.lanes[row-1]) ? LH.lanes[row-1].type : "grass";
-  let lastW = -99, lastS = -99, lastY = -99;
+  let lastW = -99, lastS = -99, lastY = -99, lastT = -99;
   for (let i=0;i<row;i++){
     const t = LH.lanes[i] && LH.lanes[i].type;
     if (t==="water") lastW=i;
     if (t==="street") lastS=i;
     if (t==="yard") lastY=i;
+    if (t==="tracks") lastT=i;
   }
   if (row <= 3) type = "grass";
   else if (row === 5) type = "water";
   else if (row === 8) type = "street";
-  else if (prev==="water" || prev==="yard") type = "grass";
+  else if (row === 14) type = "tracks";
+  else if (prev==="water" || prev==="yard" || prev==="tracks") type = "grass";
   else if (prev==="street") type = (rnd()<0.38 ? "street" : "grass");
   else if (row-lastW >= 6) type = "water";
+  else if (row-lastT >= 9 && row-lastW>2 && row-lastS>1) type = "tracks";
   else if (row-lastS >= 5) type = "street";
   else {
     const roll = rnd();
-    if (roll<0.28) type="street";
-    else if (roll<0.50) type="water";
-    else if (roll<0.64 && row-lastY>4) type="yard";
+    if (roll<0.24) type="street";
+    else if (roll<0.44) type="water";
+    else if (roll<0.56 && row-lastY>4) type="yard";
+    else if (roll<0.64 && row-lastT>8) type="tracks";
     else type="grass";
   }
   const lane = { type, row, dir: rnd()<0.5 ? -1 : 1, phase: rnd()*6.28, trees:[] };
@@ -6081,6 +6088,14 @@ function hBuildLane(row){
       used[c]=1;
       lane.sprinklers.push({c, phase: rnd()*4, period: 2.6 + rnd()*1.0});
     }
+  }
+  if (type==="tracks"){
+    lane.clock = rnd()*4;
+    lane.period = 11 + rnd()*3;
+    lane.warn = false;
+    lane.trainOn = false;
+    lane.trainCol = -8;
+    lane.trainW = 5.4;
   }
   LH.lanes[row] = lane;
   if (type==="street") hSpawnCars(lane);
@@ -6102,7 +6117,8 @@ function hSpawnCars(lane){
       dir, speed, w: 1.25,
       pal: H_CAR_PAL[palI],
       palI,
-      kind: H_CAR_KINDS[(LH.rng()*H_CAR_KINDS.length)|0]
+      kind: H_CAR_KINDS[(LH.rng()*H_CAR_KINDS.length)|0],
+      w: 1.55
     });
     col += gap + LH.rng()*1.15;
   }
@@ -6149,6 +6165,13 @@ function hCarHits(c, r){
   }
   return null;
 }
+function hTrainHits(c, r){
+  r = Math.round(r);
+  const lane = hLane(r);
+  if (lane.type!=="tracks" || !lane.trainOn) return null;
+  if (Math.abs((lane.trainCol||0) - c) < (lane.trainW||5)*0.48 + 0.35) return lane;
+  return null;
+}
 function hPadAt(c, r, slop){
   slop = slop==null ? 0.55 : slop;
   let best=null, bd=9;
@@ -6164,6 +6187,7 @@ function hCanStand(c, r){
   if (r < 0) return false;
   const lane = hLane(r);
   if (lane.type==="street") return !hCarHits(c,r);
+  if (lane.type==="tracks") return !hTrainHits(c,r);
   if (lane.type==="water") return !!hPadAt(c,r,0.62);
   if (lane.type==="yard"){
     for (const sp of (lane.sprinklers||[])){
@@ -6208,7 +6232,7 @@ function hLand(){
     if (pad){ p.ride=pad; p.c=pad.col; }
   }
   if (!hCanStand(p.c, p.r)){
-    hBoop(lane.type==="water" ? "Splash!" : lane.type==="street" ? "Watch the cars!" : "Sprinkler!");
+    hBoop(lane.type==="water" ? "Splash!" : lane.type==="street" ? "Watch the cars!" : lane.type==="tracks" ? "Train!" : "Sprinkler!");
     return;
   }
   LH.path.push({c:Math.round(p.c), r:p.r});
@@ -6378,6 +6402,21 @@ function updateHop(dt){
     if (car.dir>0 && car.col > H_COLS+2.2) car.col = -1.6;
     if (car.dir<0 && car.col < -1.6) car.col = H_COLS+2.2;
   }
+  for (let i=0;i<LH.lanes.length;i++){
+    const lane=LH.lanes[i];
+    if (!lane || lane.type!=="tracks") continue;
+    lane.clock = (lane.clock||0)+dt;
+    const C = lane.period||12;
+    const u = lane.clock % C;
+    const was = !!lane.warn;
+    lane.warn = u>=3.5 && u<8.6;
+    if (lane.warn && !was){ try{ beep(880,.08,"square",.045); setTimeout(()=>beep(660,.08,"square",.04),90); }catch(e){} }
+    lane.trainOn = u>=5.4 && u<8.3;
+    if (lane.trainOn){
+      const k=(u-5.4)/2.9;
+      lane.trainCol = lane.dir>0 ? (-5.6 + k*(H_COLS+11.2)) : (H_COLS+5.6 - k*(H_COLS+11.2));
+    } else lane.trainCol = lane.dir>0 ? -8 : H_COLS+8;
+  }
   for (const f of LH.floats){
     if (hLane(f.row).type!=="water") continue;
     f.col += f.dir * f.speed * dt;
@@ -6431,6 +6470,9 @@ function updateHop(dt){
     }
     if (!LH.player.hop && !LH.player.ride && hLane(LH.player.r).type==="street" && hCarHits(LH.player.c, LH.player.r)){
       hBoop("Watch the cars!");
+    }
+    if (!LH.player.hop && !LH.player.ride && hLane(LH.player.r).type==="tracks" && hTrainHits(LH.player.c, LH.player.r)){
+      hBoop("Train!");
     }
     if (!LH.player.hop && hLane(LH.player.r).type==="yard"){
       const lane=hLane(LH.player.r);
@@ -7000,6 +7042,7 @@ function hDrawTile(c,r,lane){
   let name="hopGrassTop";
   if (lane.type==="street") name="hopRoadTop";
   else if (lane.type==="water") name="hopWaterTop";
+  else if (lane.type==="tracks") name="hopTracks";
   else if (lane.type==="yard") name="hopGrassTop2";
   else name = ((c+r)&1) ? "hopGrassTop2" : "hopGrassTop";
   ctx.save();
@@ -7009,7 +7052,7 @@ function hDrawTile(c,r,lane){
   if (sprReady(name)){
     ctx.drawImage(SPR[name], x0, y0, H_TW, H_TH);
   } else {
-    ctx.fillStyle = lane.type==="street"?"#5a5a64":lane.type==="water"?"#2aa0c8":"#5aaa32";
+    ctx.fillStyle = lane.type==="street"?"#5a5a64":lane.type==="water"?"#2aa0c8":lane.type==="tracks"?"#6a5a48":"#5aaa32";
     ctx.fillRect(x0, y0, H_TW, H_TH);
   }
   ctx.restore();
@@ -7059,13 +7102,45 @@ function hDrawCarArt(car,x,y){
   const names=["hopCarRed","hopCarYel","hopCarBlu","hopCarGrn"];
   const n=names[(car.palI||0)%names.length];
   if (sprReady(n)){
-    drawSprC(n, x, y, 112, 52, 0, car.dir<0);
+    const im=SPR[n];
+    const hh=50;
+    const ww=hh*(im.naturalWidth/Math.max(1,im.naturalHeight));
+    drawSprC(n, x, y+8, ww, hh, 0, car.dir<0);
     return;
   }
   bakeHopAtlas();
   const kind=car.kind||"sedan";
   const pal=car.palI!=null?car.palI:0;
   hBlit("car_"+kind+"_"+pal, x, y+2, car.dir<0);
+}
+function hDrawTrainArt(lane,x,y){
+  if (!lane.trainOn) return;
+  const p=hIso(lane.trainCol, lane.row);
+  if (sprReady("hopTrain")){
+    drawSprC("hopTrain", p.x, p.y+6, 460, 82, 0, lane.dir<0);
+  } else {
+    ctx.fillStyle="#c45a18";
+    ctx.fillRect(p.x-200, p.y-18, 400, 40);
+  }
+}
+function hDrawSignalArt(x,y,warn,t){
+  if (sprReady("hopSignal")){
+    drawSprC("hopSignal", x, y-36, 52, 118);
+  } else {
+    ctx.fillStyle="#1a1a1a";
+    ctx.fillRect(x-4, y-70, 8, 80);
+  }
+  if (warn){
+    const left = Math.sin(t*16)>0;
+    const glow = 0.55+0.45*Math.abs(Math.sin(t*16));
+    ctx.save();
+    ctx.globalAlpha=glow;
+    ctx.fillStyle="#ff2a2a";
+    ctx.beginPath(); ctx.arc(x+(left?-10:10), y-78, 7, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle="rgba(255,80,80,.45)";
+    ctx.beginPath(); ctx.arc(x+(left?-10:10), y-78, 14, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
 }
 function hDrawPickupArt(pk,x,y){
   const bob=Math.sin(LH.t*4+pk.bob)*5;
@@ -7224,6 +7299,12 @@ function drawHop(){
         const p=hIso(car.col, car.row);
         hDrawCarArt(car, p.x, p.y+4);
       }
+    }
+    if (lane.type==="tracks"){
+      const left=hIso(0.15, r), right=hIso(H_COLS-1.15, r);
+      hDrawSignalArt(left.x, left.y+H_TH*0.2, !!lane.warn, LH.t);
+      hDrawSignalArt(right.x, right.y+H_TH*0.2, !!lane.warn, LH.t);
+      hDrawTrainArt(lane);
     }
     if (lane.type==="water"){
       for (const f of LH.floats){
