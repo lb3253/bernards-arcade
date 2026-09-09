@@ -315,10 +315,10 @@ body{
   justify-self:center;
 }
 .star img{
-  width:92px !important;
-  height:92px !important;
-  max-width:92px;
-  max-height:92px;
+  width:108px !important;
+  height:108px !important;
+  max-width:108px;
+  max-height:108px;
   aspect-ratio:1 / 1;
   object-fit:cover;
   object-position:58% 12%;
@@ -338,8 +338,8 @@ body{
 .picks,.picks-two{display:contents}
 .lobby > .pick.cab{
   height:100% !important;
-  max-height:380px;
-  min-height:160px;
+  max-height:420px;
+  min-height:190px;
   display:flex;
   flex-direction:column;
   align-self:stretch;

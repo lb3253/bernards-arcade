@@ -32,6 +32,10 @@ loadSpr("disc","/art/spr-disc.png");
 loadSpr("scout","/art/spr-scout.png");
 loadSpr("missile","/art/spr-missile.png");
 loadSpr("plasma","/art/spr-plasma.png");
+loadSpr("boom","/art/spr-boom.png");
+loadSpr("shot","/art/spr-shot.png");
+loadSpr("muzzle","/art/spr-muzzle.png");
+loadSpr("hills","/art/spr-hills.png");
 loadSpr("jeep","/art/spr-jeep.png");
 loadSpr("traffic","/art/spr-traffic.png");
 loadSpr("traffic2","/art/spr-traffic2.png");
@@ -39,7 +43,7 @@ loadSpr("jrock","/art/spr-jrock.png");
 loadSpr("jfuel","/art/spr-jfuel.png");
 loadSpr("mud","/art/spr-mud.png");
 loadSpr("skyJeep","/art/sky-jeep.jpg");
-["fly","biplane","jet","balloon","storm","skyAir","saucer","drone","diver","mothership","disc","scout","missile","plasma","jeep","skyJeep"].forEach(n=>{ SPR[n].addEventListener("load",()=>{ try{ if(typeof bakeAirSky==="function") bakeAirSky(); if(typeof bakeFlapSky==="function") bakeFlapSky(); if(typeof bakeJeepSky==="function") bakeJeepSky(); }catch(e){} }); });
+["fly","biplane","jet","balloon","storm","skyAir","saucer","drone","diver","mothership","disc","scout","missile","plasma","boom","shot","muzzle","hills","jeep","skyJeep"].forEach(n=>{ SPR[n].addEventListener("load",()=>{ try{ if(typeof bakeAirSky==="function") bakeAirSky(); if(typeof bakeFlapSky==="function") bakeFlapSky(); if(typeof bakeJeepSky==="function") bakeJeepSky(); }catch(e){} }); });
 function sprReady(name){
   const im=SPR[name];
   return !!(im && im.complete && im.naturalWidth>0);
@@ -54,6 +58,10 @@ function drawSprC(name,x,y,w,h,rot,flip){
   ctx.drawImage(im,-w/2,-h/2,w,h);
   ctx.restore();
   return true;
+}
+function drawDrop(x,y,rw,rh){
+  ctx.fillStyle="rgba(16,28,18,.3)";
+  ctx.beginPath(); ctx.ellipse(x, y, rw, rh, 0, 0, Math.PI*2); ctx.fill();
 }
 function aHit(px,py,rx,ry){
   if (!A) return false;
@@ -2783,7 +2791,8 @@ function flapJump(){
   F.bird.vy = F_FLAP;
   F.bird.flap = 1;
   sfx.flap();
-  fBurst(F.bird.x-22,F.bird.y+10,"rgba(255,255,255,.85)",5);
+  fBurst(F.bird.x-22,F.bird.y+10,"rgba(255,255,255,.85)",8);
+  fBurst(F.bird.x-8,F.bird.y+16,"rgba(255,210,120,.7)",4);
 }
 function fSpawnGate(){
   const gh=fGapH();
@@ -3065,6 +3074,12 @@ function drawFlapGate(g){
   }
   pillar(-40,top);
   pillar(bot,F_GROUND-26);
+  // ivy and moss so the brick stacks feel planted, not like placeholders
+  ctx.fillStyle="rgba(62,130,58,.7)";
+  for (const y of [top-28, bot+22]){
+    ctx.beginPath(); ctx.ellipse(g.x-18, y, 16, 9, -.2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(g.x+16, y+6, 13, 8, .25, 0, Math.PI*2); ctx.fill();
+  }
   // stone caps on the gap edges
   ctx.fillStyle="#d9a97e";
   ctx.beginPath(); ctx.roundRect(g.x-halfW-7,top-16,halfW*2+14,18,5); ctx.fill();
@@ -3823,10 +3838,10 @@ function newAir(best){
     shots:[], eshots:[], birdsL:[], enemies:[], clouds:[], storms:[],
     balloons:[], gusts:[], items:[], acorns:[], bolts:[], aliens:[],
     boss:null, phase:"fly",
-    squirrel:0, fireCool:0,
+    squirrel:0, fireCool:0, hitStop:0, muzzle:0,
     nx:{ item:520, bird:760, cloud:1100, storm:1700, enemy:2800, balloon:1500, gust:2600, acorn:3600, cat:5200, weapon:1400, alien:640 },
     shake:0, flash:0, flashCol:"224,58,47",
-    toasts:[], particles:[], confetti:[], feathers:[], winFx:0
+    toasts:[], particles:[], confetti:[], feathers:[], booms:[], winFx:0
   };
 }
 const aSpeed = () => (A_PLANE==="jet" ? 236 : 198) * (A.rain>0 ? .62 : 1);
@@ -3880,6 +3895,8 @@ function airFireNow(){
   else if (A.weapon===2){ mk(0); mk(-4,-150); mk(4,150); }
   else { mk(0); }
   sfx.shot();
+  A.muzzle=.1;
+  s.x = clamp(s.x-6, A_XMIN, A_XMAX);
   A.particles.push({x:x0+4,y:y0,vx:140,vy:0,life:.12,color:"#fff3b0",r:6});
 }
 function airHit(why,kind){
@@ -3915,7 +3932,36 @@ function airCrash(){
   over.classList.add("on");
 }
 
-// ------------------------------------------------------------ spawns
+function aBoom(x,y,sc){
+  A.booms.push({ x, y, life:.42, s:sc||1, rot:rand(-.35,.35) });
+  aBurst(x,y,"#ff9a3a",18,250);
+  aBurst(x,y,"#fff6c9",10,190);
+  if (!REDUCED){ A.shake=Math.max(A.shake,9); A.hitStop=Math.max(A.hitStop||0,.05); }
+}
+function aPushAlien(wx,y,kind){
+  const hp = kind==="disc"?3: kind==="saucer"?2: kind==="dive"?2:1;
+  A.aliens.push({
+    wx, y, y0:y, kind, dead:false, ph:rand(0,6.3), amp:rand(24,72),
+    sp: kind==="scout"?152: kind==="drone"?102: kind==="dive"?58: kind==="disc"?50:78,
+    fire:rand(.15,1.1), hp, hpMax:hp, flash:0
+  });
+}
+function aKillAlien(al, ax, ay, missile){
+  al.dead=true;
+  const pts=A_PTS[al.kind]||A_PTS.saucer;
+  aBoom(ax, ay, missile?1.35: al.kind==="disc"?1.2: .9);
+  sfx.pick("green");
+  aGain(pts,ax,ay,al.kind,"#9be5ff");
+  A.planes++;
+  const drop=Math.random();
+  if (drop<.18){
+    const tier = 1+Math.floor(rand(0,4));
+    A.pickups.push({ wx:al.wx, y:al.y, tier, taken:false, spin:0 });
+  } else if (drop<.5){
+    const kind=Math.random()<.22?"gold":Math.random()<.5?"red":"green";
+    A.items.push({ wx:al.wx, y:al.y, kind, taken:false, bob:rand(0,6) });
+  }
+}
 function aSpawnAhead(){
   const R = A.scroll + W + 80;
   const n = A.nx;
@@ -3923,18 +3969,32 @@ function aSpawnAhead(){
     const k=Math.random(); const kind = k<.12?"gold":k<.32?"red":"green";
     const cnt=2+Math.floor(rand(0,3)); const y=rand(A_TOP+40,A_BOT-40);
     for(let i=0;i<cnt;i++) A.items.push({ wx:n.item+i*66, y:clamp(y+Math.sin(i*1.2)*22,A_TOP+20,A_BOT-20), kind, taken:false, bob:rand(0,6.3) });
-    n.item += cnt*66 + rand(220,380);
+    n.item += cnt*66 + rand(320,520);
   }
   while (n.cloud < R){ A.clouds.push({ wx:n.cloud, y:rand(A_TOP+50,A_BOT-90), w:rand(120,170), h:rand(60,84) }); n.cloud+=rand(900,1500); }
   while (n.storm < R){ A.storms.push({ wx:n.storm, y:rand(A_TOP+20,A_TOP+120), w:150, arm:0, phase:"drift", tmr:rand(.9,1.8), flashed:0, close:false }); n.storm+=rand(1100,1900); }
   while (n.alien < R && A.phase!=="boss"){
     const r=Math.random();
-    const kind = r<.28?"saucer": r<.48?"drone": r<.66?"dive": r<.84?"disc":"scout";
-    const y=rand(A_TOP+36,A_BOT-36);
-    A.aliens.push({ wx:n.alien, y, y0:y, kind, dead:false, ph:rand(0,6.3), amp:rand(28,78),
-      sp: kind==="scout"?140: kind==="drone"?96: kind==="dive"?50: kind==="disc"?54:72,
-      fire:rand(.4,1.6) });
-    n.alien += rand(300,560);
+    const y=rand(A_TOP+70,A_BOT-70);
+    if (r<.36){
+      const kind=Math.random()<.55?"scout":"drone";
+      aPushAlien(n.alien, y, kind);
+      aPushAlien(n.alien+70, y-48, kind);
+      aPushAlien(n.alien+70, y+48, kind);
+      n.alien += rand(500,740);
+    } else if (r<.58){
+      aPushAlien(n.alien, y-36, "saucer");
+      aPushAlien(n.alien, y+36, "saucer");
+      n.alien += rand(520,760);
+    } else if (r<.78){
+      aPushAlien(n.alien, y, "disc");
+      aPushAlien(n.alien+88, y-34, "scout");
+      aPushAlien(n.alien+88, y+34, "scout");
+      n.alien += rand(560,820);
+    } else {
+      aPushAlien(n.alien, y, "dive");
+      n.alien += rand(420,640);
+    }
   }
   while (n.balloon < R){
     const cat = A.scroll > n.cat;
@@ -3960,6 +4020,10 @@ function updateAir(dt){
   comboTick(A,dt);
   for (const p of A.particles){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=120*dt; p.life-=dt; }
   A.particles=A.particles.filter(p=>p.life>0);
+  for (const b of A.booms){ b.life-=dt; b.s+=1.8*dt; }
+  A.booms=A.booms.filter(b=>b.life>0);
+  A.muzzle=Math.max(0,(A.muzzle||0)-dt);
+  if (A.hitStop>0) A.hitStop=Math.max(0,A.hitStop-dt);
   for (const f of A.feathers){ f.x+=f.vx*dt; f.y+=f.vy*dt; f.vy+=60*dt; f.vx-=90*dt; f.rot+=f.vr*dt; f.life-=dt; }
   A.feathers=A.feathers.filter(f=>f.life>0);
   for (const s of A.toasts){ s.y-=26*dt; s.life-=dt; }
@@ -3977,6 +4041,12 @@ function updateAir(dt){
   if (A.firing && A.started) airFireNow();
 
   if (!A.started){ s.y=300+Math.sin(A.t*2.4)*10; s.tilt=Math.sin(A.t*2.4)*.06; return; }
+
+  if (A.started && A.running && Math.random()<dt*28){
+    A.particles.push({ x:s.x-52, y:s.y+6+rand(-3,3), vx:rand(-110,-40), vy:rand(-18,18),
+      life:rand(.16,.32), color:A_PLANE==="jet"?"#ffb060":"#fff3b0", r:rand(3,6) });
+  }
+  if (A.hitStop>0) return;
 
   if (A.phase==="fly"){
     A.timeLeft = Math.max(0, (A_BOSS_AT-A.scroll)/aSpeed());
@@ -4345,9 +4415,20 @@ function drawAir(){
   ctx.save();
   if (A.shake>.4){ const s=A.shake*.5; ctx.translate(rand(-s,s),rand(-s,s)); }
   ctx.drawImage(abg,0,0);
-  // parallax hills strip
-  ctx.fillStyle="rgba(70,120,80,.35)";
-  for(let i=0;i<9;i++){ const x=((i*140 - A.scroll*.35)%(W+140)+W+140)%(W+140)-70; ctx.beginPath(); ctx.ellipse(x,600,86,40,0,0,Math.PI*2); ctx.fill(); }
+  // painted countryside + parallax hills
+  if (sprReady("hills")){
+    const im=SPR.hills;
+    const hh=168, ww=im.naturalWidth/im.naturalHeight*hh;
+    const off=-((A.scroll*.42)%ww);
+    for (let x=off-ww; x<W+ww; x+=ww-1){
+      ctx.drawImage(im, x, H-hh+18, ww, hh);
+    }
+  } else {
+    ctx.fillStyle="rgba(70,120,80,.35)";
+    for(let i=0;i<9;i++){ const x=((i*140 - A.scroll*.35)%(W+140)+W+140)%(W+140)-70; ctx.beginPath(); ctx.ellipse(x,600,86,40,0,0,Math.PI*2); ctx.fill(); }
+  }
+  ctx.fillStyle="rgba(42,90,48,.55)";
+  ctx.fillRect(0, H-38, W, 38);
   drawBirds(A.t,0.016,1.3);
 
   for (const g of A.gusts){
@@ -4383,26 +4464,50 @@ function drawAir(){
   for (const al of A.aliens) drawAlien(al);
   if (A.boss) drawBoss();
   for (const b of A.eshots){
-    if (!drawSprC("plasma", b.x, b.y, 22, 22, 0)){
+    ctx.save();
+    ctx.globalCompositeOperation="lighter";
+    ctx.fillStyle="rgba(124,255,198,.35)";
+    ctx.beginPath(); ctx.arc(b.x,b.y,14,0,Math.PI*2); ctx.fill();
+    if (!drawSprC("plasma", b.x, b.y, 26, 26, 0)){
       ctx.fillStyle="#7cffc6"; ctx.beginPath(); ctx.arc(b.x,b.y,b.r||7,0,Math.PI*2); ctx.fill();
     }
+    ctx.restore();
   }
   for (const b of A.shots){
     if (b.missile){
-      if (!drawSprC("missile", b.x, b.y, 46, 22, Math.atan2(b.vy||0,b.vx))){
+      if (!drawSprC("missile", b.x, b.y, 52, 24, Math.atan2(b.vy||0,b.vx))){
         ctx.fillStyle="#ff6a3d"; ctx.beginPath(); ctx.ellipse(b.x,b.y,16,5,0,0,Math.PI*2); ctx.fill();
       }
     } else {
-      ctx.fillStyle=A.weapon?A_WEAPONS[A.weapon].col:"#fff3b0";
-      ctx.beginPath(); ctx.ellipse(b.x,b.y,10,3,Math.atan2(b.vy||0,b.vx),0,Math.PI*2); ctx.fill();
-      ctx.fillStyle="rgba(255,220,120,.5)"; ctx.beginPath(); ctx.ellipse(b.x-12,b.y,10,2,0,0,Math.PI*2); ctx.fill();
+      const ang=Math.atan2(b.vy||0,b.vx);
+      if (!drawSprC("shot", b.x, b.y, 42, 18, ang)){
+        ctx.fillStyle=A.weapon?A_WEAPONS[A.weapon].col:"#fff3b0";
+        ctx.beginPath(); ctx.ellipse(b.x,b.y,12,4,ang,0,Math.PI*2); ctx.fill();
+      }
     }
+  }
+  for (const b of A.booms){
+    const a=clamp(b.life*2.4,0,1);
+    ctx.save(); ctx.globalAlpha=a;
+    const sz=70*b.s;
+    if (!drawSprC("boom", b.x, b.y, sz, sz, b.rot)){
+      ctx.fillStyle="#ff9a3a"; ctx.beginPath(); ctx.arc(b.x,b.y,sz*0.35,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
   }
   for (const f of A.feathers){ ctx.save(); ctx.globalAlpha=clamp(f.life,0,1); ctx.translate(f.x,f.y); ctx.rotate(f.rot); ctx.fillStyle=f.col; ctx.beginPath(); ctx.ellipse(0,0,7,2.5,0,0,Math.PI*2); ctx.fill(); ctx.restore(); }
 
   const s=A.ship;
   const blinkOff = s.inv>0 && s.inv<50 && s.xray<=0 && s.flashHit<=0 && Math.floor(s.blink)%2===1;
-  if (!blinkOff && !A.over) drawAirPlane(s.x,s.y,s.tilt,A_PLANE,s.xray>0,false);
+  if (!blinkOff && !A.over){
+    drawDrop(s.x-4, s.y+28, 58, 10);
+    drawAirPlane(s.x,s.y,s.tilt,A_PLANE,s.xray>0,false);
+    if (A.muzzle>0){
+      ctx.save(); ctx.globalAlpha=clamp(A.muzzle*10,0,1);
+      drawSprC("muzzle", s.x+58, s.y+2, 36, 36, 0);
+      ctx.restore();
+    }
+  }
   if (s.flashHit>0 && !A.over){
     ctx.save(); ctx.globalAlpha=s.flashHit*2.4; ctx.globalCompositeOperation="lighter";
     ctx.fillStyle="#ffffff"; ctx.beginPath(); ctx.ellipse(s.x,s.y+2,60,24,s.tilt,0,Math.PI*2); ctx.fill();
@@ -4432,6 +4537,11 @@ function drawAir(){
   if (!POSTER){ drawAirHUD(); comboDraw(A,W/2,104); }
   ctx.restore();
   drawGlass();
+  if (A.boss && A.boss.mode==="charge"){
+    const pulse=.1+Math.abs(Math.sin(A.t*10))*.12;
+    ctx.fillStyle="rgba(160,20,24,"+pulse+")";
+    ctx.fillRect(0,0,W,18); ctx.fillRect(0,H-18,W,18);
+  }
   if (A.flash>0){ ctx.fillStyle="rgba("+A.flashCol+","+(A.flash*.3)+")"; ctx.fillRect(0,0,W,H); }
 }
 function drawAirHUD(){
@@ -4491,6 +4601,7 @@ function updateAliens(dt){
       al.wx-=al.sp*dt;
       if (aX(al.wx)<W-20) al.y=lerp(al.y, s.y, dt*1.8);
     }
+    al.flash=Math.max(0,(al.flash||0)-dt);
     const ax=aX(al.wx), ay=al.y;
     const hitR = al.kind==="disc"?44: al.kind==="saucer"?34: al.kind==="dive"?30: al.kind==="scout"?20:24;
     al.fire=(al.fire||1.2)-dt;
@@ -4506,18 +4617,17 @@ function updateAliens(dt){
     for (const sh of A.shots){
       const rr = sh.missile ? hitR+18 : hitR;
       if (Math.abs(sh.x-ax)<rr && Math.abs(sh.y-ay)<rr*.75){
-        al.dead=true;
         if (!sh.missile) sh.life=0;
-        const pts=A_PTS[al.kind]||A_PTS.saucer;
-        aBurst(ax,ay,"#b6f23a", sh.missile?20:14, 220);
-        sfx.pick("green");
-        aGain(pts,ax,ay,al.kind,"#9be5ff");
-        A.planes++;
+        al.hp = (al.hp||1) - (sh.missile?3:1);
+        al.flash=.16;
+        aBurst(ax,ay,"#fff6c9",8,140);
+        if (al.hp<=0){ aKillAlien(al, ax, ay, !!sh.missile); }
+        else { sfx.bark(); if (!REDUCED) A.shake=Math.max(A.shake,4); }
         break;
       }
     }
     if (!al.dead && Math.abs(ax-s.x)<hitR+8 && Math.abs(ay-s.y)<22){
-      al.dead=true; aBurst(ax,ay,"#ffb347",12,180);
+      aKillAlien(al, ax, ay, false);
       airHit("ufo bump!","plane");
     }
   }
@@ -4657,10 +4767,19 @@ function drawAlien(al){
   const x=aX(al.wx), y=al.y;
   if (x<-80||x>W+80) return;
   const key=al.kind==="drone"?"drone": al.kind==="dive"?"diver": al.kind==="disc"?"disc": al.kind==="scout"?"scout":"saucer";
-  const sz=al.kind==="drone"?[46,46]: al.kind==="dive"?[70,48]: al.kind==="disc"?[96,62]: al.kind==="scout"?[36,34]:[78,46];
+  const sz=al.kind==="drone"?[50,50]: al.kind==="dive"?[78,54]: al.kind==="disc"?[108,70]: al.kind==="scout"?[40,38]:[86,52];
+  drawDrop(x, y+sz[1]*0.38, sz[0]*0.38, 8);
+  ctx.save();
+  if (al.flash>0){ ctx.globalAlpha=.55+al.flash*3; ctx.filter="brightness(1.8)"; }
   if (!drawSprC(key,x,y,sz[0],sz[1], al.kind==="dive"?Math.atan2(A.ship.y-y,-40)*.4:0)){
     ctx.fillStyle=al.kind==="drone"?"#7a4ab0": al.kind==="disc"?"#ff8c2e":"#8fd11f";
     ctx.beginPath(); ctx.ellipse(x,y,sz[0]/2,sz[1]/3,0,0,Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+  if ((al.hpMax||1)>1 && al.hp>0){
+    const bw=28, bh=4;
+    ctx.fillStyle="rgba(0,0,0,.45)"; ctx.beginPath(); ctx.roundRect(x-bw/2,y-sz[1]/2-10,bw,bh,2); ctx.fill();
+    ctx.fillStyle="#c9f24d"; ctx.beginPath(); ctx.roundRect(x-bw/2,y-sz[1]/2-10,bw*(al.hp/al.hpMax),bh,2); ctx.fill();
   }
 }
 
