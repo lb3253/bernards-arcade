@@ -5608,12 +5608,16 @@ function startJeep(){
 // ================================================================
 const H_COLS = 9;
 const H_PLAY0 = 1, H_PLAY1 = 7;
-const H_TW = 96, H_TH = 54;
-const H_ORIGIN = 500;
+const H_TW = 98, H_TH = 58, H_LIP = 16;
+const H_ORIGIN = 548;
 const H_FERRY_CD = 6;
-const H_HOP_DUR = 0.15;
-const H_CAR_SPR = ["hopCarRed","hopCarYel","hopCarBlu","hopCarGrn"];
-const H_FLOAT_SPR = ["hopPad","hopRing","hopDuck","hopTube"];
+const H_HOP_DUR = 0.18;
+const H_CAR_PAL = [
+  {body:"#e44545", dark:"#9a1c1c", win:"#d7f1ff", trim:"#f2d2d2"},
+  {body:"#f0c12e", dark:"#b07a10", win:"#fff4c8", trim:"#fff0b0"},
+  {body:"#3ea0e8", dark:"#1a5f9c", win:"#e7f5ff", trim:"#b8dcff"},
+  {body:"#4ecf86", dark:"#1b7a46", win:"#e4ffef", trim:"#b6f0cc"}
+];
 
 let LH = null;
 let H_CHAR = "giulia";
@@ -5641,7 +5645,7 @@ function newHop(best){
     path: [{c:4,r:2}],
     cars: [], floats: [], pickups: [],
     particles: [], toasts: [], ripples: [],
-    camC:4, camR:1.2,
+    camC:4, camR:0.5,
     ferry:null, sinceFerry: H_FERRY_CD,
     booping:0, shake:0, flash:0, flashCol:"80,180,255",
     prevKey:{up:true,down:true,left:true,right:true,ferry:true}, stickHeld:true, nextGen:18
@@ -5674,67 +5678,65 @@ function hBuildLane(row){
   else {
     const prev = (row>0 && LH.lanes[row-1]) ? LH.lanes[row-1].type : "grass";
     const roll = rnd();
-    if (prev==="street") type = (rnd()<0.55 ? "street" : "grass");
-    else if (prev==="water") type = (rnd()<0.45 ? "water" : "grass");
-    else if (prev==="yard") type = (rnd()<0.4 ? "yard" : "grass");
+    if (prev==="water") type = "grass";
+    else if (prev==="yard") type = "grass";
+    else if (prev==="street") type = (rnd()<0.42 ? "street" : "grass");
     else {
-      if (roll<0.34) type="street";
-      else if (roll<0.58) type="water";
-      else if (roll<0.78) type="yard";
+      if (roll<0.30) type="street";
+      else if (roll<0.48) type="water";
+      else if (roll<0.64) type="yard";
       else type="grass";
     }
   }
-  const lane = { type, row, dir: rnd()<0.5 ? -1 : 1, phase: rnd()*6.28, trees:[0,8] };
+  const lane = { type, row, dir: rnd()<0.5 ? -1 : 1, phase: rnd()*6.28, trees:[] };
+  if (type==="grass" || type==="yard"){
+    if (rnd()<0.42) lane.trees.push(0);
+    if (rnd()<0.42) lane.trees.push(H_COLS-1);
+  }
   if (type==="yard"){
     lane.sprinklers = [];
-    const n = 2 + (rnd()<0.5?1:0);
+    const n = 1 + (rnd()<0.55?1:0);
     const used={};
     for(let i=0;i<n;i++){
-      const c = H_PLAY0 + ((rnd()* (H_PLAY1-H_PLAY0+1))|0);
-      if (used[c]) continue;
+      const c = H_PLAY0 + 1 + ((rnd()* (H_PLAY1-H_PLAY0-1))|0);
+      if (used[c] || c===4) continue;
       used[c]=1;
-      lane.sprinklers.push({c, phase: rnd()*4, period: 2.4 + rnd()*1.1});
-    }
-  }
-  if (type==="grass" && row>3 && rnd()<0.55){
-    const extra = 1 + ((rnd()*2)|0);
-    for(let i=0;i<extra;i++){
-      const c = rnd()<0.5 ? 0 : 8;
-      if (lane.trees.indexOf(c)<0) lane.trees.push(c);
+      lane.sprinklers.push({c, phase: rnd()*4, period: 2.6 + rnd()*1.0});
     }
   }
   LH.lanes[row] = lane;
   if (type==="street") hSpawnCars(lane);
   if (type==="water") hSpawnFloats(lane);
-  if ((type==="grass"||type==="yard") && row>3 && rnd()<0.38) hSpawnPickup(row);
+  if ((type==="grass"||type==="yard") && row>3 && rnd()<0.34) hSpawnPickup(row);
   return lane;
 }
 function hSpawnCars(lane){
   const dist = Math.max(0, lane.row-4);
-  const speed = 1.55 + dist*0.07 + LH.rng()*0.4;
-  const gap = Math.max(2.6, 4.6 - dist*0.05);
+  const speed = 1.45 + dist*0.06 + LH.rng()*0.35;
+  const gap = Math.max(2.8, 4.8 - dist*0.04);
   let col = LH.rng()*gap;
   const dir = lane.dir;
+  const row = lane.row|0;
   while (col < H_COLS+4){
     LH.cars.push({
-      row: lane.row, col: dir>0 ? col-2 : H_COLS+2-col,
-      dir, speed, w: 1.35 + LH.rng()*0.25,
-      spr: H_CAR_SPR[(LH.rng()*H_CAR_SPR.length)|0]
+      row, col: dir>0 ? col-2 : H_COLS+2-col,
+      dir, speed, w: 1.15,
+      pal: H_CAR_PAL[(LH.rng()*H_CAR_PAL.length)|0]
     });
-    col += gap + LH.rng()*1.2;
+    col += gap + LH.rng()*1.1;
   }
 }
 function hSpawnFloats(lane){
-  const dist = Math.max(0, lane.row-4);
-  const n = Math.max(3, 5 - (dist>20?1:0));
   const dir = lane.dir;
-  const speed = 0.7 + dist*0.02 + LH.rng()*0.25;
-  for(let i=0;i<n;i++){
+  const speed = 0.55 + LH.rng()*0.18;
+  const kinds = ["pad","ring","duck"];
+  const slots = [1.6, 4.0, 6.4];
+  for (let i=0;i<slots.length;i++){
     LH.floats.push({
-      row: lane.row,
-      col: (i+0.4)*((H_COLS)/(n)) + LH.rng()*0.4,
+      row: lane.row|0,
+      col: slots[i] + (LH.rng()-0.5)*0.25,
       dir, speed,
-      spr: H_FLOAT_SPR[(LH.rng()*H_FLOAT_SPR.length)|0],
+      kind: kinds[i%kinds.length],
       bob: LH.rng()*6.28
     });
   }
@@ -5746,22 +5748,23 @@ function hSpawnPickup(row){
 }
 
 function hIso(c, r){
-  const dc = c - LH.camC, dr = r - LH.camR;
   return {
-    x: W/2 + (dc - dr) * (H_TW/2),
-    y: H_ORIGIN - (dc + dr) * (H_TH/2)
+    x: W/2 + (c - LH.camC) * H_TW,
+    y: H_ORIGIN - (r - LH.camR) * H_TH
   };
 }
-function hDepth(c,r){ return c + r; }
+function hDepth(c,r){ return r*20 + c; }
 
 function hSprayOn(sp, t){
   const u = (t + sp.phase) % sp.period;
   return u < sp.period * 0.42;
 }
 function hCarHits(c, r){
+  r = Math.round(r);
   for (const car of LH.cars){
-    if (car.row!==r) continue;
-    if (Math.abs(car.col - c) < car.w*0.55 + 0.28) return car;
+    if ((car.row|0)!==r) continue;
+    if (hLane(car.row).type!=="street") continue;
+    if (Math.abs(car.col - c) < car.w*0.52 + 0.30) return car;
   }
   return null;
 }
@@ -5948,10 +5951,8 @@ function hCanvasTap(p){
   if (Math.hypot(p.x-dpos.x, p.y-(dpos.y-36)) < 56){ hFerry(); return; }
   const pos = hIso(LH.player.c, LH.player.r);
   const dx=p.x-pos.x, dy=p.y-pos.y;
-  const dc = dx/(H_TW/2) - dy/(H_TH/2);
-  const dr = -dx/(H_TW/2) - dy/(H_TH/2);
-  if (Math.abs(dr)>=Math.abs(dc)) hTryHop(0, dr>0?1:-1);
-  else hTryHop(dc>0?1:-1, 0);
+  if (Math.abs(dy)>=Math.abs(dx)) hTryHop(0, dy<0?1:-1);
+  else hTryHop(dx<0?-1:1, 0);
 }
 
 function hAnim(ent, dt, dur){
@@ -5991,18 +5992,20 @@ function updateHop(dt){
   const spdMul = 1 + dist*0.018;
 
   for (const car of LH.cars){
+    if (hLane(car.row).type!=="street") continue;
     car.col += car.dir * car.speed * spdMul * dt;
-    if (car.dir>0 && car.col > H_COLS+3) car.col = -2.5;
-    if (car.dir<0 && car.col < -3) car.col = H_COLS+2.5;
+    if (car.dir>0 && car.col > H_COLS+2.2) car.col = -1.6;
+    if (car.dir<0 && car.col < -1.6) car.col = H_COLS+2.2;
   }
   for (const f of LH.floats){
+    if (hLane(f.row).type!=="water") continue;
     f.col += f.dir * f.speed * dt;
     f.bob += dt*3;
-    if (f.dir>0 && f.col > H_COLS+1.5) f.col = -1.2;
-    if (f.dir<0 && f.col < -1.5) f.col = H_COLS+1.2;
-    if (LH.rng()<0.02){
+    if (f.dir>0 && f.col > H_PLAY1+0.8) f.col = H_PLAY0-0.4;
+    if (f.dir<0 && f.col < H_PLAY0-0.8) f.col = H_PLAY1+0.4;
+    if (LH.rng()<0.03){
       const p=hIso(f.col,f.row);
-      LH.ripples.push({x:p.x,y:p.y+6,r:6,life:.5});
+      LH.ripples.push({x:p.x,y:p.y+8,r:8,life:.5});
     }
   }
 
@@ -6058,9 +6061,9 @@ function updateHop(dt){
 
   hInputEdges();
 
-  const wantC = LH.player.c, wantR = LH.player.r - 0.35;
-  LH.camC = lerp(LH.camC, wantC, 1-Math.exp(-dt*5.5));
-  LH.camR = lerp(LH.camR, wantR, 1-Math.exp(-dt*5.5));
+  const wantR = LH.player.r - 1.45;
+  LH.camC = 4;
+  LH.camR = lerp(LH.camR, wantR, 1-Math.exp(-dt*5.2));
 
   while (LH.lanes.length < LH.player.r + 14) hBuildLane(LH.lanes.length);
   const minR = LH.player.r - 8;
@@ -6071,93 +6074,248 @@ function updateHop(dt){
   }
 }
 
-function hTilePoly(x,y,tw,th){
-  ctx.beginPath();
-  ctx.moveTo(x, y-th/2);
-  ctx.lineTo(x+tw/2, y);
-  ctx.lineTo(x, y+th/2);
-  ctx.lineTo(x-tw/2, y);
-  ctx.closePath();
+function hRound(c,x,y,w,h,r){
+  c.beginPath(); c.roundRect(x,y,w,h,r); c.fill();
 }
 function hDrawTile(c,r,lane){
   const p=hIso(c,r);
-  const tw=H_TW-2, th=H_TH-2;
-  let top, left, right, stroke;
+  const tw=H_TW-5, th=H_TH-10;
+  let top, lip, line;
   if (lane.type==="street"){
-    top="#5a5a66"; left="#3a3a44"; right="#2e2e36"; stroke="rgba(0,0,0,.18)";
+    top = (c%2)?"#5d5d68":"#555560"; lip="#32323a"; line="rgba(255,214,80,.8)";
   } else if (lane.type==="water"){
-    const wob=0.5+0.5*Math.sin(LH.t*2.2 + c*0.7 + r);
-    top = wob>0.55 ? "#4ec6e6" : "#3aaed4";
-    left="#1e7fa3"; right="#166888"; stroke="rgba(255,255,255,.18)";
+    const wob=0.5+0.5*Math.sin(LH.t*2.4 + c*0.8 + r);
+    top = wob>0.5 ? "#4ec8ea" : "#35b3d8"; lip="#1678a0"; line="rgba(255,255,255,.28)";
   } else if (lane.type==="yard"){
-    top = (c+r)%2 ? "#8ee05a" : "#7ed64c";
-    left="#4ea32c"; right="#3d8a22"; stroke="rgba(40,90,20,.2)";
+    top = (c%2)?"#8ee05c":"#7ad64a"; lip="#3f9224"; line=null;
   } else {
-    top = (c+r)%2 ? "#9aea62" : "#86dc52";
-    left="#57ad32"; right="#458c26"; stroke="rgba(40,90,20,.18)";
+    top = (c%2)?"#98ea62":"#84dc50"; lip="#4aa128"; line=null;
   }
   ctx.save();
-  hTilePoly(p.x, p.y+8, tw, th);
-  ctx.fillStyle="rgba(20,40,18,.28)";
-  ctx.fill();
-  // chunky side faces
-  ctx.beginPath();
-  ctx.moveTo(p.x-tw/2, p.y);
-  ctx.lineTo(p.x, p.y+th/2);
-  ctx.lineTo(p.x, p.y+th/2+8);
-  ctx.lineTo(p.x-tw/2, p.y+8);
-  ctx.closePath();
-  ctx.fillStyle=left; ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(p.x+tw/2, p.y);
-  ctx.lineTo(p.x, p.y+th/2);
-  ctx.lineTo(p.x, p.y+th/2+8);
-  ctx.lineTo(p.x+tw/2, p.y+8);
-  ctx.closePath();
-  ctx.fillStyle=right; ctx.fill();
-  hTilePoly(p.x, p.y, tw, th);
+  ctx.fillStyle="rgba(16,36,16,.22)";
+  hRound(ctx, p.x-tw/2+3, p.y-th/2+H_LIP+2, tw, th, 10);
+  ctx.fillStyle=lip;
+  hRound(ctx, p.x-tw/2, p.y+th/2-6, tw, H_LIP, 8);
   const g=ctx.createLinearGradient(p.x, p.y-th/2, p.x, p.y+th/2);
-  g.addColorStop(0, top); g.addColorStop(1, left);
-  ctx.fillStyle=g; ctx.fill();
-  ctx.strokeStyle=stroke; ctx.lineWidth=1.4; ctx.stroke();
+  g.addColorStop(0, top); g.addColorStop(1, lip);
+  ctx.fillStyle=g;
+  hRound(ctx, p.x-tw/2, p.y-th/2, tw, th, 11);
+  ctx.fillStyle="rgba(255,255,255,.18)";
+  hRound(ctx, p.x-tw/2+8, p.y-th/2+5, tw*0.42, th*0.28, 8);
   if (lane.type==="street"){
-    ctx.strokeStyle="rgba(255,214,80,.75)"; ctx.lineWidth=2; ctx.setLineDash([8,10]);
-    ctx.beginPath(); ctx.moveTo(p.x-tw*0.28,p.y); ctx.lineTo(p.x+tw*0.28,p.y); ctx.stroke();
+    ctx.strokeStyle=line; ctx.lineWidth=3; ctx.setLineDash([10,12]); ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(p.x-tw*0.32, p.y+2); ctx.lineTo(p.x+tw*0.32, p.y+2); ctx.stroke();
     ctx.setLineDash([]);
   }
   if (lane.type==="water"){
-    ctx.strokeStyle="rgba(255,255,255,"+(0.18+0.1*Math.sin(LH.t*3+c))+")";
-    ctx.lineWidth=1.5;
-    ctx.beginPath(); ctx.moveTo(p.x-18,p.y+2); ctx.quadraticCurveTo(p.x,p.y-4,p.x+18,p.y+2); ctx.stroke();
-  }
-  if (lane.type==="grass" || lane.type==="yard"){
-    ctx.fillStyle="rgba(255,255,255,.22)";
-    ctx.beginPath(); ctx.ellipse(p.x-10, p.y-th*0.18, 10, 4, -0.6, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,"+(0.22+0.12*Math.sin(LH.t*3+c))+")";
+    ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(p.x-22,p.y+4); ctx.quadraticCurveTo(p.x,p.y-6,p.x+22,p.y+4); ctx.stroke();
   }
   ctx.restore();
 }
 
-function hDrawSprFeet(name,x,y,w,h,flip,sqx,sqy){
-  ctx.save();
-  ctx.translate(x,y);
-  if (flip) ctx.scale(-1,1);
-  ctx.scale(sqx||1, sqy||1);
-  if (!drawSprC(name, 0, -h/2, w, h, 0, false)){
-    ctx.fillStyle="#d9a06a";
-    ctx.beginPath(); ctx.ellipse(0,-h*0.35,w*0.28,h*0.38,0,0,Math.PI*2); ctx.fill();
-  }
-  ctx.restore();
-}
-
-function hActorPos(ent){
-  let c=ent.c, r=ent.r, air=0;
+function hSquash(ent){
+  let sx=1, sy=1;
+  if (ent.squash>0){ sx=1.16; sy=0.82; }
   if (ent.hop){
     const u=Math.min(1,ent.hop.t);
-    air = Math.sin(u*Math.PI) * 26;
+    const air=Math.sin(u*Math.PI);
+    sx=1-0.14*air; sy=1+0.22*air;
   }
-  if (LH.ferry && ent===LH.player) air = 10 + Math.sin(LH.ferry.t*Math.PI)*8;
-  const p=hIso(c,r);
+  return {sx,sy};
+}
+function hActorPos(ent){
+  let air=0;
+  if (ent.hop){
+    const u=Math.min(1,ent.hop.t);
+    air = Math.sin(u*Math.PI) * 28;
+  }
+  if (LH.ferry && (ent===LH.player || ent===LH.dog)) air = 8 + Math.sin(LH.ferry.t*Math.PI)*10;
+  const p=hIso(ent.c, ent.r);
   return {x:p.x, y:p.y-air, air};
+}
+
+function hDrawTree(x,y){
+  ctx.save(); ctx.translate(x,y);
+  ctx.fillStyle="rgba(16,36,16,.28)";
+  ctx.beginPath(); ctx.ellipse(0,6,18,7,0,0,Math.PI*2); ctx.fill();
+  blob(ctx, 0, -6, 7, 16, 0, "#c4894a", "#7a4a1e");
+  blob(ctx, -10, -28, 18, 16, -0.2, "#6fd24a", "#2f8a22");
+  blob(ctx, 12, -30, 16, 15, 0.15, "#7ae056", "#348f24");
+  blob(ctx, 1, -40, 17, 15, 0, "#8aee62", "#3a9a28");
+  ctx.fillStyle="rgba(255,255,255,.18)";
+  ctx.beginPath(); ctx.ellipse(-6,-42,8,5,-0.4,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function hDrawSprinklerArt(x,y,on,t,ph){
+  ctx.save(); ctx.translate(x,y);
+  blob(ctx, 0, 2, 10, 5, 0, "#9aa3a8", "#5c656c");
+  blob(ctx, 0, -8, 5, 12, 0, "#d8dee4", "#7c8790");
+  orb(ctx, 0, -18, 6, "#c6f06a", "#5aa018", true);
+  if (on){
+    ctx.globalAlpha=0.5;
+    ctx.fillStyle="#bff4ff";
+    for (let i=0;i<9;i++){
+      const a=-Math.PI/2+(i-4)*0.2;
+      const len=16+9*Math.sin(t*11+ph+i);
+      ctx.beginPath(); ctx.ellipse(Math.cos(a)*len, -18+Math.sin(a)*len, 3, 7, a, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
+}
+function hDrawFloatArt(f,x,y){
+  const bob=Math.sin(f.bob)*3;
+  ctx.save(); ctx.translate(x, y+bob);
+  ctx.fillStyle="rgba(10,40,60,.22)";
+  ctx.beginPath(); ctx.ellipse(0,10,22,7,0,0,Math.PI*2); ctx.fill();
+  if (f.kind==="ring"){
+    ctx.lineWidth=12; ctx.lineCap="round";
+    ctx.strokeStyle="#ff6fa8";
+    ctx.beginPath(); ctx.ellipse(0,-2,18,10,0,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle="#ffd0e4"; ctx.lineWidth=4;
+    ctx.beginPath(); ctx.ellipse(-6,-6,6,3,-0.5,0,Math.PI); ctx.stroke();
+  } else if (f.kind==="duck"){
+    blob(ctx, 0, 0, 18, 12, 0, "#ffe056", "#d8a010");
+    orb(ctx, 14, -8, 8, "#ffe87a", "#e0b01a", true);
+    ctx.fillStyle="#ff7a2a";
+    ctx.beginPath(); ctx.ellipse(22,-7,6,3.4,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle="#1a1a1a";
+    ctx.beginPath(); ctx.arc(16,-10,1.4,0,Math.PI*2); ctx.fill();
+  } else {
+    blob(ctx, 0, 2, 24, 12, 0, "#6fe05a", "#2e9a28");
+    blob(ctx, 0, 0, 18, 8, 0, "#8aee72", "#46b034");
+    ctx.strokeStyle="rgba(20,80,20,.35)"; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(-6,0); ctx.lineTo(8,-2); ctx.stroke();
+  }
+  ctx.restore();
+}
+function hDrawCarArt(car,x,y){
+  const pal=car.pal||H_CAR_PAL[0];
+  ctx.save(); ctx.translate(x,y);
+  ctx.scale(car.dir<0?-1:1,1);
+  ctx.fillStyle="rgba(16,20,28,.3)";
+  ctx.beginPath(); ctx.ellipse(0,10,34,8,0,0,Math.PI*2); ctx.fill();
+  blob(ctx, -18, 8, 8, 8, 0, "#2a2a32", "#111118");
+  blob(ctx, 20, 8, 8, 8, 0, "#2a2a32", "#111118");
+  blob(ctx, 1, -2, 36, 14, 0, pal.body, pal.dark);
+  blob(ctx, 6, -12, 20, 10, 0.05, pal.win, pal.body);
+  ctx.fillStyle="rgba(255,255,255,.45)";
+  ctx.beginPath(); ctx.ellipse(0,-12,10,4,-0.3,0,Math.PI*2); ctx.fill();
+  blob(ctx, 32, -2, 5, 4, 0, "#ffe9a0", "#e0b040");
+  ctx.restore();
+}
+function hDrawPickupArt(pk,x,y){
+  const bob=Math.sin(LH.t*4+pk.bob)*5;
+  ctx.save(); ctx.translate(x, y-12+bob);
+  if (pk.kind==="ball"){
+    orb(ctx, 0, 0, 12, "#d6ff7a", "#5d9109", true);
+    ctx.strokeStyle="rgba(255,255,255,.55)"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(0,0,12,-0.4,1.1); ctx.stroke();
+  } else {
+    blob(ctx, 0, 0, 14, 7, 0.2, "#f3e0b0", "#c8a060");
+    blob(ctx, -12, -2, 7, 8, 0, "#f3e0b0", "#c8a060");
+    blob(ctx, 12, 2, 7, 8, 0, "#f3e0b0", "#c8a060");
+  }
+  ctx.restore();
+}
+
+function hDrawBernard(x,y,flip,sx,sy,swim,t){
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.scale(flip?-1:1, 1);
+  ctx.scale(sx*1.22, sy*1.22);
+  ctx.fillStyle="rgba(16,32,20,.32)";
+  ctx.beginPath(); ctx.ellipse(2, 6, 24, 8, 0,0,Math.PI*2); ctx.fill();
+  if (swim){
+    blob(ctx, 2, -8, 28, 13, 0.12, "#e3ac60", "#a0702c");
+    blob(ctx, -6, -14, 22, 10, -0.08, "#3c342e", "#1a1614");
+    orb(ctx, 18, -4, 6, "#fdfaf0", "#c9c0ac", false);
+    blob(ctx, -26, -10, 10, 8, 0.4, "#d9a257", "#8f6224");
+    orb(ctx, 22, -18, 12, "#584c42", "#211d1a", false);
+    blob(ctx, 30, -16, 9, 6, 0.15, "#2c2724", "#100e0d");
+    blob(ctx, 16, -30, 5, 10, -0.15, "#3c342e", "#1a1614");
+    blob(ctx, 26, -30, 5, 10, 0.1, "#3c342e", "#1a1614");
+    orb(ctx, 26, -20, 2.2, "#f6e3c2", "#140e08", false);
+    ctx.fillStyle="#140e08"; ctx.beginPath(); ctx.arc(26.4,-19.4,1.1,0,Math.PI*2); ctx.fill();
+  } else {
+    limb(ctx,-12,-6,-14,6,8,"#c4883f","#8a5a24");
+    limb(ctx,10,-6,12,6,8,"#c4883f","#8a5a24");
+    limb(ctx,-4,-4,-6,5,7,"#dba95e","#a4752f");
+    limb(ctx,16,-4,18,5,7,"#dba95e","#a4752f");
+    blob(ctx, 2, -8, 22, 14, 0, "#e3ac60", "#a0702c");
+    blob(ctx, -2, -16, 20, 11, -0.08, "#3c342e", "#1a1614");
+    blob(ctx, 14, -6, 12, 12, 0, "#eec078", "#ac7e36");
+    orb(ctx, 18, -2, 6, "#fdfaf0", "#c9c0ac", false);
+    blob(ctx, -22, -12, 11, 9, 0.5, "#d9a257", "#8f6224");
+    blob(ctx, 16, -22, 13, 12, 0, "#584c42", "#211d1a");
+    blob(ctx, 10, -18, 7, 7, 0, "#c98d3f", "#8d5f24");
+    blob(ctx, 26, -20, 9, 6, 0.12, "#2c2724", "#100e0d");
+    blob(ctx, 12, -36, 6, 11, -0.12, "#3c342e", "#1a1614");
+    blob(ctx, 22, -37, 6, 11, 0.08, "#3c342e", "#1a1614");
+    blob(ctx, 22, -34, 3, 6, 0.08, "#7d5f45", "#3c342e");
+    ctx.fillStyle="rgba(196,140,66,.9)";
+    ctx.beginPath(); ctx.ellipse(14,-28,3,2,-0.3,0,Math.PI*2); ctx.fill();
+    orb(ctx, 20, -24, 3.4, "#f6e3c2", "#9a7b52", false);
+    ctx.fillStyle="#140e08"; ctx.beginPath(); ctx.arc(20.6,-23.4,1.5,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle="rgba(255,255,255,.9)"; ctx.beginPath(); ctx.arc(19.6,-24.6,0.9,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle="#b5705c"; ctx.lineWidth=1.6;
+    ctx.beginPath(); ctx.arc(24,-17,3.2,0.15,Math.PI-0.15); ctx.stroke();
+  }
+  ctx.restore();
+}
+function hDrawPaw(x,y,s){
+  ctx.save(); ctx.translate(x,y); ctx.scale(s,s);
+  ctx.fillStyle="#ffe56a";
+  ctx.beginPath(); ctx.ellipse(0,4,7,6,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-7,-4,3.4,4.2,-0.4,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-2,-8,3.2,4.4,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(4,-8,3.2,4.4,0.1,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(8,-3,3.4,4.2,0.4,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function hDrawKidArt(x,y,flip,sx,sy,girl,hopU){
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.scale(flip?-1:1, 1);
+  ctx.scale(sx*1.42, sy*1.42);
+  ctx.fillStyle="rgba(16,32,20,.3)";
+  ctx.beginPath(); ctx.ellipse(0, 6, 16, 6, 0,0,Math.PI*2); ctx.fill();
+  const swing = hopU ? Math.sin(hopU*Math.PI)*6 : 0;
+  const skinL="#f3c299", skinD="#c08a56";
+  const shirtL = girl ? "#d492a4" : "#9a7a90";
+  const shirtD = girl ? "#a45d74" : "#6a4e64";
+  const pantL = girl ? "#8a8f98" : "#3d6cb0";
+  const pantD = girl ? "#4e545c" : "#1f3f78";
+  limb(ctx,-8,-4,-10+swing,10,8,pantL,pantD);
+  limb(ctx,8,-4,10-swing,10,8,pantL,pantD);
+  blob(ctx, -10+swing, 12, 6, 3.5, 0, girl?"#e8e2d8":"#f2f2f2", "#b8b2a8");
+  blob(ctx, 10-swing, 12, 6, 3.5, 0, girl?"#e8e2d8":"#f2f2f2", "#b8b2a8");
+  blob(ctx, 0, -10, 16, 16, 0, shirtL, shirtD);
+  limb(ctx,-14,-14,-18-swing,-2,7,skinL,skinD);
+  limb(ctx,14,-14,18+swing,-2,7,skinL,skinD);
+  if (girl){
+    blob(ctx, -2, -28, 16, 16, 0, "#6b452a", "#3a2414");
+    orb(ctx, 2, -30, 12, skinL, skinD, false);
+    blob(ctx, 0, -40, 13, 7, 0, "#6b452a", "#3a2414");
+    blob(ctx, -12, -24, 6, 12, 0.2, "#6b452a", "#3a2414");
+    blob(ctx, 10, -22, 5, 11, -0.15, "#6b452a", "#3a2414");
+  } else {
+    orb(ctx, 2, -30, 12, skinL, skinD, false);
+    blob(ctx, 1, -40, 12, 7, 0, "#4b3524", "#2a1c12");
+    blob(ctx, -8, -34, 6, 8, 0.2, "#4b3524", "#2a1c12");
+    blob(ctx, 10, -34, 5, 6, -0.1, "#4b3524", "#2a1c12");
+  }
+  ctx.fillStyle="#2b1d12";
+  ctx.beginPath(); ctx.arc(5,-32,1.8,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(11,-32,1.8,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle="rgba(255,255,255,.7)";
+  ctx.beginPath(); ctx.arc(4.4,-32.6,0.6,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(10.4,-32.6,0.6,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle="#b5705c"; ctx.lineWidth=1.7;
+  ctx.beginPath(); ctx.arc(8,-26,3.4,0.2,Math.PI-0.2); ctx.stroke();
+  ctx.restore();
 }
 
 function drawHop(){
@@ -6166,24 +6324,87 @@ function drawHop(){
   if (LH.shake){ ctx.translate((Math.random()-0.5)*LH.shake,(Math.random()-0.5)*LH.shake); }
 
   const sky=ctx.createLinearGradient(0,0,0,H);
-  sky.addColorStop(0,"#8fd4ff"); sky.addColorStop(.42,"#c8ecff"); sky.addColorStop(1,"#8ecf5a");
+  sky.addColorStop(0,"#7ec8ff"); sky.addColorStop(.38,"#c5eaff"); sky.addColorStop(1,"#8ecf5a");
   ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle="rgba(255,255,255,.55)";
-  for (let i=0;i<5;i++){
-    const cx=((i*187 + LH.t*12)%(W+160))-80;
-    const cy=50+i*18;
-    ctx.beginPath(); ctx.ellipse(cx,cy,60,18,0,0,Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(cx+30,cy+6,44,14,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle="rgba(255,255,255,.5)";
+  for (let i=0;i<4;i++){
+    const cx=((i*210 + LH.t*10)%(W+180))-90;
+    const cy=40+i*16;
+    ctx.beginPath(); ctx.ellipse(cx,cy,70,18,0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx+28,cy+6,48,14,0,0,Math.PI*2); ctx.fill();
   }
 
-  const r0 = Math.max(0, Math.floor(LH.camR-6));
-  const r1 = Math.floor(LH.camR+12);
-  const drawables=[];
+  const r0 = Math.max(0, Math.floor(LH.camR-3));
+  const r1 = Math.floor(LH.camR+11);
 
-  for (let r=r0;r<=r1;r++){
+  for (let r=r1;r>=r0;r--){
     const lane=hLane(r);
-    for (let c=0;c<H_COLS;c++){
-      hDrawTile(c,r,lane);
+    for (let c=0;c<H_COLS;c++) hDrawTile(c,r,lane);
+    for (const tcol of (lane.trees||[])){
+      const p=hIso(tcol,r);
+      hDrawTree(p.x, p.y+4);
+    }
+    if (lane.sprinklers){
+      for (const sp of lane.sprinklers){
+        const p=hIso(sp.c,r);
+        hDrawSprinklerArt(p.x, p.y+2, hSprayOn(sp,LH.t), LH.t, sp.phase);
+      }
+    }
+    if (lane.type==="street"){
+      for (const car of LH.cars){
+        if ((car.row|0)!==r) continue;
+        const p=hIso(car.col, car.row);
+        hDrawCarArt(car, p.x, p.y+2);
+      }
+    }
+    if (lane.type==="water"){
+      for (const f of LH.floats){
+        if ((f.row|0)!==r) continue;
+        const p=hIso(f.col, f.row);
+        hDrawFloatArt(f, p.x, p.y+4);
+      }
+    }
+    for (const pk of LH.pickups){
+      if (pk.taken || pk.row!==r) continue;
+      const p=hIso(pk.c, pk.row);
+      hDrawPickupArt(pk, p.x, p.y);
+    }
+    if (Math.round(LH.dog.r)===r){
+      const p=hActorPos(LH.dog);
+      const sq=hSquash(LH.dog);
+      const ready=hFerryReady();
+      const cool=Math.max(0, H_FERRY_CD-LH.sinceFerry);
+      if (LH.ferry){
+        hDrawBernard(p.x, p.y+4, LH.dog.face<0, sq.sx, sq.sy, true, LH.t);
+      } else if (ready){
+        const pulse=0.55+0.45*Math.sin(LH.pulse*2);
+        ctx.save();
+        ctx.globalAlpha=0.4+0.35*pulse;
+        ctx.strokeStyle="#ffe56a"; ctx.lineWidth=5;
+        ctx.beginPath(); ctx.ellipse(p.x, p.y-28, 32, 38, 0,0,Math.PI*2); ctx.stroke();
+        ctx.restore();
+        hDrawBernard(p.x, p.y+4, LH.dog.face<0, sq.sx, sq.sy, false, LH.t);
+        hDrawPaw(p.x, p.y-80, 0.95+0.12*pulse);
+      } else {
+        if (cool>0){
+          ctx.save(); ctx.globalAlpha=0.62;
+          hDrawBernard(p.x, p.y+4, LH.dog.face<0, sq.sx, sq.sy, false, LH.t);
+          ctx.restore();
+          goldPanel(ctx, p.x-16, p.y-74, 32, 22, 8);
+          ctx.textAlign="center";
+          ctx.font="700 13px Fredoka, system-ui, sans-serif";
+          ctx.fillStyle="#ffe9b0";
+          ctx.fillText(String(cool), p.x, p.y-58);
+        } else {
+          hDrawBernard(p.x, p.y+4, LH.dog.face<0, sq.sx, sq.sy, false, LH.t);
+        }
+      }
+    }
+    if (Math.round(LH.player.r)===r){
+      const p=hActorPos(LH.player);
+      const sq=hSquash(LH.player);
+      const hopU=LH.player.hop?LH.player.hop.t:0;
+      hDrawKidArt(p.x, p.y+2, LH.player.face<0, sq.sx, sq.sy, H_CHAR!=="nic", hopU);
     }
   }
 
@@ -6192,115 +6413,17 @@ function drawHop(){
     ctx.lineWidth=2;
     ctx.beginPath(); ctx.ellipse(rp.x,rp.y, rp.r, rp.r*0.45, 0,0,Math.PI*2); ctx.stroke();
   }
-
-  for (let r=r0;r<=r1;r++){
-    const lane=hLane(r);
-    for (const tcol of (lane.trees||[])){
-      drawables.push({z:hDepth(tcol,r)+0.2, kind:"tree", c:tcol, r});
-    }
-    if (lane.sprinklers){
-      for (const sp of lane.sprinklers){
-        drawables.push({z:hDepth(sp.c,r)+0.15, kind:"sp", sp, r});
-      }
-    }
-  }
-  for (const car of LH.cars){
-    if (car.row<r0-1||car.row>r1+1) continue;
-    drawables.push({z:hDepth(car.col, car.row)+0.4, kind:"car", car});
-  }
-  for (const f of LH.floats){
-    if (f.row<r0-1||f.row>r1+1) continue;
-    drawables.push({z:hDepth(f.col,f.row)+0.25, kind:"float", f});
-  }
-  for (const pk of LH.pickups){
-    if (pk.taken) continue;
-    if (pk.row<r0||pk.row>r1) continue;
-    drawables.push({z:hDepth(pk.c,pk.row)+0.3, kind:"pick", pk});
-  }
-  const dogP = hActorPos(LH.dog);
-  const plP = hActorPos(LH.player);
-  drawables.push({z:hDepth(LH.dog.c,LH.dog.r)+0.55, kind:"dog", p:dogP});
-  drawables.push({z:hDepth(LH.player.c,LH.player.r)+0.6, kind:"kid", p:plP});
-
-  drawables.sort((a,b)=>a.z-b.z);
-  for (const d of drawables){
-    if (d.kind==="tree"){
-      const p=hIso(d.c,d.r);
-      hDrawSprFeet("hopTree", p.x, p.y+6, 78, 96, false, 1,1);
-    } else if (d.kind==="sp"){
-      const p=hIso(d.sp.c, d.r);
-      hDrawSprFeet("hopSprinkler", p.x, p.y+4, 36, 44, false,1,1);
-      if (hSprayOn(d.sp, LH.t)){
-        ctx.save();
-        ctx.translate(p.x, p.y-28);
-        const on = 0.6+0.4*Math.sin(LH.t*14+d.sp.phase);
-        ctx.globalAlpha=0.45*on;
-        ctx.fillStyle="#b8f0ff";
-        for (let i=0;i<10;i++){
-          const a=-Math.PI/2 + (i-4.5)*0.18;
-          const len=18+10*Math.sin(LH.t*10+i);
-          ctx.beginPath(); ctx.ellipse(Math.cos(a)*len, Math.sin(a)*len, 3, 6, a, 0, Math.PI*2); ctx.fill();
-        }
-        ctx.restore();
-        ctx.globalAlpha=1;
-      }
-    } else if (d.kind==="car"){
-      const car=d.car;
-      const p=hIso(car.col, car.row);
-      const flip = car.dir<0;
-      hDrawSprFeet(car.spr, p.x, p.y+4, 118, 72, flip, 1,1);
-    } else if (d.kind==="float"){
-      const f=d.f;
-      const p=hIso(f.col, f.row);
-      const bob=Math.sin(f.bob)*3;
-      const sz = f.spr==="hopPad" ? 64 : 58;
-      hDrawSprFeet(f.spr, p.x, p.y+4+bob, sz, sz*0.72, false,1,1);
-    } else if (d.kind==="pick"){
-      const pk=d.pk;
-      const p=hIso(pk.c, pk.row);
-      const bob=Math.sin(LH.t*4+pk.bob)*5;
-      hDrawSprFeet(pk.kind==="ball"?"hopBall":"hopBone", p.x, p.y-10+bob, 28, 28, false,1,1);
-    } else if (d.kind==="dog"){
-      const p=d.p;
-      const sq = LH.dog.squash>0 ? {x:1.12,y:0.86} : {x:1,y:1};
-      if (LH.dog.hop){ const u=LH.dog.hop.t; sq.x=1-0.08*Math.sin(u*Math.PI); sq.y=1+0.14*Math.sin(u*Math.PI); }
-      ctx.save();
-      ctx.fillStyle="rgba(16,32,20,.28)";
-      ctx.beginPath(); ctx.ellipse(p.x, hIso(LH.dog.c,LH.dog.r).y+8, 22, 10, 0,0,Math.PI*2); ctx.fill();
-      if (LH.dog.glow>0.05){
-        ctx.globalAlpha=0.35+0.35*LH.dog.glow*Math.sin(LH.pulse);
-        ctx.strokeStyle="#ffe56a"; ctx.lineWidth=4;
-        ctx.beginPath(); ctx.ellipse(p.x, p.y-18, 28, 34, 0,0,Math.PI*2); ctx.stroke();
-        ctx.globalAlpha=1;
-      }
-      const swim = !!LH.ferry;
-      hDrawSprFeet(swim?"hopSwim":"hopBernard", p.x, p.y+4, swim?92:78, swim?56:70, LH.dog.face<0, sq.x, sq.y);
-      ctx.restore();
-    } else if (d.kind==="kid"){
-      const p=d.p;
-      let sx=1, sy=1;
-      if (LH.player.squash>0){ sx=1.14; sy=0.84; }
-      if (LH.player.hop){ const u=LH.player.hop.t; sx=1-0.1*Math.sin(u*Math.PI); sy=1+0.16*Math.sin(u*Math.PI); }
-      ctx.fillStyle="rgba(16,32,20,.28)";
-      ctx.beginPath(); ctx.ellipse(p.x, hIso(LH.player.c,LH.player.r).y+8, 16, 8, 0,0,Math.PI*2); ctx.fill();
-      const who = H_CHAR==="nic" ? "hopNic" : "hopGiulia";
-      hDrawSprFeet(who, p.x, p.y+2, 52, 92, LH.player.face<0, sx, sy);
-    }
-  }
-
   for (const p of LH.particles){
     ctx.globalAlpha=Math.max(0,p.life*2);
     ctx.fillStyle=p.color;
     ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
   }
   ctx.globalAlpha=1;
-
   if (LH.flash>0){
     ctx.fillStyle="rgba("+LH.flashCol+","+(LH.flash*0.28)+")";
     ctx.fillRect(0,0,W,H);
   }
   ctx.restore();
-
   if (!POSTER) drawHopHUD();
 }
 
@@ -6318,19 +6441,6 @@ function drawHopHUD(){
   ctx.fillText("BEST", W-162, 32);
   chunky(ctx, String(LH.best), W-162, 58, 26, "#fff6c9", "#4a2408");
 
-  const ready = hFerryReady();
-  goldPanel(ctx, W/2-150, H-78, 300, 58, 14);
-  ctx.textAlign="center";
-  ctx.font="700 16px Fredoka, system-ui, sans-serif";
-  if (ready){
-    ctx.fillStyle="#b6f23a";
-    ctx.fillText("Bernard is ready  ·  A / B  ride", W/2, H-44);
-  } else {
-    const left = Math.max(0, H_FERRY_CD - LH.sinceFerry);
-    ctx.fillStyle="#ffe9b0";
-    ctx.fillText(LH.ferry ? "Crossing the creek…" : ("Bernard resting  ·  "+left+" rows"), W/2, H-44);
-  }
-
   for (const s of LH.toasts){
     ctx.globalAlpha=Math.max(0, s.life);
     chunky(ctx, s.text, s.x, s.y, 22, s.color, "#2a1810");
@@ -6340,12 +6450,12 @@ function drawHopHUD(){
   if (!LH.started){
     const pl=(Math.sin(LH.pulse)+1)/2;
     ctx.globalAlpha=.65+pl*.35;
-    chunky(ctx,"HOP TO START",W/2,H/2+88,26,"#fff6c9","#4a1f08",700);
+    chunky(ctx,"HOP TO START",W/2,H/2+40,26,"#fff6c9","#4a1f08",700);
     ctx.globalAlpha=1;
     ctx.font="600 13px Fredoka, system-ui, sans-serif";
     ctx.fillStyle="rgba(255,255,255,.85)";
     ctx.textAlign="center";
-    ctx.fillText("d-pad hops  ·  A / B  Bernard ferry  ·  tap to hop", W/2, H/2+118);
+    ctx.fillText("up hops forward  ·  A / B rides Bernard", W/2, H/2+70);
   }
 }
 
