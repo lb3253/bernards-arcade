@@ -42,8 +42,13 @@ loadSpr("traffic2","/art/spr-traffic2.png");
 loadSpr("jrock","/art/spr-jrock.png");
 loadSpr("jfuel","/art/spr-jfuel.png");
 loadSpr("mud","/art/spr-mud.png");
+loadSpr("jtrail","/art/spr-jtrail.png");
+loadSpr("jpalm","/art/spr-jpalm.png");
+loadSpr("jramp","/art/spr-jramp.png");
+loadSpr("jstop","/art/spr-jstop.png");
+loadSpr("jscrub","/art/spr-jscrub.png");
 loadSpr("skyJeep","/art/sky-jeep.jpg");
-["fly","biplane","jet","balloon","storm","skyAir","saucer","drone","diver","mothership","disc","scout","missile","plasma","boom","shot","muzzle","hills","jeep","skyJeep"].forEach(n=>{ SPR[n].addEventListener("load",()=>{ try{ if(typeof bakeAirSky==="function") bakeAirSky(); if(typeof bakeFlapSky==="function") bakeFlapSky(); if(typeof bakeJeepSky==="function") bakeJeepSky(); }catch(e){} }); });
+["fly","biplane","jet","balloon","storm","skyAir","saucer","drone","diver","mothership","disc","scout","missile","plasma","boom","shot","muzzle","hills","jeep","skyJeep","jtrail","jpalm","jramp","jstop","jscrub"].forEach(n=>{ SPR[n].addEventListener("load",()=>{ try{ if(typeof bakeAirSky==="function") bakeAirSky(); if(typeof bakeFlapSky==="function") bakeFlapSky(); if(typeof bakeJeepSky==="function") bakeJeepSky(); }catch(e){} }); });
 function sprReady(name){
   const im=SPR[name];
   return !!(im && im.complete && im.naturalWidth>0);
@@ -4903,12 +4908,47 @@ const J_XMIN = 118, J_XMAX = 470;
 const J_FUEL0 = 100;
 let J = null, jbg = null;
 
+function jLayout(){
+  return {
+    ramps: [
+      {wx: 980,  h: 74, w: 250},
+      {wx: 1280, h: 42, w: 150},
+      {wx: 2140, h: 98, w: 290},
+      {wx: 2520, h: 50, w: 170},
+      {wx: 3460, h: 112,w: 310},
+      {wx: 4380, h: 68, w: 220},
+      {wx: 5220, h: 90, w: 270},
+      {wx: 6320, h: 104,w: 300},
+      {wx: 7180, h: 58, w: 190},
+      {wx: 8280, h: 120,w: 330},
+      {wx: 9380, h: 76, w: 230},
+      {wx: 10140,h: 92, w: 260}
+    ],
+    crosses: [
+      {wx: 540,  w: 236},
+      {wx: 1680, w: 250},
+      {wx: 2920, w: 244},
+      {wx: 4180, w: 258},
+      {wx: 5540, w: 240},
+      {wx: 6820, w: 252},
+      {wx: 7920, w: 246},
+      {wx: 9140, w: 260},
+      {wx: 10340,w: 236}
+    ]
+  };
+}
 function jGround(wx){
-  return 448
-    + Math.sin(wx*0.0037)*34
-    + Math.sin(wx*0.0091+1.2)*18
-    + Math.sin(wx*0.021+0.4)*9
-    + Math.sin(wx*0.041)*4;
+  let y = 438
+    + Math.sin(wx*0.0026)*16
+    + Math.sin(wx*0.0074+1.1)*10
+    + Math.sin(wx*0.018)*5;
+  if (J && J.ramps){
+    for (const r of J.ramps){
+      const t = (wx - r.wx) / (r.w * 0.5);
+      if (t>-1 && t<1) y -= r.h * 0.5 * (1 + Math.cos(t * Math.PI));
+    }
+  }
+  return y;
 }
 function jLaneY(lane, wx){
   return jGround(wx) - 62 + lane*128;
@@ -4917,14 +4957,18 @@ function jWorldX(){ return J.dist + J.jeep.x; }
 function jSX(wx){ return wx - J.dist; }
 
 function newJeep(best){
+  const L=jLayout();
   return {
     t:0, pulse:0, running:true, started:false, over:false, won:false,
     score:0, best:best||0, balls:0, cans:0, bumps:0,
     dist:0, speed:0, fuel:J_FUEL0,
     jeep:{ x:210, lane:0.48, vy:0, tilt:0, inv:0, blink:0, flash:0 },
     air:0, airV:0,
-    items:[], hazards:[], crosses:[], cars:[],
-    nextItem:520, nextCross:1680,
+    ramps: L.ramps,
+    items:[], hazards:[],
+    crosses: L.crosses.map(c=>({ wx:c.wx, w:c.w, seeded:false, warned:false })),
+    cars:[],
+    nextItem:280,
     particles:[], toasts:[], confetti:[], dust:[],
     shake:0, flash:0, flashCol:"224,58,47",
     yell:{ text:"", life:0, cool:0 },
@@ -4952,41 +4996,50 @@ function saveJeepBest(v){ try{ localStorage.setItem("jeep_best",String(v)); }cat
 function loadJeepBest(){ try{ const v=+localStorage.getItem("jeep_best"); if(v&&J) J.best=v; }catch(e){} }
 
 function jOnCross(wx){
-  for (const c of J.crosses) if (wx>c.wx-30 && wx<c.wx+c.w+30) return c;
+  if (!J) return null;
+  for (const c of J.crosses) if (wx>c.wx-12 && wx<c.wx+c.w+12) return c;
   return null;
 }
-function jSpawnCross(wx){
-  const w=rand(280,360);
-  J.crosses.push({wx, w});
-  const n=3+Math.floor(rand(0,3));
+function jSeedCars(c){
+  const n=5+Math.floor(rand(0,2));
   for (let i=0;i<n;i++){
-    const fromTop=Math.random()<.5;
+    const fromTop = i%2===0;
+    const lane = (i+0.5)/n;
     J.cars.push({
-      wx: wx + 36 + i*((w-72)/Math.max(n-1,1)) + rand(-10,10),
-      y: fromTop ? rand(-80,-20) : rand(H+20,H+90),
-      vy: (fromTop?1:-1)*rand(150,240),
-      kind: Math.random()<.5?0:1,
+      wx: c.wx + 28 + lane*(c.w-56),
+      y: fromTop ? -70 - i*70 : H+70 + i*70,
+      vy: (fromTop?1:-1)*rand(120,190),
+      kind: i%2,
       hit:false,
-      born: wx
+      born: c.wx
     });
   }
 }
 function jSpawnAhead(){
-  const R=J.dist+W+240;
+  const R=J.dist+W+260;
+  for (const c of J.crosses){
+    if (!c.seeded && c.wx < R){
+      c.seeded=true;
+      jSeedCars(c);
+    }
+    const dx = c.wx - jWorldX();
+    if (!c.warned && dx<240 && dx>20){
+      c.warned=true;
+      titaYell("Watch the cars!", true);
+      jToast("INTERSECTION!","#ffd36a", W/2, 150);
+    }
+  }
   while (J.nextItem<R){
     const wx=J.nextItem;
-    J.nextItem += rand(220,360);
+    J.nextItem += rand(180,300);
     if (jOnCross(wx)) continue;
+    const onRamp = (J.ramps||[]).some(r=>Math.abs(wx-r.wx)<r.w*0.45);
     const lane=rand(0.16,0.84);
     const roll=Math.random();
-    if (roll<.44) J.items.push({wx, lane, kind: Math.random()<.18?"gold":"green", taken:false, bob:rand(0,6)});
-    else if (roll<.68) J.items.push({wx, lane, kind:"fuel", taken:false, bob:rand(0,6)});
-    else if (roll<.84) J.hazards.push({wx, lane, type:"rock", hit:false});
-    else J.hazards.push({wx, lane, type:"mud", hit:false, w:rand(78,120)});
-  }
-  while (J.nextCross<R && J.nextCross<J_GOAL-700){
-    jSpawnCross(J.nextCross);
-    J.nextCross += rand(1550,2300);
+    if (roll<.40) J.items.push({wx, lane, kind: Math.random()<.2?"gold":"green", taken:false, bob:rand(0,6)});
+    else if (roll<.66) J.items.push({wx, lane, kind:"fuel", taken:false, bob:rand(0,6)});
+    else if (roll<.84 && !onRamp) J.hazards.push({wx, lane, type:"rock", hit:false});
+    else if (!onRamp) J.hazards.push({wx, lane, type:"mud", hit:false, w:rand(78,130)});
   }
 }
 
@@ -5079,6 +5132,12 @@ function updateJeep(dt){
     else {
       jp.x=210+Math.sin(J.t*1.6)*6;
       jp.tilt=Math.sin(J.t*1.6)*.04;
+      jSpawnAhead();
+      for (const c of J.cars){
+        c.y += c.vy*dt;
+        if (c.y>H+90 && c.vy>0){ c.y=-70; c.hit=false; }
+        if (c.y<-90 && c.vy<0){ c.y=H+70; c.hit=false; }
+      }
       return;
     }
   }
@@ -5102,24 +5161,32 @@ function updateJeep(dt){
   const wx=jWorldX();
   const g0=jGround(wx), g1=jGround(wx+36);
   const slope=(g1-g0)/36;
-  if (slope>0.22) J.speed = Math.max(0, J.speed - slope*90*dt);
-  if (slope<-0.12 && J.speed>40) J.speed = Math.min(J_MAXV+20, J.speed - slope*40*dt);
+  // uphill (y shrinking) slows you; downhill speeds you up
+  if (slope < -0.16) J.speed = Math.max(0, J.speed + slope*110*dt);
+  if (slope >  0.12 && J.speed>24) J.speed = Math.min(J_MAXV+28, J.speed + slope*70*dt);
 
   // catch air off a crest
-  const rise = jGround(wx-48) - g0;
-  if (J.air<=0 && J.speed>155 && rise>11){
-    J.airV = -(140 + J.speed*0.85 + rise*4);
-    J.air = 4;
+  const rise = jGround(wx-40) - g0;
+  if (J.air<=0 && J.speed>85 && rise>8){
+    J.airV = -(120 + J.speed*0.95 + rise*5.5);
+    J.air = 6;
     titaYell("Hold on!");
-    jBurst(jp.x-20, jLaneY(jp.lane,wx)+18, "rgba(232,210,160,.9)", 8, 120);
+    jBurst(jp.x-20, jLaneY(jp.lane,wx)+18, "rgba(232,210,160,.9)", 10, 140);
   }
+  const wasAir=J.air;
   if (J.air>0 || J.airV<0){
-    J.airV += 900*dt;
+    J.airV += 880*dt;
     J.air -= J.airV * dt;
-    if (J.air>150){ J.air=150; J.airV=Math.max(0,J.airV); }
-    if (J.air<=0){ J.air=0; J.airV=0; }
+    if (J.air>170){ J.air=170; J.airV=Math.max(0,J.airV); }
+    if (J.air<=0){
+      if (wasAir>32){
+        jBurst(jp.x, jLaneY(jp.lane,wx)+20, "rgba(210,180,120,.85)", 14, 150);
+        if (!REDUCED) J.shake=Math.max(J.shake,8);
+      }
+      J.air=0; J.airV=0;
+    }
   }
-  jp.tilt = lerp(jp.tilt, clamp(slope*0.85 + (J.air>0?J.airV*0.0007:0) + mx*0.08, -0.42, 0.42), dt*8);
+  jp.tilt = lerp(jp.tilt, clamp(slope*0.9 + (J.air>0?J.airV*0.0007:0) + mx*0.08, -0.48, 0.48), dt*8);
 
   J.dist += J.speed*dt;
   J.fuel -= (1.55 + J.speed*0.0064)*dt;
@@ -5189,7 +5256,7 @@ function updateJeep(dt){
   }
   J.items=J.items.filter(it=>!it.taken && jSX(it.wx)<W+160);
   J.hazards=J.hazards.filter(h=>jSX(h.wx)<W+160);
-  J.crosses=J.crosses.filter(c=>jSX(c.wx+c.w)<W+80);
+  J.cars=J.cars.filter(c=> jSX(c.wx)<W+280 && jSX(c.wx)>-200);
 
   // dust
   if (J.air<=0 && J.speed>50 && Math.random()<dt*18){
@@ -5212,79 +5279,88 @@ function bakeJeepSky(){
   jbg=document.createElement("canvas"); jbg.width=W; jbg.height=H;
   const b=jbg.getContext("2d");
   const sky=b.createLinearGradient(0,0,0,H);
-  sky.addColorStop(0,"#6ec4f0"); sky.addColorStop(.42,"#c5e38a"); sky.addColorStop(1,"#d9c07a");
+  sky.addColorStop(0,"#6ec4f0"); sky.addColorStop(.48,"#c8e89a"); sky.addColorStop(1,"#7eb24a");
   b.fillStyle=sky; b.fillRect(0,0,W,H);
   if (sprReady("skyJeep")){
     const im=SPR.skyJeep;
-    const sh=im.naturalHeight*0.40;
-    b.drawImage(im, 0, 0, im.naturalWidth, sh, 0, 0, W, H*0.42);
-    const fade=b.createLinearGradient(0,H*0.38,0,H*0.56);
-    fade.addColorStop(0,"rgba(197,227,138,0)");
-    fade.addColorStop(1,"#c5e38a");
-    b.fillStyle=fade; b.fillRect(0, H*0.38, W, H*0.22);
+    b.drawImage(im, 0, 0, im.naturalWidth, im.naturalHeight*0.52, 0, 0, W, H*0.55);
+    const fade=b.createLinearGradient(0,H*0.44,0,H*0.62);
+    fade.addColorStop(0,"rgba(200,232,154,0)");
+    fade.addColorStop(1,"#8fc85a");
+    b.fillStyle=fade; b.fillRect(0, H*0.44, W, H*0.22);
   }
+  const grass=b.createLinearGradient(0,H*0.58,0,H);
+  grass.addColorStop(0,"#8fc85a"); grass.addColorStop(1,"#3f7a32");
+  b.fillStyle=grass; b.fillRect(0, H*0.58, W, H*0.42);
 }
 
 function drawJeepTrail(){
-  // far palmettos / bushes
-  ctx.fillStyle="rgba(46,92,48,.55)";
-  for(let i=0;i<14;i++){
-    const x=((i*130 - J.dist*.28)%(W+130)+W+130)%(W+130)-50;
-    const y=318+Math.sin(i*1.7)*18;
-    ctx.beginPath(); ctx.ellipse(x,y,18,42,0,0,Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(x-16,y+8,14,32,-.3,0,Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(x+16,y+8,14,32,.3,0,Math.PI*2); ctx.fill();
-  }
-  // paved intersections
-  for (const c of J.crosses){
-    const x0=jSX(c.wx), x1=x0+c.w;
-    if (x1<0||x0>W) continue;
-    ctx.fillStyle="#5a5c62";
-    ctx.fillRect(x0, 0, c.w, H);
-    ctx.fillStyle="#6e7076";
-    ctx.fillRect(x0+8, 0, c.w-16, H);
-    ctx.strokeStyle="rgba(255,255,255,.75)"; ctx.lineWidth=4; ctx.setLineDash([18,16]);
-    ctx.beginPath(); ctx.moveTo(x0+c.w/2, 0); ctx.lineTo(x0+c.w/2, H); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle="#e8c84a";
-    ctx.fillRect(x0,0,8,H); ctx.fillRect(x1-8,0,8,H);
-  }
-  // dirt band
-  ctx.beginPath();
-  ctx.moveTo(0,H);
-  for (let x=0;x<=W;x+=8){
-    const wx=J.dist+x;
-    ctx.lineTo(x, jGround(wx)+92);
-  }
-  ctx.lineTo(W,H); ctx.closePath();
-  const dirt=ctx.createLinearGradient(0,400,0,H);
-  dirt.addColorStop(0,"#c9a15a"); dirt.addColorStop(.45,"#8a6230"); dirt.addColorStop(1,"#4a3218");
-  ctx.fillStyle=dirt; ctx.fill();
-  ctx.beginPath();
-  for (let x=0;x<=W;x+=8){
-    const wx=J.dist+x;
-    const y=jGround(wx);
-    if (x===0) ctx.moveTo(x,y-78);
-    else ctx.lineTo(x,y-78);
-  }
-  for (let x=W;x>=0;x-=8){
-    ctx.lineTo(x, jGround(J.dist+x)+88);
-  }
-  ctx.closePath();
-  const trail=ctx.createLinearGradient(0,300,0,560);
-  trail.addColorStop(0,"#e6c882"); trail.addColorStop(.5,"#c4964a"); trail.addColorStop(1,"#8d5e28");
-  ctx.fillStyle=trail; ctx.fill();
-  // ruts
-  ctx.strokeStyle="rgba(90,56,20,.28)"; ctx.lineWidth=3;
-  for (const off of [-28, 18]){
-    ctx.beginPath();
-    for (let x=0;x<=W;x+=10){
-      const y=jGround(J.dist+x)+off+Math.sin((J.dist+x)*0.05)*2;
-      if (x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  // far palmetto scrub
+  for(let i=0;i<8;i++){
+    const x=((i*190 - J.dist*.22)%(W+190)+W+190)%(W+190)-70;
+    const y=292+Math.sin(i*1.4)*16;
+    if (!drawSprC("jscrub", x, y, 150, 92, 0)){
+      ctx.fillStyle="rgba(46,92,48,.5)";
+      ctx.beginPath(); ctx.ellipse(x,y,28,46,0,0,Math.PI*2); ctx.fill();
     }
-    ctx.stroke();
   }
-  // finish banner
+  // near palmettos along the ribbon
+  for(let i=0;i<10;i++){
+    const x=((i*240+80 - J.dist*.92)%(W+240)+W+240)%(W+240)-40;
+    const y=jGround(J.dist+x) - 118;
+    if (!drawSprC("jpalm", x, y, 78, 150, 0)){
+      ctx.fillStyle="#2e6a34";
+      ctx.beginPath(); ctx.ellipse(x,y,18,50,0,0,Math.PI*2); ctx.fill();
+    }
+  }
+
+  const th=188, sl=6;
+  if (sprReady("jtrail")){
+    const im=SPR.jtrail;
+    for (let x=0; x<=W; x+=sl){
+      const wx=J.dist+x;
+      if (jOnCross(wx)) continue;
+      const y=jGround(wx);
+      const sx=((wx % im.naturalWidth)+im.naturalWidth)%im.naturalWidth;
+      const sw=Math.min(sl+1, im.naturalWidth-sx);
+      ctx.drawImage(im, sx, 0, sw, im.naturalHeight, x, y-th*0.46, sl+2, th);
+    }
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(0,H);
+    for (let x=0;x<=W;x+=8) ctx.lineTo(x, jGround(J.dist+x)+92);
+    ctx.lineTo(W,H); ctx.closePath();
+    ctx.fillStyle="#c4964a"; ctx.fill();
+  }
+
+  for (const r of J.ramps){
+    const x=jSX(r.wx);
+    if (x<-160||x>W+160) continue;
+    const y=jGround(r.wx)+18;
+    drawSprC("jramp", x, y, r.w*1.15, r.h*1.35, 0);
+  }
+
+  for (const c of J.crosses){
+    const x0=jSX(c.wx), w=c.w;
+    if (x0+w<0||x0>W) continue;
+    ctx.fillStyle="#3e4046";
+    ctx.fillRect(x0, 0, w, H);
+    ctx.fillStyle="#555860";
+    ctx.fillRect(x0+10, 0, w-20, H);
+    ctx.fillStyle="#2e3036";
+    ctx.fillRect(x0, 0, 10, H); ctx.fillRect(x0+w-10, 0, 10, H);
+    ctx.fillStyle="#e8c84a";
+    ctx.fillRect(x0,0,6,H); ctx.fillRect(x0+w-6,0,6,H);
+    ctx.strokeStyle="rgba(255,236,110,.9)"; ctx.lineWidth=5; ctx.setLineDash([22,18]);
+    ctx.beginPath(); ctx.moveTo(x0+w/2, 0); ctx.lineTo(x0+w/2, H); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle="rgba(255,255,255,.85)";
+    ctx.fillRect(x0+16, jGround(c.wx)-78, w-32, 8);
+    ctx.fillRect(x0+16, jGround(c.wx)+70, w-32, 8);
+    drawSprC("jstop", x0+22, jGround(c.wx)-118, 36, 76, 0);
+    drawSprC("jstop", x0+w-22, jGround(c.wx)+108, 36, 76, 0);
+  }
+
   const fx=jSX(J_GOAL);
   if (fx>-40 && fx<W+40){
     ctx.fillStyle="#c9f24d";
@@ -5364,7 +5440,8 @@ function drawJeep(){
     const cx=jSX(c.wx); if (cx<-80||cx>W+80) continue;
     const key=c.kind? "traffic2":"traffic";
     ctx.globalAlpha=c.hit?0.5:1;
-    if (!drawSprC(key, cx, c.y, 100, 56, 0)){
+    drawDrop(cx, c.y+22, 42, 9);
+    if (!drawSprC(key, cx, c.y, 118, 64, 0)){
       ctx.fillStyle=c.kind?"#d94a3a":"#3a6ad9";
       ctx.beginPath(); ctx.roundRect(cx-36,c.y-16,72,32,8); ctx.fill();
     }
@@ -5494,6 +5571,8 @@ function startJeep(){
   J=newJeep(best);
   MODE="jeep"; setMark("jeep");
   hideAll();
+  jSpawnAhead();
+  if (!jbg) bakeJeepSky();
   if (!ac) beep(1,.01);
   syncHud();
 }
