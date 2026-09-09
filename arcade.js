@@ -54,11 +54,10 @@ loadSpr("hopBernard","/art/spr-hop-bernard.png");
 loadSpr("hopSwim","/art/spr-hop-swim.png");
 loadSpr("hopNicHop","/art/spr-hop-nic-hop.png");
 loadSpr("hopGiuliaHop","/art/spr-hop-giulia-hop.png");
-loadSpr("hopGrass0","/art/spr-hop-grass0.png");
-loadSpr("hopGrass1","/art/spr-hop-grass1.png");
-loadSpr("hopGrass2","/art/spr-hop-grass2.png");
-loadSpr("hopRoad","/art/spr-hop-road.png");
-loadSpr("hopWater","/art/spr-hop-water.png");
+loadSpr("hopGrassTop","/art/spr-hop-grass-top.png");
+loadSpr("hopGrassTop2","/art/spr-hop-grass-top2.png");
+loadSpr("hopRoadTop","/art/spr-hop-road-top.png");
+loadSpr("hopWaterTop","/art/spr-hop-water-top.png");
 loadSpr("hopCarRed","/art/spr-hop-car-red.png");
 loadSpr("hopCarYel","/art/spr-hop-car-yel.png");
 loadSpr("hopCarBlu","/art/spr-hop-car-blu.png");
@@ -5955,8 +5954,8 @@ function startJeep(){
 // ================================================================
 const H_COLS = 9;
 const H_PLAY0 = 1, H_PLAY1 = 7;
-const H_TW = 96, H_TH = 46, H_LIP = 24, H_SKEW = 16;
-const H_ORIGIN = 552;
+const H_TW = 100, H_TH = 76, H_LIP = 0, H_SKEW = 0;
+const H_ORIGIN = 548;
 const H_FERRY_CD = 6;
 const H_HOP_DUR = 0.18;
 const H_CAR_PAL = [
@@ -6997,43 +6996,29 @@ function hBlitActor(name, x, yFeet, height, flip, sx, sy){
 
 function hDrawTile(c,r,lane){
   const p=hIso(c,r);
-  const tw=H_TW, th=H_TH-2, sk=H_SKEW;
-  let fill="#5aaa32", fill2="#3e7a20";
-  if (lane.type==="street"){ fill="#5a5a64"; fill2="#2e2e36"; }
-  else if (lane.type==="water"){ fill="#2aa0c8"; fill2="#0e5878"; }
-  else if (lane.type==="yard"){ fill="#6ec43c"; fill2="#3e8a1c"; }
+  const x0=Math.round(p.x-H_TW/2), y0=Math.round(p.y-H_TH/2);
+  let name="hopGrassTop";
+  if (lane.type==="street") name="hopRoadTop";
+  else if (lane.type==="water") name="hopWaterTop";
+  else if (lane.type==="yard") name="hopGrassTop2";
+  else name = ((c+r)&1) ? "hopGrassTop2" : "hopGrassTop";
+  ctx.save();
   ctx.beginPath();
-  ctx.moveTo(p.x-tw/2+sk, p.y-th/2);
-  ctx.lineTo(p.x+tw/2+sk, p.y-th/2);
-  ctx.lineTo(p.x+tw/2,     p.y+th/2);
-  ctx.lineTo(p.x-tw/2,     p.y+th/2);
-  ctx.closePath();
-  ctx.fillStyle=fill; ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(p.x-tw/2, p.y+th/2);
-  ctx.lineTo(p.x+tw/2, p.y+th/2);
-  ctx.lineTo(p.x+tw/2, p.y+th/2+H_LIP);
-  ctx.lineTo(p.x-tw/2, p.y+th/2+H_LIP);
-  ctx.closePath();
-  ctx.fillStyle=fill2; ctx.fill();
-  let name=null;
-  if (lane.type==="street" && sprReady("hopRoad")) name="hopRoad";
-  else if (lane.type==="water" && sprReady("hopWater")) name="hopWater";
-  else if (sprReady("hopGrass0")){
-    const v=((c+r*3)%3+3)%3;
-    name = v===1&&sprReady("hopGrass1") ? "hopGrass1" : v===2&&sprReady("hopGrass2") ? "hopGrass2" : "hopGrass0";
-    if (lane.type==="yard" && sprReady("hopGrass1")) name="hopGrass1";
+  ctx.rect(x0, y0, H_TW, H_TH);
+  ctx.clip();
+  if (sprReady(name)){
+    ctx.drawImage(SPR[name], x0, y0, H_TW, H_TH);
+  } else {
+    ctx.fillStyle = lane.type==="street"?"#5a5a64":lane.type==="water"?"#2aa0c8":"#5aaa32";
+    ctx.fillRect(x0, y0, H_TW, H_TH);
   }
-  if (name && sprReady(name)){
-    drawSprC(name, p.x, p.y+8, 188, 136);
-    return;
+  ctx.restore();
+  ctx.fillStyle="rgba(0,0,0,.16)";
+  ctx.fillRect(x0, y0+H_TH-3, H_TW, 3);
+  if (lane.type==="street"){
+    ctx.fillStyle="rgba(0,0,0,.22)";
+    ctx.fillRect(x0, y0, H_TW, 3);
   }
-  bakeHopAtlas();
-  if (lane.type==="street") name="road_"+(c%2);
-  else if (lane.type==="water") name="water_"+(((Math.floor(LH.t*3+r+c))%4+4)%4);
-  else if (lane.type==="yard") name="yard_"+(c%2);
-  else name="grass_"+(((c+r*3)%3+3)%3);
-  hBlit(name, p.x, p.y, false);
 }
 function hDrawTree(x,y,variant){
   if (sprReady("hopTree")){
@@ -7074,7 +7059,7 @@ function hDrawCarArt(car,x,y){
   const names=["hopCarRed","hopCarYel","hopCarBlu","hopCarGrn"];
   const n=names[(car.palI||0)%names.length];
   if (sprReady(n)){
-    drawSprC(n, x, y-16, 118, 72, 0, car.dir<0);
+    drawSprC(n, x, y, 112, 52, 0, car.dir<0);
     return;
   }
   bakeHopAtlas();
@@ -7216,31 +7201,35 @@ function drawHop(){
   const r0 = Math.max(0, Math.floor(LH.camR-2.1));
   const r1 = Math.floor(LH.camR+12);
 
+  // Tiles first, clipped to their own row, so nothing can bury cars.
   for (let r=r1;r>=r0;r--){
     const lane=hLane(r);
     for (let c=0;c<H_COLS;c++) hDrawTile(c,r,lane);
+  }
+  for (let r=r1;r>=r0;r--){
+    const lane=hLane(r);
     for (const tcol of (lane.trees||[])){
       const p=hIso(tcol,r);
-      hDrawTree(p.x, p.y+6, (tcol + r) % 3);
+      hDrawTree(p.x, p.y+H_TH*0.28, (tcol + r) % 3);
     }
     if (lane.sprinklers){
       for (const sp of lane.sprinklers){
         const p=hIso(sp.c,r);
-        hDrawSprinklerArt(p.x, p.y+2, hSprayOn(sp,LH.t), LH.t, sp.phase);
+        hDrawSprinklerArt(p.x, p.y+H_TH*0.2, hSprayOn(sp,LH.t), LH.t, sp.phase);
       }
     }
     if (lane.type==="street"){
       for (const car of LH.cars){
         if ((car.row|0)!==r) continue;
         const p=hIso(car.col, car.row);
-        hDrawCarArt(car, p.x, p.y+2);
+        hDrawCarArt(car, p.x, p.y+4);
       }
     }
     if (lane.type==="water"){
       for (const f of LH.floats){
         if ((f.row|0)!==r) continue;
         const p=hIso(f.col, f.row);
-        hDrawFloatArt(f, p.x, p.y+4);
+        hDrawFloatArt(f, p.x, p.y+6);
       }
     }
     for (const pk of LH.pickups){
@@ -7253,29 +7242,30 @@ function drawHop(){
       const sq=hSquash(LH.dog);
       const ready=hFerryReady();
       const cool=Math.max(0, H_FERRY_CD-LH.sinceFerry);
+      const fy=p.y+H_TH*0.28;
       if (LH.ferry){
-        hDrawBernard(p.x, p.y+4, LH.dog.face<0, sq.sx, sq.sy, true, LH.t);
+        hDrawBernard(p.x, fy, LH.dog.face<0, sq.sx, sq.sy, true, LH.t);
       } else if (ready){
         const pulse=0.55+0.45*Math.sin(LH.pulse*2);
         ctx.save();
         ctx.globalAlpha=0.4+0.35*pulse;
         ctx.strokeStyle="#ffe56a"; ctx.lineWidth=5;
-        ctx.beginPath(); ctx.ellipse(p.x, p.y-28, 32, 38, 0,0,Math.PI*2); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(p.x, fy-28, 32, 38, 0,0,Math.PI*2); ctx.stroke();
         ctx.restore();
-        hDrawBernard(p.x, p.y+4, LH.dog.face<0, sq.sx, sq.sy, false, LH.t);
-        hDrawPaw(p.x, p.y-80, 0.95+0.12*pulse);
+        hDrawBernard(p.x, fy, LH.dog.face<0, sq.sx, sq.sy, false, LH.t);
+        hDrawPaw(p.x, fy-80, 0.95+0.12*pulse);
       } else {
         if (cool>0){
           ctx.save(); ctx.globalAlpha=0.62;
-          hDrawBernard(p.x, p.y+4, LH.dog.face<0, sq.sx, sq.sy, false, LH.t);
+          hDrawBernard(p.x, fy, LH.dog.face<0, sq.sx, sq.sy, false, LH.t);
           ctx.restore();
-          goldPanel(ctx, p.x-16, p.y-74, 32, 22, 8);
+          goldPanel(ctx, p.x-16, fy-74, 32, 22, 8);
           ctx.textAlign="center";
           ctx.font="700 13px Fredoka, system-ui, sans-serif";
           ctx.fillStyle="#ffe9b0";
-          ctx.fillText(String(cool), p.x, p.y-58);
+          ctx.fillText(String(cool), p.x, fy-58);
         } else {
-          hDrawBernard(p.x, p.y+4, LH.dog.face<0, sq.sx, sq.sy, false, LH.t);
+          hDrawBernard(p.x, fy, LH.dog.face<0, sq.sx, sq.sy, false, LH.t);
         }
       }
     }
@@ -7283,7 +7273,7 @@ function drawHop(){
       const p=hActorPos(LH.player);
       const sq=hSquash(LH.player);
       const hopU=LH.player.hop?LH.player.hop.t:0;
-      hDrawKidArt(p.x, p.y+2, LH.player.face<0, sq.sx, sq.sy, H_CHAR!=="nic", hopU);
+      hDrawKidArt(p.x, p.y+H_TH*0.28, LH.player.face<0, sq.sx, sq.sy, H_CHAR!=="nic", hopU);
     }
   }
 
