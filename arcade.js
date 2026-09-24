@@ -694,11 +694,32 @@ function initCarousel(){
 }
 
 let lastKeyCode="";
+function keyName(e){
+  const c=e.code;
+  if (c && c!=="Unidentified") return c;
+  const k=e.key||"";
+  const named={
+    ArrowUp:"ArrowUp", ArrowDown:"ArrowDown", ArrowLeft:"ArrowLeft", ArrowRight:"ArrowRight",
+    Enter:"Enter", " ":"Space", Escape:"Escape", Backspace:"Backspace",
+    a:"KeyA", A:"KeyA", w:"KeyW", W:"KeyW", s:"KeyS", S:"KeyS", d:"KeyD", D:"KeyD",
+    x:"KeyX", X:"KeyX", z:"KeyZ", Z:"KeyZ"
+  };
+  if (named[k]) return named[k];
+  const kc=e.keyCode||e.which||0;
+  const byCode={
+    37:"ArrowLeft", 38:"ArrowUp", 39:"ArrowRight", 40:"ArrowDown",
+    19:"ArrowUp", 20:"ArrowDown", 21:"ArrowLeft", 22:"ArrowRight",
+    13:"Enter", 32:"Space", 27:"Escape", 8:"Backspace", 4:"Escape",
+    96:"Space", 97:"KeyX", 99:"KeyZ", 100:"KeyX",
+    108:"Enter", 109:"Escape"
+  };
+  return byCode[kc]||"";
+}
 function gpChip(){
   const c=document.getElementById("padChip");
   if (!c) return;
   if (GP.idx===null){
-    c.textContent = "No controller";
+    c.textContent = lastKeyCode ? ("Key: "+lastKeyCode) : "No controller";
     c.classList.remove("live");
     return;
   }
@@ -711,31 +732,81 @@ function gpEdge(name,val){
   GP.prev[name]=val;
   return val && !was;
 }
-
-function pollGamepad(){
-  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-
-  // adopt the first pad that shows up; drop it if it goes away
-  if (GP.idx===null){
-    for (let i=0;i<pads.length;i++){
-      if (pads[i]){ GP.idx=i; GP.id=pads[i].id||"Controller"; GP.focus=0; UI_FOCUS=true; gpChip(); gpApplyFocus(); break; }
-    }
+function gpBtn(b,i){
+  const x=b && b[i];
+  if (!x) return false;
+  return !!(x.pressed || (x.value>0.5));
+}
+function gpAxis(gp,i){
+  const v=gp.axes[i];
+  if (typeof v!=="number" || !isFinite(v)) return 0;
+  if (!GP.rest || GP.restIdx!==gp.index || !GP.rest[i] && GP.rest[i]!==0){
+    // rest is filled by gpLearnRest
   }
-  const gp = GP.idx===null ? null : pads[GP.idx];
+  const rest=(GP.rest && GP.restIdx===gp.index) ? (GP.rest[i]||0) : 0;
+  return v-rest;
+}
+function gpLearnRest(gp){
+  if (GP.restIdx!==gp.index || !GP.rest){
+    GP.restIdx=gp.index;
+    GP.rest=Array.from(gp.axes||[]);
+    GP.restN=1;
+    return;
+  }
+  if (GP.restN>=20) return;
+  let busy=false;
+  const b=gp.buttons||[];
+  for (let i=0;i<b.length;i++) if (gpBtn(b,i)) busy=true;
+  if (busy) return;
+  for (let i=0;i<gp.axes.length;i++){
+    GP.rest[i]=(GP.rest[i]||0)*0.85 + gp.axes[i]*0.15;
+  }
+  GP.restN++;
+}
+function gpPick(pads){
+  if (GP.idx!=null && pads[GP.idx]){
+    const cur=pads[GP.idx];
+    let hot=false;
+    const b=cur.buttons||[];
+    for (let i=0;i<b.length;i++) if (gpBtn(b,i)) hot=true;
+    if (hot) return cur;
+  }
+  let best=null, score=-1;
+  for (let i=0;i<pads.length;i++){
+    const p=pads[i];
+    if (!p) continue;
+    let s=p.mapping==="standard"?3:1;
+    const b=p.buttons||[];
+    for (let j=0;j<b.length;j++) if (gpBtn(b,j)) s+=12;
+    if (s>score){ score=s; best=p; }
+  }
+  return best || (GP.idx!=null ? pads[GP.idx] : null);
+}
+
+let gpTick=0;
+function pollGamepad(){
+  if (pollGamepad._seen===gpTick) return;
+  pollGamepad._seen=gpTick;
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  const gp = gpPick(pads);
+
   if (!gp){
     if (GP.idx!==null){ GP.idx=null; GP.id=""; GP.lastBtn=""; gpChip(); gpClearFocus(); }
     return;
   }
+  if (GP.idx!==gp.index){
+    GP.idx=gp.index; GP.id=gp.id||"Controller"; GP.focus=0; UI_FOCUS=true;
+    GP.rest=null; GP.restIdx=-1; GP.restN=0;
+    gpChip(); gpApplyFocus();
+  }
+  gpLearnRest(gp);
 
-  // ---- directions: d-pad buttons OR stick axes, whichever the pad reports
-  const b=gp.buttons, DEAD=.45;
-  const ax=gp.axes[0]||0, ay=gp.axes[1]||0;
-  let up    = !!(b[12]&&b[12].pressed) || ay<-DEAD;
-  let down  = !!(b[13]&&b[13].pressed) || ay> DEAD;
-  let left  = !!(b[14]&&b[14].pressed) || ax<-DEAD;
-  let right = !!(b[15]&&b[15].pressed) || ax> DEAD;
-  // some pads expose the d-pad as a hat on axis 9 instead. Centred reads as
-  // ~3.29 (out of range), so only decode genuine -1..1 values, never a bare 0.
+  const b=gp.buttons, DEAD=.42;
+  const ax=gpAxis(gp,0), ay=gpAxis(gp,1);
+  let up    = gpBtn(b,12) || ay<-DEAD;
+  let down  = gpBtn(b,13) || ay> DEAD;
+  let left  = gpBtn(b,14) || ax<-DEAD;
+  let right = gpBtn(b,15) || ax> DEAD;
   const hat=gp.axes[9];
   if (typeof hat==="number" && hat!==0 && hat>=-1.01 && hat<=1.01){
     const d=Math.round((hat+1)/0.2857);
@@ -744,16 +815,16 @@ function pollGamepad(){
     if (d>=3&&d<=5) down=true;
     if (d>=5&&d<=7) left=true;
   }
-  // secondary stick, in case the d-pad landed on axes 2/3
-  const ax2=gp.axes[2]||0, ay2=gp.axes[3]||0;
-  if (ax2<-DEAD) left=true;  if (ax2>DEAD) right=true;
-  if (ay2<-DEAD) up=true;    if (ay2>DEAD) down=true;
+  // right stick only after it has actually moved off its rest
+  if (GP.restN>=8){
+    const ax2=gpAxis(gp,2), ay2=gpAxis(gp,3);
+    if (ax2<-DEAD) left=true;  if (ax2>DEAD) right=true;
+    if (ay2<-DEAD) up=true;    if (ay2>DEAD) down=true;
+  }
 
-  // ---- any face button confirms / acts; Start too
-  const face  = !!(b[0]&&b[0].pressed)||!!(b[1]&&b[1].pressed)||
-                !!(b[2]&&b[2].pressed)||!!(b[3]&&b[3].pressed);
-  const startB= !!(b[9]&&b[9].pressed)||!!(b[11]&&b[11].pressed);
-  const selB  = !!(b[8]&&b[8].pressed)||!!(b[10]&&b[10].pressed);
+  const face  = gpBtn(b,0)||gpBtn(b,1)||gpBtn(b,2)||gpBtn(b,3);
+  const startB= gpBtn(b,9)||gpBtn(b,11)||gpBtn(b,16);
+  const selB  = gpBtn(b,8)||gpBtn(b,10)||gpBtn(b,17);
 
   // ---- live readout, so an unmapped pad can still be diagnosed
   let pressed="";
@@ -851,9 +922,12 @@ window.addEventListener("gamepaddisconnected",e=>{
 addEventListener("keydown",e=>{
   // On menus the arrows move the selection instead of a character. TV remotes
   // and many Android pads send exactly these, so this is the path they use.
-  lastKeyCode=e.code; gpChip();
+  // Android TV often leaves e.code as "Unidentified" and only fills key/keyCode.
+  const code=keyName(e);
+  lastKeyCode=code||e.code||e.key||""; gpChip();
+  if (!code) return;
   if (gpScreen()!=="play"){
-    const c=e.code;
+    const c=code;
     const home=gpScreen()==="home";
     if (c==="ArrowRight"||c==="ArrowDown"||c==="KeyD"||c==="KeyS"){
       if (home){ if (!e.repeat){ carouselNudge(1); CAR.keyDir=1; CAR.keyT=0; } }
@@ -865,19 +939,23 @@ addEventListener("keydown",e=>{
       else uiNav(-1);
       e.preventDefault(); return;
     }
-    if (c==="Enter"||c==="NumpadEnter"||c==="Space"){ uiActivate(); e.preventDefault(); return; }
+    if (c==="Enter"||c==="NumpadEnter"||c==="Space"||c==="KeyX"){ uiActivate(); e.preventDefault(); return; }
     if (c==="Escape"||c==="Backspace"){ uiBack(); e.preventDefault(); return; }
     return;
   }
-  if (e.code==="Escape"||e.code==="KeyP"||e.code==="Backspace"){ togglePause(); e.preventDefault(); return; }
-  if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","KeyX","KeyZ","ShiftLeft","ShiftRight"].includes(e.code)) e.preventDefault();
-  if (e.code==="Space" && !keys.has("Space")) actionDown();
-  keys.add(e.code);
+  if (code==="Escape"||code==="KeyP"||code==="Backspace"){ togglePause(); e.preventDefault(); return; }
+  if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","KeyX","KeyZ","ShiftLeft","ShiftRight"].includes(code)) e.preventDefault();
+  if ((code==="Space"||code==="KeyX") && !keys.has("Space") && !keys.has("KeyX")) actionDown();
+  keys.add(code);
+  if (code==="KeyX") keys.add("Space");
 });
 addEventListener("keyup",e=>{
-  keys.delete(e.code);
-  if (e.code==="Space") actionUp();
-  if (["ArrowRight","ArrowDown","KeyD","KeyS","ArrowLeft","ArrowUp","KeyA","KeyW"].includes(e.code)) CAR.keyDir=0;
+  const code=keyName(e);
+  if (!code) return;
+  keys.delete(code);
+  if (code==="KeyX") keys.delete("Space");
+  if (code==="Space") actionUp();
+  if (["ArrowRight","ArrowDown","KeyD","KeyS","ArrowLeft","ArrowUp","KeyA","KeyW"].includes(code)) CAR.keyDir=0;
 });
 function canvasPos(e){
   const r=cv.getBoundingClientRect();
@@ -7466,8 +7544,10 @@ let frameErr=0;
 let PAUSED=false;
 let lastPlaying="";
 function frame(now){
+  gpTick++;
   const dt=Math.min((now-last)/1000,.05); last=now;
   try{
+    pollGamepad();
     const pl = gameRunning() ? "1" : "0";
     if (pl!==lastPlaying){ lastPlaying=pl; document.body.dataset.playing=pl; syncHud(); }
     const d = PAUSED ? 0 : dt;
@@ -7737,6 +7817,46 @@ document.getElementById("glareBtn").addEventListener("click",e=>{
   e.target.textContent="Glare: "+(glare?"on":"off");
   e.target.setAttribute("aria-pressed",String(glare));
 });
+
+let FS_SOFT=false;
+function fsOn(){
+  return !!(document.fullscreenElement||document.webkitFullscreenElement||document.msFullscreenElement||FS_SOFT);
+}
+function syncFs(){
+  const on=fsOn();
+  document.body.classList.toggle("fs", on);
+  const b=document.getElementById("fsBtn");
+  if (b){
+    b.textContent=on?"Exit full":"Full screen";
+    b.setAttribute("aria-pressed", String(on));
+  }
+}
+function toggleFullscreen(){
+  const on=document.fullscreenElement||document.webkitFullscreenElement||document.msFullscreenElement;
+  if (on || FS_SOFT){
+    FS_SOFT=false;
+    const exit=document.exitFullscreen||document.webkitExitFullscreen||document.msExitFullscreen;
+    if (on && exit){ try{ const p=exit.call(document); if (p&&p.catch) p.catch(()=>{}); }catch(e){} }
+    syncFs();
+    return;
+  }
+  const el=document.documentElement;
+  const req=el.requestFullscreen||el.webkitRequestFullscreen||el.webkitRequestFullScreen||el.msRequestFullscreen;
+  let asked=false;
+  if (req){
+    try{
+      const p=req.call(el,{navigationUI:"hide"});
+      asked=true;
+      if (p&&p.then) p.then(()=>syncFs()).catch(()=>{ FS_SOFT=true; syncFs(); });
+    }catch(e){ asked=false; }
+  }
+  if (!asked){ FS_SOFT=true; syncFs(); }
+  try{ if (navigator.getGamepads) navigator.getGamepads(); }catch(e){}
+}
+const fsBtn=document.getElementById("fsBtn");
+if (fsBtn) fsBtn.addEventListener("click", toggleFullscreen);
+document.addEventListener("fullscreenchange", syncFs);
+document.addEventListener("webkitfullscreenchange", syncFs);
 
 ambInit();
 bakeBackground();
