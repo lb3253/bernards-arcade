@@ -515,6 +515,7 @@ body:not([data-screen="home"]) .chase{ display:none }
 #pickFlap .thumb{background-image:url("/art/card-flap.jpg") !important;background-position:center 35% !important}
 #pickAir .thumb{background-image:url("/art/card-air.jpg") !important;background-position:center 42% !important}
 #pickHop .thumb{background-image:url("/art/card-hop.jpg") !important;background-position:center 40% !important}
+#pickBallies .thumb{background-image:var(--ph-ballies,var(--ph-bernard)) !important;background-position:center 58% !important}
 #airmenu .shot{background-image:url("/art/card-air.jpg");background-size:cover;background-position:center;transition:opacity .18s ease}
 #airmenu.jet .shot{background-image:url("/art/card-air-jet.jpg")}
 #flapmenu .shot{background-image:url("/art/card-flap.jpg")}

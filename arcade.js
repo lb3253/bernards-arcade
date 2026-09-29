@@ -73,6 +73,7 @@ loadSpr("hopSprinkler","/art/spr-hop-sprinkler.png");
 loadSpr("hopTree","/art/spr-hop-tree.png");
 loadSpr("hopBall","/art/spr-hop-ball.png");
 loadSpr("hopBone","/art/spr-hop-bone.png");
+["hopBall","hopBernard","hopNic","hopGiulia","hopTree"].forEach(n=>{ SPR[n].addEventListener("load",()=>{ try{ bakeBallSprites(); if(typeof makeBalliesPoster==="function") makeBalliesPoster(); }catch(e){} }); });
 ["fly","biplane","jet","balloon","storm","skyAir","saucer","drone","diver","mothership","disc","scout","missile","plasma","boom","shot","muzzle","hills","jeep","skyJeep","jtrail","jpalm","jramp","jstop","jscrub"].forEach(n=>{ SPR[n].addEventListener("load",()=>{ try{ if(typeof bakeAirSky==="function") bakeAirSky(); if(typeof bakeFlapSky==="function") bakeFlapSky(); if(typeof bakeJeepSky==="function") bakeJeepSky(); }catch(e){} }); });
 function sprReady(name){
   const im=SPR[name];
@@ -88,6 +89,35 @@ function drawSprC(name,x,y,w,h,rot,flip){
   ctx.drawImage(im,-w/2,-h/2,w,h);
   ctx.restore();
   return true;
+}
+// the tennis-ball painting, re-tinted for the three ball kinds in Ballies
+const BALL_SPR={};
+function bakeBallSprites(){
+  if (!sprReady("hopBall")) return;
+  const tint={ red:"#e83a2c", gold:"#ffb300" };
+  for (const k in KINDS){
+    const c=document.createElement("canvas"); c.width=c.height=64;
+    const g=c.getContext("2d");
+    g.drawImage(SPR.hopBall,2,2,60,60);
+    if (tint[k]){
+      g.globalCompositeOperation="color"; g.fillStyle=tint[k]; g.fillRect(0,0,64,64);
+      g.globalCompositeOperation="multiply"; g.globalAlpha=.35; g.fillStyle=tint[k]; g.fillRect(0,0,64,64);
+      g.globalAlpha=1; g.globalCompositeOperation="destination-in"; g.drawImage(SPR.hopBall,2,2,60,60);
+    }
+    BALL_SPR[k]=c;
+  }
+}
+function drawBallSpr(c,kind,x,y,r,rot){
+  const im=BALL_SPR[kind]; if (!im) return false;
+  c.save(); c.translate(x,y); if (rot) c.rotate(rot);
+  c.drawImage(im,-r,-r,r*2,r*2); c.restore();
+  return true;
+}
+function drawTree(t){
+  if (!sprReady("hopTree")) return;
+  const im=SPR.hopTree, h=140*t.s, w=h*(im.naturalWidth/im.naturalHeight);
+  softShadow(ctx,t.x+10,t.y-2,w*.28,10,.3);
+  ctx.drawImage(im,t.x-w/2,t.y-h,w,h);
 }
 function drawDrop(x,y,rw,rh){
   ctx.fillStyle="rgba(16,28,18,.3)";
@@ -119,8 +149,10 @@ for (let i=0;i<6;i++){
   const a = -Math.PI/2 + i*(Math.PI*2/6) + .4;
   CHAIRS.push({ x:PIT.x+Math.cos(a)*108, y:PIT.y+Math.sin(a)*86, r:21, a:a+Math.PI/2 });
 }
+const TREES = [ {x:250,y:266,s:1.1}, {x:640,y:258,s:1.25} ];
 const OBSTACLES = [
   { type:"circle", x:PIT.x, y:PIT.y, r:PIT.r },
+  ...TREES.map(t=>({type:"circle",x:t.x,y:t.y-8,r:13})),
   ...CHAIRS.map(c=>({type:"circle",x:c.x,y:c.y,r:c.r})),
   { type:"rect", x:ROOF.x, y:ROOF.y, w:ROOF.w, h:ROOF.h }
 ];
@@ -240,7 +272,7 @@ function chunky(c,txt,x,y,size,fill,stroke,weight){
 
 // ---------------------------------------------------------------- audio
 let audioOn=true, glare=true, ac=null;
-const ARCADE_FLASH = {flap:false, hop:false, air:false};
+const ARCADE_FLASH = {flap:false, hop:false, air:false, ballies:false};
 function beep(f,dur,type,vol){
   if (!audioOn) return;
   try{
@@ -457,7 +489,7 @@ let pointer={down:false,x:0,y:0};
 const GP = { idx:null, id:"", prev:{}, focus:0, lastScreen:"", navHold:0, lastBtn:"" };
 
 const GP_ITEMS = {
-  home:     ["pickFlap","pickHop","pickAir"],
+  home:     ["pickFlap","pickHop","pickAir","pickBallies"],
   menu:     ["startBtn","menuBack"],
   titamenu: ["titaStartBtn","titaBack"],
   flapmenu: ["flapStartBtn","flapBack"],
@@ -557,9 +589,9 @@ function uiBack(){ const sc=gpScreen(); if (sc==="pause") resumeGame(); else if 
 
 // ---------------------------------------------------------------- lobby carousel
 const CAR = {
-  items:["pickFlap","pickHop","pickAir"],
-  flashKey:{pickFlap:"flap", pickHop:"hop", pickAir:"air"},
-  spill:{pickFlap:"rgba(80,190,255,.32)", pickHop:"rgba(110,220,90,.30)", pickAir:"rgba(255,90,160,.32)"},
+  items:["pickFlap","pickHop","pickAir","pickBallies"],
+  flashKey:{pickFlap:"flap", pickHop:"hop", pickAir:"air", pickBallies:"ballies"},
+  spill:{pickFlap:"rgba(80,190,255,.32)", pickHop:"rgba(110,220,90,.30)", pickAir:"rgba(255,90,160,.32)", pickBallies:"rgba(255,207,58,.30)"},
   index:0, pos:0, vel:0, target:0, bounce:0,
   tiltX:0, tiltY:0, wantTiltX:0, wantTiltY:0,
   drag:null, lastIdx:-1, chaseT:0, ready:false
@@ -601,6 +633,7 @@ function carouselLaunch(){
   if (id==="pickFlap") openFlap();
   else if (id==="pickHop") openHop();
   else if (id==="pickAir") openAir();
+  else if (id==="pickBallies") openBallies();
 }
 function carouselOnClick(id){
   const i=CAR.items.indexOf(id);
@@ -1409,7 +1442,7 @@ function endGame(reason){
   over.classList.add("on");
 }
 function loadBest(){ try{ const v=+localStorage.getItem("ballies_best"); if(v&&G) G.best=v; }catch(e){} }
-function saveBest(v){ try{ localStorage.setItem("ballies_best",String(v)); }catch(e){} }
+function saveBest(v){ try{ const o=+localStorage.getItem("ballies_best")||0; if(v>o){ ARCADE_FLASH.ballies=true; localStorage.setItem("ballies_best",String(v)); } }catch(e){} }
 
 function update(dt){
   if (!G) return;
@@ -1858,6 +1891,15 @@ function drawHuman(h,shirtL,shirtD,skin,capL,capD){
   ctx.restore();
 }
 
+// Nick and Giulia from the Lane Hoppers paintings, feet planted at y+26
+function drawYardKid(h,name,shirtL,shirtD,capL,capD){
+  if (!sprReady(name)){ drawHuman(h,shirtL,shirtD,"#e0a877",capL,capD); return; }
+  const bob=Math.abs(Math.sin(h.step))*2.4 + (h.wave>.05 ? h.wave*6 : 0);
+  softShadow(ctx,h.x+2,h.y+24,22,8,.34);
+  const im=SPR[name], hh=84, ww=hh*(im.naturalWidth/im.naturalHeight);
+  drawSprC(name,h.x,h.y+26-hh/2-bob,ww,hh,Math.sin(h.step)*.05,Math.cos(h.face)<-.01);
+}
+
 // fringe strokes that read as long fur along an edge
 // A soft feathered rim. This used to throw strokes outward, which read as
 // spines on screen, so it now hugs the silhouette instead of poking out of it.
@@ -1880,6 +1922,19 @@ function drawDog(d,tnow){
   d=d||G.dog; tnow=(tnow===undefined)?G.t:tnow;
   const bob=Math.sin(d.phase)*2.6;
   softShadow(ctx,d.x+11,d.y+20,29,11,.4);
+  if (sprReady("hopBernard")){
+    const flip=Math.cos(d.face)>.01;          // the painting faces left
+    const im=SPR.hopBernard, hh=88, ww=hh*(im.naturalWidth/im.naturalHeight);
+    const happy=d.hasBall?Math.sin(tnow*14)*.05:0;
+    drawSprC("hopBernard",d.x,d.y+20-hh/2+bob*.6,ww,hh,Math.sin(d.phase)*.04+happy,flip);
+    if (d.hasBall){
+      const fx=d.x+(flip?32:-32), fy=d.y-38+bob*.6;
+      const k=KINDS[d.hasBall];
+      if (!drawBallSpr(ctx,d.hasBall,fx,fy,11,tnow*3)) orb(ctx,fx,fy,8,k.light,k.dark);
+    }
+    if (d.bark) bubble(d.x,d.y-84,d.bark,"#fff","#1e2a18");
+    return;
+  }
   ctx.save();
   ctx.translate(d.x,d.y+bob);
   ctx.scale(Math.cos(d.face)<0?-1:1,1);
@@ -1996,7 +2051,7 @@ function drawLaura(){
   ctx.globalAlpha=emerging?clamp(la.warn,0,1)*.55:1;
   softShadow(ctx,la.x+9,la.y+21,19,8,.36);
   const sway=Math.sin(la.step)*2.4;
-  ctx.translate(la.x,la.y);
+  ctx.translate(la.x,la.y+10); ctx.scale(1.45,1.45);
   // broom
   ctx.save(); ctx.rotate(Math.sin(la.sweep)*.55-.5);
   limb(ctx,4,-2,31,15,4.5,"#d7a45e","#94682c");
@@ -2039,7 +2094,7 @@ function drawLaura(){
   ctx.strokeStyle="#8d3a4a"; ctx.lineWidth=1.8;
   ctx.beginPath(); ctx.arc(0,-8.5,3.2,Math.PI*1.15,Math.PI*1.85); ctx.stroke();
   ctx.restore();
-  if (la.bark && !emerging) bubble(la.x,la.y-62,la.bark,"#fff2f7","#7d2b52");
+  if (la.bark && !emerging) bubble(la.x,la.y-78,la.bark,"#fff2f7","#7d2b52");
 }
 
 function bubble(x,y,b,bgc,fgc){
@@ -2064,6 +2119,14 @@ function drawBall(b){
     ctx.beginPath(); ctx.arc(s.x,s.y,7*s.life,0,Math.PI*2); ctx.fill();
   }
   ctx.restore();
+  if (drawBallSpr(ctx,b.kind,b.x,gy,r+4,b.spin)){
+    if (b.kind==="gold" && b.mode==="loose"){
+      const k2=(Math.sin(G.pulse*1.6+b.x)+1)/2;
+      ctx.strokeStyle="rgba(255,214,90,"+(.6-k2*.4)+")"; ctx.lineWidth=2.5;
+      ctx.beginPath(); ctx.arc(b.x,b.y,17+k2*10,0,Math.PI*2); ctx.stroke();
+    }
+    return;
+  }
   ctx.save(); ctx.translate(b.x,gy);
   ctx.fillStyle="rgba(255,255,255,.85)";
   ctx.beginPath(); ctx.arc(0,0,r+2,0,Math.PI*2); ctx.fill();
@@ -2250,7 +2313,7 @@ function drawHUD(){
     ctx.beginPath(); ctx.arc(x,y,14,0,Math.PI*2); ctx.fill();
     if (G.carry[i]){
       const k=KINDS[G.carry[i]];
-      orb(ctx,x,y,12,k.light,k.dark);
+      if (!drawBallSpr(ctx,G.carry[i],x,y,13,0)) orb(ctx,x,y,12,k.light,k.dark);
     } else {
       ctx.strokeStyle="rgba(255,255,255,.18)"; ctx.lineWidth=2;
       ctx.beginPath(); ctx.arc(x,y,12,0,Math.PI*2); ctx.stroke();
@@ -2319,10 +2382,11 @@ function draw(){
   for (const b of grounded) drawBall(b);
 
   const actors=[
-    {y:G.npc.y,   f:()=>drawHuman(G.npc,"#ffd45e","#d98d12","#e0a877","#e8622f","#a3320f")},
+    ...TREES.map(t=>({y:t.y-30, f:()=>drawTree(t)})),
+    {y:G.npc.y,   f:()=>drawYardKid(G.npc,"hopGiulia","#ffd45e","#d98d12","#e8622f","#a3320f")},
     {y:G.dog.y,   f:drawDog},
     {y:G.laura.y, f:drawLaura},
-    {y:G.player.y,f:()=>drawHuman(G.player,"#6fd0ff","#1f6f9e","#e0a877","#2f4f8f","#16294f")}
+    {y:G.player.y,f:()=>drawYardKid(G.player,"hopNic","#6fd0ff","#1f6f9e","#2f4f8f","#16294f")}
   ].sort((a,b)=>a.y-b.y);
   for (const a of actors) a.f();
 
@@ -2368,7 +2432,7 @@ function draw(){
   ctx.globalAlpha=1;
 
   drawGlass();
-  drawHUD();
+  if (!POSTER){ drawHUD(); }
   ctx.restore();
 
   if (G.flash>0){
@@ -7873,13 +7937,14 @@ function updateStar(){
   const id=(GP_ITEMS.home||[])[GP.focus]||"pickFlap";
   const air=id==="pickAir";
   const hop=id==="pickHop";
-  const which=hop?"hop":air?(A_PLANE==="jet"?"jet":"air"):"flap";
+  const yard=id==="pickBallies";
+  const which=yard?"yard":hop?"hop":air?(A_PLANE==="jet"?"jet":"air"):"flap";
   if (img.getAttribute("data-which")===which){ img.style.opacity="1"; return; }
   img.style.opacity="0";
   setTimeout(()=>{
     img.src=hop?"/art/bernard-portrait.jpg":air?(which==="jet"?"/art/bernard-jet-portrait.jpg":"/art/bernard-pilot-portrait.jpg"):"/art/bernard-portrait.jpg";
     img.setAttribute("data-which",which);
-    if (cap) cap.textContent=hop?"The hoppers":air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
+    if (cap) cap.textContent=yard?"Ball thief":hop?"The hoppers":air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
     img.style.opacity="1";
   },90);
 }
@@ -8111,7 +8176,19 @@ function makeAirPoster(){
   try{ drawAir(); document.documentElement.style.setProperty("--ph-air","url("+cv.toDataURL("image/jpeg",.82)+")"); }catch(e){}
   POSTER=false; A=keep;
 }
-function makePosters(){ makeTitaPoster(); makeFlapPoster(); makePaddlePoster(); makeAirPoster(); }
+function makeBalliesPoster(){
+  const keep=G, keepMode=MODE;
+  G=newGame(0); G.running=false; G.t=1.2; G.pulse=2;
+  G.player.x=470; G.player.y=470; G.player.face=0; G.player.step=1;
+  G.dog.x=330; G.dog.y=440; G.dog.face=0; G.dog.hasBall="gold"; G.dog.phase=1;
+  G.carry=["green","gold"];
+  G.balls=[newBall(560,520,"red"),newBall(620,430,"green"),newBall(420,560,"gold")];
+  G.balls[1].z=60;
+  POSTER=true;
+  try{ draw(); document.documentElement.style.setProperty("--ph-ballies","url("+cv.toDataURL("image/jpeg",.82)+")"); }catch(e){}
+  POSTER=false; G=keep; MODE=keepMode;
+}
+function makePosters(){ makeTitaPoster(); makeFlapPoster(); makePaddlePoster(); makeAirPoster(); makeBalliesPoster(); }
 makePosters();
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(makePosters);
 setMark("home");
