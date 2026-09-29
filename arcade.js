@@ -7723,12 +7723,13 @@ function updateStar(){
     img.style.opacity="1";
   },90);
 }
-function startAir(){
+function startAir(opts){
   const best=A?A.best:0;
   A=newAir(best);
   A.running=false;
   MODE="air"; setMark("air");
-  openAirStory("intro");
+  if (opts && opts.skipStory) beginAirPlay();
+  else openAirStory("intro");
 }
 // ---- pause / quit, reachable from every game
 function gameRunning(){
@@ -7772,7 +7773,7 @@ function startTita(){
   hideAll();
   if (!ac) beep(1,.01);
 }
-function startCurrent(){ if (MODE==="tita") startTita(); else if (MODE==="flap") startFlap(); else if (MODE==="paddle") startPaddle(); else if (MODE==="air") startAir(); else if (MODE==="hop") startHop(); else if (MODE==="jeep") startJeep(); else start(); }
+function startCurrent(){ if (MODE==="tita") startTita(); else if (MODE==="flap") startFlap(); else if (MODE==="paddle") startPaddle(); else if (MODE==="air") startAir({skipStory:true}); else if (MODE==="hop") startHop(); else if (MODE==="jeep") startJeep(); else start(); }
 
 document.getElementById("goalNum").textContent=WIN_SCORE;
 document.getElementById("titaGoal").textContent=T_WIN;
