@@ -1517,7 +1517,7 @@ function update(dt){
     if (L>0){
       p.x+=dx/L*spd*dt; p.y+=dy/L*spd*dt;
       p.face=Math.atan2(dy,dx); p.step+=dt*(p.slow>0?5:11);
-    }
+    } else p.step+=dt*2.4;
     p.x=clamp(p.x,FIELD.x0+p.r,FIELD.x1-p.r);
     p.y=clamp(p.y,FIELD.y0+p.r,FIELD.y1-p.r);
     pushOut(p);
@@ -1601,6 +1601,7 @@ function update(dt){
   {
     const ax=n.hx-n.x, ay=n.hy-n.y, L=Math.hypot(ax,ay);
     if (L>4){ n.x+=ax/L*NPC_SPEED*dt; n.y+=ay/L*NPC_SPEED*dt; n.step+=dt*10; n.face=Math.atan2(ay,ax); }
+    else n.step+=dt*1.8;
   }
 
   // ---- Bernard
@@ -1641,10 +1642,11 @@ function update(dt){
   if (target && d.delay<=0){
     const ax=target.x-d.x, ay=target.y-d.y, L=Math.hypot(ax,ay);
     if (L>2){ d.x+=ax/L*speed*dt; d.y+=ay/L*speed*dt; d.face=Math.atan2(ay,ax); d.phase+=dt*13; }
+    else d.phase+=dt*2.6;
     d.x=clamp(d.x,FIELD.x0+d.r,FIELD.x1-d.r);
     d.y=clamp(d.y,FIELD.y0+d.r,FIELD.y1-d.r);
     pushOut(d);
-  }
+  } else d.phase+=dt*2.2;
   if (!d.hasBall && d.delay<=0 && d.chew<=0){
     if (G.carry.length && dist(d,p)<d.r+p.r+4) dogRobsPlayer();
     else {
@@ -1675,12 +1677,13 @@ function update(dt){
     la.patience-=dt;
     const ax=p.x-la.x, ay=p.y-la.y, L=Math.hypot(ax,ay);
     if (L>3){ la.x+=ax/L*LAURA_SPEED*dt; la.y+=ay/L*LAURA_SPEED*dt; la.step+=dt*9; }
+    else la.step+=dt*2;
     if (L<la.r+p.r+8 && p.shooCool<=0) lauraShoos();
     if (la.patience<=0 || nearDoor>DOOR_R*1.9) la.mode="returning";
   } else {
     const ax=DOOR.x-la.x, ay=DOOR.y-la.y, L=Math.hypot(ax,ay);
     if (L>4){ la.x+=ax/L*LAURA_SPEED*.8*dt; la.y+=ay/L*LAURA_SPEED*.8*dt; la.step+=dt*7; }
-    else { la.mode="inside"; la.warn=0; }
+    else { la.step+=dt*1.6; la.mode="inside"; la.warn=0; }
   }
 }
 
@@ -1918,19 +1921,30 @@ function bakeBackground(){
 
 // ---------------------------------------------------------------- actors
 function drawHuman(h,shirtL,shirtD,skin,capL,capD){
-  const bob=Math.sin(h.step)*1.8;
+  const bob=Math.sin(h.step)*3.2;
   softShadow(ctx,h.x+9,h.y+19,20,9,.36);
   ctx.save(); ctx.translate(0,bob);
-  const sw=Math.sin(h.step)*5;
-  limb(ctx,h.x-5,h.y+13,h.x-5+sw,h.y+25,6.5,"#5a6b86","#33405a");
-  limb(ctx,h.x+5,h.y+13,h.x+5-sw,h.y+25,6.5,"#5a6b86","#33405a");
+  const sw=Math.sin(h.step)*9;
+  limb(ctx,h.x-5,h.y+13,h.x-5+sw,h.y+26,6.5,"#5a6b86","#33405a");
+  limb(ctx,h.x+5,h.y+13,h.x+5-sw,h.y+26,6.5,"#5a6b86","#33405a");
   const g=ctx.createLinearGradient(h.x-11,h.y-4,h.x+8,h.y+18);
   g.addColorStop(0,shirtL); g.addColorStop(1,shirtD);
+  ctx.save();
+  ctx.translate(h.x,h.y+6);
+  ctx.scale(1, 1+Math.sin(h.step*0.5)*0.04);
+  ctx.translate(-h.x,-(h.y+6));
   ctx.fillStyle=g; ctx.beginPath(); ctx.roundRect(h.x-11,h.y-4,22,21,8); ctx.fill();
   ctx.fillStyle="rgba(255,255,255,.22)";
   ctx.beginPath(); ctx.roundRect(h.x-9,h.y-2,8,15,5); ctx.fill();
-  const a=(h.wave>.05)?(-Math.PI/2-Math.sin(G.t*15)*h.wave*.95):h.face;
-  limb(ctx,h.x,h.y+2,h.x+Math.cos(a)*16,h.y+Math.sin(a)*16+2,6,skin,"#a06b47");
+  ctx.restore();
+  const waving=h.wave>.05;
+  const a=waving?(-Math.PI/2-Math.sin(G.t*15)*h.wave*.95):h.face;
+  if (!waving){
+    limb(ctx,h.x-2,h.y+2,h.x-14,h.y+8+sw*.7,5.5,skin,"#a06b47");
+  }
+  limb(ctx,h.x+2,h.y+2,h.x+Math.cos(a)*16,h.y+Math.sin(a)*16+2-(waving?0:sw*.55),6,skin,"#a06b47");
+  ctx.save();
+  ctx.translate(Math.sin(h.step)*.8, Math.sin(h.step*0.9)*1.6);
   orb(ctx,h.x,h.y-13,10,skin,"#a06b47");
   const cg=ctx.createLinearGradient(0,h.y-24,0,h.y-12);
   cg.addColorStop(0,capL); cg.addColorStop(1,capD);
@@ -1939,6 +1953,7 @@ function drawHuman(h,shirtL,shirtD,skin,capL,capD){
   ctx.beginPath(); ctx.roundRect(h.x-10,h.y-16,20,4,2); ctx.fill();
   ctx.fillStyle="rgba(255,255,255,.3)";
   ctx.beginPath(); ctx.ellipse(h.x-4,h.y-20,3.5,2,-.5,0,Math.PI*2); ctx.fill();
+  ctx.restore();
   ctx.restore();
 }
 
@@ -1992,11 +2007,12 @@ function drawDog(d,tnow){
   ctx.lineCap="round";
 
   // ---- plumed tail, pale at the tip like the real thing
-  const twx=Math.sin(d.wag)*9, twy=Math.cos(d.wag)*5;
-  limb(ctx,-16,0,-30+twx,-14+twy,13,"#d9a257","#8f6224");
-  fur(ctx,-30+twx,-14+twy,9,9,9,9,"rgba(60,50,42,.55)",Math.PI*1.5,2.1);
-  limb(ctx,-29+twx*.8,-13+twy*.8,-36+twx,-22+twy,10,"#cdc4b2","#8b8172");
-  fur(ctx,-36+twx,-22+twy,7,7,7,8,"rgba(215,208,192,.75)",Math.PI*1.6,1.6);
+  const wag=Math.sin(d.wag), wag2=Math.sin(d.wag*2);
+  const twx=wag*18, twy=wag2*11;
+  limb(ctx,-16,0,-34+twx,-16+twy,13,"#d9a257","#8f6224");
+  fur(ctx,-34+twx,-16+twy,10,10,9,10,"rgba(60,50,42,.55)",Math.PI*1.5,2.1);
+  limb(ctx,-32+twx*.85,-14+twy*.7,-46+twx*1.15,-26+twy,10,"#cdc4b2","#8b8172");
+  fur(ctx,-46+twx*1.15,-26+twy,8,8,7,9,"rgba(215,208,192,.75)",Math.PI*1.6,1.6);
 
   // ---- legs
   limb(ctx,-10,4,-10+Math.sin(d.phase)*6,18,6.5,"#c4883f","#8a5a24");
@@ -2025,11 +2041,14 @@ function drawDog(d,tnow){
   orb(ctx,18,7,5,"#fdfaf0","#c9c0ac",false);
 
   // ---- big shepherd ears, black-tipped
+  const ear=Math.sin(tnow*3.6)*3.2;
+  ctx.save();
+  ctx.translate(Math.sin(tnow*2.2)*1.4, Math.sin(tnow*2.7)*1.6);
   const earG=ctx.createLinearGradient(8,-34,22,-14);
   earG.addColorStop(0,"#4b4139"); earG.addColorStop(1,"#1d1a17");
   ctx.fillStyle=earG;
-  ctx.beginPath(); ctx.moveTo(11,-14); ctx.lineTo(8,-34); ctx.lineTo(21,-18); ctx.closePath(); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(19,-15); ctx.lineTo(24,-34); ctx.lineTo(29,-16); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(11,-14); ctx.lineTo(8+ear,-36); ctx.lineTo(21,-18); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(19,-15); ctx.lineTo(24+ear*.6,-36); ctx.lineTo(29,-16); ctx.closePath(); ctx.fill();
   ctx.fillStyle="#7d5f45";
   ctx.beginPath(); ctx.moveTo(20,-17); ctx.lineTo(24,-29); ctx.lineTo(27,-17); ctx.closePath(); ctx.fill();
   // wispy ear fringe
@@ -2075,6 +2094,7 @@ function drawDog(d,tnow){
   const tl=6+Math.sin(tnow*9)*2;
   ctx.fillStyle="#e8808f";
   ctx.beginPath(); ctx.roundRect(31,-2,5.5,tl,3); ctx.fill();
+  ctx.restore();
 
   // ---- red collar
   const cg=ctx.createLinearGradient(8,-14,14,2);
@@ -2131,8 +2151,8 @@ function drawLaura(){
   }
   ctx.fillStyle="#a03a6b"; ctx.beginPath(); ctx.roundRect(-11,-6,22,5,2); ctx.fill();
   // arms, head, bun
-  limb(ctx,-7,-1,-15,8,5,"#f0c69e","#c08a5e");
-  limb(ctx,6,-1,14,5,5,"#f0c69e","#c08a5e");
+  limb(ctx,-7,-1,-16+Math.sin(la.step)*4,8,5,"#f0c69e","#c08a5e");
+  limb(ctx,6,-1,15-Math.sin(la.step)*4,5,5,"#f0c69e","#c08a5e");
   orb(ctx,0,-15,9.5,"#f0c69e","#c08a5e");
   const hg=ctx.createLinearGradient(0,-26,0,-12);
   hg.addColorStop(0,"#c9c6c2"); hg.addColorStop(1,"#8d8a86");
@@ -7420,13 +7440,13 @@ function bakeHopAtlas(){
   H_ATLAS_READY = true;
 }
 
-function hBlitActor(name, x, yFeet, height, flip, sx, sy){
+function hBlitActor(name, x, yFeet, height, flip, sx, sy, rot){
   if (!sprReady(name)) return false;
   const im=SPR[name];
   const hh=height*(sy||1);
   const ww=hh*(im.naturalWidth/Math.max(1,im.naturalHeight))*(sx||1);
   drawDrop(x, yFeet+5, Math.max(10, ww*0.28), 6);
-  drawSprC(name, x, yFeet - hh*0.46, ww, hh, 0, flip);
+  drawSprC(name, x, yFeet - hh*0.46, ww, hh, rot||0, flip);
   return true;
 }
 
@@ -7548,7 +7568,6 @@ function hDrawPickupArt(pk,x,y){
   hBlit(pk.kind==="ball"?"ball":"bone", x, y-8+bob, false);
 }
 
-// a little red bike, drawn under the rider or bobbing on the grass as a pickup
 function hDrawBike(x,y,s,spin){
   ctx.save(); ctx.translate(x,y); ctx.scale(s,s);
   ctx.lineCap="round";
@@ -7564,13 +7583,31 @@ function hDrawBike(x,y,s,spin){
   ctx.beginPath(); ctx.moveTo(-17,2); ctx.lineTo(-6,-12); ctx.lineTo(9,-12); ctx.lineTo(17,2); ctx.lineTo(1,4); ctx.lineTo(-6,-12); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(9,-12); ctx.lineTo(14,-19); ctx.stroke();
   ctx.strokeStyle="#3a3a40"; ctx.lineWidth=3;
-  ctx.beginPath(); ctx.moveTo(10,-19); ctx.lineTo(19,-19); ctx.stroke();      // bars
-  ctx.beginPath(); ctx.moveTo(-9,-16); ctx.lineTo(-3,-16); ctx.stroke();      // saddle
+  ctx.beginPath(); ctx.moveTo(10,-19); ctx.lineTo(19,-19); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-9,-16); ctx.lineTo(-3,-16); ctx.stroke();
+  ctx.restore();
+}
+function hWagTail(x, y, flip, t){
+  const wag=Math.sin((t||0)*7.6);
+  ctx.save();
+  ctx.translate(x+(flip?40:-40), y-22);
+  ctx.scale(flip?-1:1, 1);
+  ctx.rotate(-0.55+wag*1.05);
+  ctx.lineCap="round";
+  limb(ctx, 6, 4, -14, -8, 10, "#3c342e", "#1a1614");
+  limb(ctx, -12, -6, -30, -18+wag*4, 9, "#d9a257", "#8f6224");
+  fur(ctx, -28, -16, 9, 9, 7, 9, "rgba(253,250,240,.9)", Math.PI*1.5, 1.6);
   ctx.restore();
 }
 function hDrawBernard(x,y,flip,sx,sy,swim,t){
+  const bob=Math.sin((t||0)*2.6)*1.8;
+  const breathe=1+Math.sin((t||0)*3.1)*0.03;
+  const rock=Math.sin((t||0)*2.4)*0.05;
   const name = swim && sprReady("hopSwim") ? "hopSwim" : "hopBernard";
-  if (hBlitActor(name, x, y+4, swim?58:72, flip, sx, sy)) return;
+  if (hBlitActor(name, x, y+4+bob, (swim?58:72)*breathe, flip, sx, (sy||1), swim?Math.sin((t||0)*4)*0.08:rock)) {
+    if (!swim) hWagTail(x, y+bob, flip, t||0);
+    return;
+  }
   ctx.save();
   ctx.translate(x,y);
   ctx.scale(flip?-1:1, 1);
@@ -7625,11 +7662,14 @@ function hDrawPaw(x,y,s){
   ctx.restore();
 }
 function hDrawKidArt(x,y,flip,sx,sy,girl,hopU){
+  const t=(LH&&LH.t)||0;
   const hopping = hopU>0.12 && hopU<0.88;
+  const bob=Math.sin(t*2.8)*1.8 - Math.sin(Math.min(1,hopU||0)*Math.PI)*6;
+  const rock=Math.sin(t*2.6)*0.045;
   const name = girl
     ? (hopping && sprReady("hopGiuliaHop") ? "hopGiuliaHop" : "hopGiulia")
     : (hopping && sprReady("hopNicHop") ? "hopNicHop" : "hopNic");
-  if (hBlitActor(name, x, y+4, hopping?108:100, flip, sx, sy)) return;
+  if (hBlitActor(name, x, y+4+bob, hopping?108:100, flip, sx, sy, rock)) return;
   ctx.save();
   ctx.translate(x,y);
   ctx.scale(flip?-1:1, 1);
