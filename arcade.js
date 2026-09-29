@@ -843,6 +843,7 @@ function pollGamepad(){
     // never let a held direction leak into the next round
     keys.delete("ArrowUp"); keys.delete("ArrowDown");
     keys.delete("ArrowLeft"); keys.delete("ArrowRight");
+    GP.prev.dUp=GP.prev.dDown=GP.prev.dLeft=GP.prev.dRight=false;
 
     // evaluate every edge first: || would short-circuit and desync the rest
     const eR=gpEdge("navRight",right), eD=gpEdge("navDown",down);
@@ -881,10 +882,14 @@ function pollGamepad(){
 
   // ================================================ gameplay
   gpApplyFocus();   // clears the ring once a round is running
-  if (up)    keys.add("ArrowUp");    else keys.delete("ArrowUp");
-  if (down)  keys.add("ArrowDown");  else keys.delete("ArrowDown");
-  if (left)  keys.add("ArrowLeft");  else keys.delete("ArrowLeft");
-  if (right) keys.add("ArrowRight"); else keys.delete("ArrowRight");
+  // only touch an arrow when the pad changes it, so keyboard/remote arrows keep working
+  const padDir=(name,on,key)=>{
+    if (on && !GP.prev[name]) keys.add(key);
+    else if (!on && GP.prev[name]) keys.delete(key);
+    GP.prev[name]=on;
+  };
+  padDir("dUp",up,"ArrowUp");       padDir("dDown",down,"ArrowDown");
+  padDir("dLeft",left,"ArrowLeft"); padDir("dRight",right,"ArrowRight");
 
   // Jeep: B (0/2) is held GAS, A (1/3) is held BRAKE — not edge-fired face buttons
   if (MODE==="jeep"){
@@ -954,7 +959,7 @@ addEventListener("keyup",e=>{
   if (!code) return;
   keys.delete(code);
   if (code==="KeyX") keys.delete("Space");
-  if (code==="Space") actionUp();
+  if (code==="Space"||code==="KeyX") actionUp();
   if (["ArrowRight","ArrowDown","KeyD","KeyS","ArrowLeft","ArrowUp","KeyA","KeyW"].includes(code)) CAR.keyDir=0;
 });
 function canvasPos(e){
@@ -4303,7 +4308,7 @@ function newAir(best){
 }
 const aSpeed = () => (A_PLANE==="jet" ? 236 : 198) * (A.rain>0 ? .62 : 1);
 const aTurn  = () => A_PLANE==="jet" ? 300 : 236;
-function saveABest(v){ try{ const o=+localStorage.getItem("air_best")||0; if(v>o) ARCADE_FLASH.air=true; localStorage.setItem("air_best",String(v)); }catch(e){} }
+function saveABest(v){ try{ const o=+localStorage.getItem("air_best")||0; if(v>o){ ARCADE_FLASH.air=true; localStorage.setItem("air_best",String(v)); } }catch(e){} }
 function loadABest(){ try{ const v=+localStorage.getItem("air_best"); if(v&&A) A.best=v; }catch(e){} }
 
 function aToast(text,color,x,y){ A.toasts.push({text,color,x:x===undefined?W/2:x,y:y===undefined?220:y,life:1.15}); }
@@ -7904,9 +7909,7 @@ loadBest(); loadTitaBest(); loadFlapBest(); loadPBest(); loadABest(); loadJeepBe
 // Bernardy Flap's card art, rendered from a posed frame of the game
 function makeFlapPoster(){
   const keep=F;
-  F=newFlap(0); F.running=false;
-P=newPaddle(0); P.running=false;
-A=newAir(0); A.running=false; F.started=true; F.t=1.4; F.pulse=2.1;
+  F=newFlap(0); F.running=false; F.started=true; F.t=1.4; F.pulse=2.1;
   F.bird.x=250; F.bird.y=286; F.bird.vy=-150; F.bird.tilt=-.32;
   F.bird.flap=1; F.bird.wing=1.9;
   F.gates=[
@@ -7924,8 +7927,7 @@ A=newAir(0); A.running=false; F.started=true; F.t=1.4; F.pulse=2.1;
 }
 function makePaddlePoster(){
   const keep=P, keepChar=P_CHAR;
-  P=newPaddle(0); P.running=false;
-A=newAir(0); A.running=false; P.started=true; P.t=1.3; P.pulse=2.0; P.dist=600;
+  P=newPaddle(0); P.running=false; P.started=true; P.t=1.3; P.pulse=2.0; P.dist=600;
   P.vx=210; P.rider.y=402; P.rider.stroke=.55;
   P.items=[{wx:900,y:330,kind:"gold",taken:false,bob:1},
            {wx:1040,y:470,kind:"green",taken:false,bob:2.4}];
