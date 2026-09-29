@@ -274,6 +274,160 @@ const sfx={
   win:   ()=>{ [523,659,784,1047,1319].forEach((f,i)=>setTimeout(()=>beep(f,.26,"square",.05),i*120)); }
 };
 
+// ---------------------------------------------------------------- soundtrack
+// A tiny chiptune sequencer. Each tune is a few 16-step patterns written as
+// MIDI note numbers (0 = rest). Nothing is downloaded: the TV plays it from
+// the same AudioContext the sound effects use, and the Sound button mutes it.
+const MUSIC = { name:null, gain:null, timer:null, nextT:0, step:0, bar:0, vol:.5 };
+const MUSIC_VOL = 0.32;
+const mNote = n => 440*Math.pow(2,(n-69)/12);
+const TUNES = {
+  // sunny back-yard bounce: major key, brushed hats, walking bass
+  ballies: { bpm:126, swing:.12,
+    bass:  [[45,0,45,0,52,0,45,0, 50,0,50,0,57,0,50,0],
+            [47,0,47,0,54,0,47,0, 52,0,52,0,59,0,52,0]],
+    lead:  [[69,0,72,0,76,0,72,0, 74,0,72,0,69,0,0,0],
+            [71,0,74,0,78,0,74,0, 76,0,74,0,71,0,69,0],
+            [69,0,72,0,76,0,79,0, 81,0,79,0,76,0,72,0],
+            [74,0,76,0,74,0,71,0, 69,0,0,0,0,0,0,0]],
+    arp:   [[57,60,64,60,57,60,64,60, 62,65,69,65,62,65,69,65]],
+    drums: ["k.h.s.h.k.h.s.hh","k.h.s.h.k.k.s.h."],
+    leadType:"square", bassType:"triangle", arpType:"triangle"
+  },
+  // sky-high flapping: light and quick
+  flap: { bpm:140, swing:0,
+    bass:  [[48,0,48,48,0,48,0,48, 43,0,43,43,0,43,0,43],
+            [53,0,53,53,0,53,0,53, 55,0,55,55,0,55,0,55]],
+    lead:  [[72,0,76,0,79,0,76,0, 74,0,0,0,71,0,0,0],
+            [72,0,76,0,79,0,84,0, 83,0,79,0,76,0,0,0],
+            [77,0,81,0,84,0,81,0, 79,0,76,0,72,0,0,0],
+            [74,0,77,0,74,0,71,0, 72,0,0,0,0,0,0,0]],
+    arp:   [[60,64,67,64,60,64,67,64, 55,59,62,59,55,59,62,59],
+            [53,57,60,57,53,57,60,57, 55,59,62,59,55,59,62,59]],
+    drums: ["k.hhs.h.k.hhs.h.","k.hhs.h.k.k.s.ss"],
+    leadType:"square", bassType:"square", arpType:"triangle"
+  },
+  // park lanes: cheeky hop-along groove
+  hop: { bpm:118, swing:.2,
+    bass:  [[41,0,41,0,48,0,41,0, 46,0,46,0,53,0,46,0],
+            [43,0,43,0,50,0,43,0, 48,0,48,0,55,0,48,0]],
+    lead:  [[65,0,0,68,0,70,0,0, 72,0,70,0,68,0,65,0],
+            [65,0,0,68,0,70,0,0, 75,0,72,0,70,0,0,0],
+            [70,0,0,72,0,75,0,0, 77,0,75,0,72,0,70,0],
+            [67,0,0,70,0,67,0,0, 65,0,0,0,0,0,0,0]],
+    arp:   [[53,56,60,56,53,56,60,56, 58,62,65,62,58,62,65,62]],
+    drums: ["k..hs..hk.k.s..h","k..hs..hk.k.s.ss"],
+    leadType:"triangle", bassType:"square", arpType:"square"
+  },
+  // dogfight over the mothership: driving minor key
+  air: { bpm:150, swing:0,
+    bass:  [[45,45,0,45,45,0,45,0, 45,45,0,45,45,0,43,0],
+            [41,41,0,41,41,0,41,0, 43,43,0,43,43,0,47,0]],
+    lead:  [[69,0,0,72,0,0,76,0, 74,0,72,0,69,0,0,0],
+            [69,0,0,72,0,0,76,0, 81,0,79,0,76,0,72,0],
+            [77,0,0,76,0,0,74,0, 72,0,71,0,72,0,0,0],
+            [74,0,76,0,77,0,76,0, 74,0,72,0,71,0,0,0]],
+    arp:   [[57,60,64,60,57,60,64,60, 57,60,64,60,55,59,62,59],
+            [53,57,60,57,53,57,60,57, 55,59,62,59,59,62,65,62]],
+    drums: ["k.hhs.hhk.hhs.hh","k.hhs.hhk.k.s.ss"],
+    leadType:"sawtooth", bassType:"square", arpType:"square"
+  }
+};
+let mNoise=null;
+function mNoiseBuf(){
+  if (mNoise) return mNoise;
+  const len=ac.sampleRate*.25, buf=ac.createBuffer(1,len,ac.sampleRate), d=buf.getChannelData(0);
+  for (let i=0;i<len;i++) d[i]=Math.random()*2-1;
+  return (mNoise=buf);
+}
+function mTone(freq,t,dur,type,vol,slide){
+  const o=ac.createOscillator(), g=ac.createGain();
+  o.type=type; o.frequency.setValueAtTime(freq,t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(slide,t+dur);
+  g.gain.setValueAtTime(.0001,t);
+  g.gain.linearRampToValueAtTime(vol,t+.012);
+  g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g); g.connect(MUSIC.gain);
+  o.start(t); o.stop(t+dur+.02);
+}
+function mDrum(ch,t){
+  if (ch==="k"){ mTone(150,t,.16,"sine",.9,42); return; }
+  const src=ac.createBufferSource(), g=ac.createGain(), f=ac.createBiquadFilter();
+  src.buffer=mNoiseBuf();
+  f.type= ch==="h" ? "highpass" : "bandpass";
+  f.frequency.value= ch==="h" ? 7000 : 1800;
+  const dur= ch==="h" ? .04 : .13, vol= ch==="h" ? .18 : .45;
+  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  src.connect(f); f.connect(g); g.connect(MUSIC.gain);
+  src.start(t); src.stop(t+dur+.01);
+}
+function mSchedule(){
+  const tune=TUNES[MUSIC.name]; if (!tune) return;
+  const stepDur=60/tune.bpm/4;
+  while (MUSIC.nextT < ac.currentTime+.14){
+    const s=MUSIC.step, bar=MUSIC.bar;
+    const t=MUSIC.nextT + ((s&1) ? stepDur*tune.swing : 0);
+    const bass=tune.bass[bar%tune.bass.length][s];
+    const lead=tune.lead[bar%tune.lead.length][s];
+    const arp =tune.arp[bar%tune.arp.length][s];
+    const dr  =tune.drums[bar%tune.drums.length][s];
+    if (bass) mTone(mNote(bass),t,stepDur*1.6,tune.bassType,.30);
+    if (lead) mTone(mNote(lead),t,stepDur*2.2,tune.leadType,.16);
+    if (arp)  mTone(mNote(arp),t,stepDur*.9,tune.arpType,.07);
+    if (dr && dr!==".") for (const ch of dr) mDrum(ch,t);
+    MUSIC.nextT+=stepDur;
+    MUSIC.step=(s+1)&15;
+    if (!MUSIC.step) MUSIC.bar++;
+  }
+}
+function musicPlay(name){
+  if (!audioOn || !TUNES[name]) return;
+  if (MUSIC.name===name) return;
+  musicStop(true);
+  try{
+    if (!ac) ac=new (window.AudioContext||window.webkitAudioContext)();
+    if (ac.state==="suspended") ac.resume();
+    MUSIC.gain=ac.createGain();
+    MUSIC.gain.gain.setValueAtTime(.0001,ac.currentTime);
+    MUSIC.gain.gain.exponentialRampToValueAtTime(MUSIC_VOL,ac.currentTime+.5);
+    MUSIC.gain.connect(ac.destination);
+    MUSIC.name=name; MUSIC.step=0; MUSIC.bar=0; MUSIC.nextT=ac.currentTime+.05; MUSIC.ducked=false;
+    mSchedule();
+    MUSIC.timer=setInterval(mSchedule,50);
+  }catch(e){ MUSIC.name=null; }
+}
+function musicStop(quick){
+  if (MUSIC.timer){ clearInterval(MUSIC.timer); MUSIC.timer=null; }
+  const g=MUSIC.gain; MUSIC.gain=null; MUSIC.name=null;
+  if (g && ac){
+    try{
+      const t=ac.currentTime;
+      g.gain.cancelScheduledValues(t);
+      g.gain.setValueAtTime(Math.max(g.gain.value,.0001),t);
+      g.gain.exponentialRampToValueAtTime(.0001,t+(quick?.15:.6));
+      setTimeout(()=>{ try{ g.disconnect(); }catch(e){} }, quick?200:700);
+    }catch(e){}
+  }
+}
+// pause turns the music down instead of off, so it picks back up where it was
+function musicDuck(on){
+  if (!MUSIC.gain || !ac || MUSIC.ducked===on) return;
+  MUSIC.ducked=on;
+  try{
+    const t=ac.currentTime;
+    MUSIC.gain.gain.cancelScheduledValues(t);
+    MUSIC.gain.gain.setValueAtTime(Math.max(MUSIC.gain.gain.value,.0001),t);
+    MUSIC.gain.gain.exponentialRampToValueAtTime(on?MUSIC_VOL*.18:MUSIC_VOL,t+.25);
+  }catch(e){}
+}
+// called every frame: whichever game is running picks the tune
+function musicTick(){
+  const want = (audioOn && gameRunning()) ? MODE : null;
+  if (!want || !TUNES[want]){ if (MUSIC.name) musicStop(false); return; }
+  if (MUSIC.name!==want) musicPlay(want);
+  musicDuck(!!PAUSED);
+}
+
 // ---------------------------------------------------------------- state
 let G=null;
 function newGame(best){
@@ -7555,6 +7709,7 @@ function frame(now){
     pollGamepad();
     const pl = gameRunning() ? "1" : "0";
     if (pl!==lastPlaying){ lastPlaying=pl; document.body.dataset.playing=pl; syncHud(); }
+    musicTick();
     const d = PAUSED ? 0 : dt;
     const onHome = homeEl && homeEl.classList.contains("on");
     tickCarousel(dt);
