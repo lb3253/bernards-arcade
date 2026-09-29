@@ -99,6 +99,15 @@
   .hint{font-size:11.5px;font-weight:500;color:#c2dcc0;line-height:1.45;max-width:460px;
     text-shadow:0 2px 8px rgba(0,0,0,.95)}
   .hint .warn{color:#ffb0d2;font-weight:600}
+  .strategy{width:min(560px,100%);margin-top:4px;padding:8px 12px 9px;border-radius:12px;
+    background:rgba(6,16,10,.62);border:1px solid rgba(255,207,58,.22);box-shadow:0 6px 18px rgba(0,0,0,.4)}
+  .strategy-h{font-size:10px;font-weight:700;letter-spacing:.28em;text-indent:.28em;color:#ffe07a;
+    text-align:center;margin-bottom:5px}
+  .strategy ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:3px 14px}
+  .strategy li{font-size:10.5px;line-height:1.35;color:#d9ead6;padding-left:12px;position:relative}
+  .strategy li::before{content:"\25CF";position:absolute;left:0;top:0;color:#c9f24d;font-size:8px;line-height:1.7}
+  .strategy li b{color:#fff6c9;font-weight:700}
+  @media (max-width:620px){ .strategy ul{grid-template-columns:1fr} .strategy li:nth-child(n+4){display:none} }
 
   /* results screen still needs its words, so it keeps a proper card */
   .card{max-width:520px;margin:0 auto}

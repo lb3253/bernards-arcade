@@ -177,6 +177,9 @@ const ROUND_TIME = 90;
 const WIN_SCORE = 450;
 const STEAL_LIMIT = 8;
 const MAX_LOOSE = 6, SPAWN_EVERY = 2.1;
+const BONE_EVERY = 20, BONE_LIFE = 12, CHEW_TIME = 4.5;   // a bone keeps Bernard busy
+const LONG_THROW = 330, LONG_BONUS = 15;                   // per ball, thrown from far out
+const LAST_CALL = 15;                                      // final seconds bank double
 const THROW_BTN = { x:W-94, y:H-98, r:56 };
 
 const KINDS = {
@@ -469,9 +472,10 @@ function newGame(best){
     stolen:0, banked:0, bestVolley:0, won:false, winFx:0,
     shake:0, flash:0, flashCol:"224,58,47", toasts:[], particles:[], sparks:[], confetti:[],
     balls:[], carry:[], spawnT:1.0,
+    bone:null, boneT:BONE_EVERY*.6, chewAt:null, longThrows:0,
     player:{x:430,y:604,r:16,face:-Math.PI/2,step:0,slow:0,shooCool:0},
     npc:{x:330,y:250,hx:330,hy:250,r:16,step:0,face:Math.PI/2,wave:0,windup:0},
-    dog:{x:250,y:410,r:22,face:0,phase:0,wag:0,delay:1.2,bark:null,carryT:0,hasBall:null},
+    dog:{x:250,y:410,r:22,face:0,phase:0,wag:0,delay:1.2,bark:null,carryT:0,hasBall:null,chew:0},
     laura:{x:DOOR.x,y:DOOR.y,r:17,mode:"inside",warn:0,patience:0,step:0,sweep:0,bark:null},
     charging:false, power:0, nagCool:0, pulse:0
   };
@@ -1299,11 +1303,12 @@ function throwVolley(power){
   else if (d<=OK_W){ mult=1; label="NICE"; col="#dff7c8"; }
   else { mult=0; label = power<SWEET ? "SHORT!" : "OVERCOOKED!"; col="#ff6a5e"; }
 
+  const far = mult>0 && dist(G.player,n)>=LONG_THROW;
   held.forEach((kind,i)=>{
     const b=newBall(G.player.x,G.player.y-4,kind);
     b.spin=rand(0,6);
     if (mult>0){
-      b.val=KINDS[kind].value*mult;
+      b.val=KINDS[kind].value*mult + (far?LONG_BONUS:0);
       const off=(i-(held.length-1)/2)*26;
       launch(b,n.x+off,n.y-6,.8+i*.06,205,"bank",null);
     } else {
@@ -1314,6 +1319,7 @@ function throwVolley(power){
     G.balls.push(b);
   });
   toast(label+(mult===2?" x2":""),col);
+  if (far){ G.longThrows++; toast("LONG BALL +"+LONG_BONUS+" each","#9be5ff",G.player.x,G.player.y-96); }
   if (mult>0 && held.length===CARRY_MAX){
     G.score+=40; toast("FULL ARMS +40","#ffcf3a",G.player.x,G.player.y-72);
   }
@@ -1321,7 +1327,8 @@ function throwVolley(power){
 }
 function bankBall(b){
   const m=comboHit(G,b.x,b.y,(t,c,x,y)=>toast(t,c,x,y));
-  const gained=b.val*m;
+  let gained=b.val*m;
+  if (G.timeLeft<=LAST_CALL){ gained*=2; G.toasts.push({text:"LAST CALL x2",color:"#ffcf3a",x:b.x-30,y:b.y-56,life:.9}); }
   G.score+=gained; G.banked++;
   if (m>1) G.toasts.push({text:"x"+m,color:"#9be5ff",x:b.x+30,y:b.y-40,life:.9});
   G.bestVolley=Math.max(G.bestVolley,b.val);
@@ -1437,6 +1444,7 @@ function endGame(reason){
     line=reason+" \u2014 you banked "+G.banked+" balls for "+G.score+" points"+
          (gap>0?", "+gap+" short of beating Bernard":"")+". Best so far: "+G.best+".";
   }
+  if (G.longThrows) line+=" Long throws: "+G.longThrows+".";
   document.getElementById("overTitle").textContent=title;
   document.getElementById("finalLine").textContent=line;
   over.classList.add("on");
@@ -1548,6 +1556,32 @@ function update(dt){
   }
   G.balls=G.balls.filter(b=>!b.dead);
 
+  // ---- a bone turns up now and then; grab it and Bernard goes chewing
+  G.boneT-=dt;
+  if (!G.bone && G.boneT<=0){
+    const t=clearSpot(rand(FIELD.x0+80,FIELD.x1-80),rand(FIELD.y0+90,FIELD.y1-60),30);
+    G.bone={x:t.x,y:t.y,life:BONE_LIFE,bob:0};
+    G.boneT=BONE_EVERY;
+  }
+  if (G.bone){
+    G.bone.life-=dt; G.bone.bob+=dt*4;
+    if (G.bone.life<=0) G.bone=null;
+    else if (Math.hypot(p.x-G.bone.x,p.y-G.bone.y)<p.r+18){
+      // toss it to whichever far corner is emptiest, and he's off after it
+      const corners=[{x:FIELD.x0+60,y:FIELD.y0+70},{x:FIELD.x1-60,y:FIELD.y0+70},{x:FIELD.x1-60,y:FIELD.y1-50}];
+      let best=corners[0],bd=-1;
+      for (const c of corners){ const dd=dist(c,G.npc)+dist(c,p)*.5; if (dd>bd){ bd=dd; best=c; } }
+      G.chewAt=clearSpot(best.x,best.y,26);
+      G.dog.chew=CHEW_TIME+dist(G.dog,G.chewAt)/240;
+      G.dog.gloat=0; G.dog.delay=0;
+      G.bone=null;
+      sfx.perfect();
+      sparkle(p.x,p.y-20,"#fff6d8",10);
+      toast("BONE! HE'S BUSY","#fff6d8");
+      G.dog.bark={text:"Bone!",life:1.2};
+    }
+  }
+
   // ---- friend by the wall
   const n=G.npc;
   n.wave=Math.max(0,n.wave-dt*1.6);
@@ -1565,8 +1599,13 @@ function update(dt){
   d.carryT=Math.max(0,d.carryT-dt);
   if (d.carryT<=0) d.hasBall=null;
 
+  d.chew=Math.max(0,d.chew-dt);
+  if (d.chew<=0) G.chewAt=null;
   let target=null, speed=dogSpeed();
-  if (d.hasBall && d.gloat>0){
+  if (d.chew>0 && G.chewAt){
+    target=G.chewAt; speed=250;                           // beelines for the bone, then gnaws it
+    if (dist(d,G.chewAt)<8){ target=null; d.phase+=dt*4; }
+  } else if (d.hasBall && d.gloat>0){
     target=null;                                          // sits and gloats
     d.phase+=dt*3;
   } else if (d.hasBall){
@@ -1594,7 +1633,7 @@ function update(dt){
     d.y=clamp(d.y,FIELD.y0+d.r,FIELD.y1-d.r);
     pushOut(d);
   }
-  if (!d.hasBall && d.delay<=0){
+  if (!d.hasBall && d.delay<=0 && d.chew<=0){
     if (G.carry.length && dist(d,p)<d.r+p.r+4) dogRobsPlayer();
     else {
       for (const b of G.balls){
@@ -2155,6 +2194,25 @@ function drawBall(b){
 }
 
 // ---------------------------------------------------------------- HUD + overlays
+function drawBone(){
+  const bn=G.bone, at=G.chewAt;
+  if (bn){
+    const bob=Math.sin(bn.bob)*3, fade=bn.life<2 ? (Math.sin(bn.life*14)+1)/2*.6+.4 : 1;
+    ctx.save(); ctx.globalAlpha=fade;
+    const k=(Math.sin(G.pulse*1.4)+1)/2;
+    ctx.strokeStyle="rgba(255,246,216,"+(.7-k*.4)+")"; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.arc(bn.x,bn.y,20+k*9,0,Math.PI*2); ctx.stroke();
+    softShadow(ctx,bn.x,bn.y+8,16,6,.3);
+    if (!drawSprC("hopBone",bn.x,bn.y-6-bob,44,33,Math.sin(bn.bob*.5)*.2)){
+      ctx.fillStyle="#fff2d0"; ctx.beginPath(); ctx.roundRect(bn.x-16,bn.y-10-bob,32,9,4); ctx.fill();
+    }
+    ctx.restore();
+  }
+  if (at && G.dog.chew>0 && dist(G.dog,at)<12){
+    const flip=Math.cos(G.dog.face)>.01;
+    drawSprC("hopBone",G.dog.x+(flip?26:-26),G.dog.y+8,34,26,.3);
+  }
+}
 function drawSafetyRing(){
   if (!G.running || !G.carry.length) return;
   const p=G.player, clear=dist(G.dog,p)>=SAFE_DIST;
@@ -2286,6 +2344,13 @@ function drawHUD(){
   ctx.textAlign="center";
   const secs=Math.ceil(G.timeLeft);
   chunky(ctx,(secs<10?"0":"")+secs+"s",W/2,25,15,"#fff5cf","#4a2408",600);
+  if (G.running && G.timeLeft<=LAST_CALL){
+    const k=(Math.sin(G.pulse*2.5)+1)/2;
+    chunky(ctx,"LAST CALL \u2014 DOUBLE POINTS",W/2,76,15,"#ffe07a","#4a2408",700);
+    ctx.globalAlpha=.4+k*.6;
+    chunky(ctx,"LAST CALL \u2014 DOUBLE POINTS",W/2,76,15,"#fff6c9","#4a2408",700);
+    ctx.globalAlpha=1;
+  }
 
   // Bernard's haul
   goldPanel(ctx,W-182,12,168,54,14);
@@ -2380,6 +2445,7 @@ function draw(){
 
   const grounded=G.balls.filter(b=>b.z<12);
   for (const b of grounded) drawBall(b);
+  drawBone();
 
   const actors=[
     ...TREES.map(t=>({y:t.y-30, f:()=>drawTree(t)})),
