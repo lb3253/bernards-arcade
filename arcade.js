@@ -73,7 +73,7 @@ loadSpr("hopSprinkler","/art/spr-hop-sprinkler.png");
 loadSpr("hopTree","/art/spr-hop-tree.png");
 loadSpr("hopBall","/art/spr-hop-ball.png");
 loadSpr("hopBone","/art/spr-hop-bone.png");
-["hopBall","hopBernard","hopNic","hopGiulia","hopTree"].forEach(n=>{ SPR[n].addEventListener("load",()=>{ try{ bakeBallSprites(); if(typeof makeBalliesPoster==="function") makeBalliesPoster(); }catch(e){} }); });
+["hopBall","hopBernard","hopNic","hopGiulia","hopTree"].forEach(n=>{ SPR[n].addEventListener("load",()=>{ try{ bakeBallSprites(); if(typeof makeBalliesPoster==="function") makeBalliesPoster(); if(typeof makeMemoPoster==="function") makeMemoPoster(); }catch(e){} }); });
 ["fly","biplane","jet","balloon","storm","skyAir","saucer","drone","diver","mothership","disc","scout","missile","plasma","boom","shot","muzzle","hills","jeep","skyJeep","jtrail","jpalm","jramp","jstop","jscrub"].forEach(n=>{ SPR[n].addEventListener("load",()=>{ try{ if(typeof bakeAirSky==="function") bakeAirSky(); if(typeof bakeFlapSky==="function") bakeFlapSky(); if(typeof bakeJeepSky==="function") bakeJeepSky(); }catch(e){} }); });
 function sprReady(name){
   const im=SPR[name];
@@ -275,7 +275,7 @@ function chunky(c,txt,x,y,size,fill,stroke,weight){
 
 // ---------------------------------------------------------------- audio
 let audioOn=true, glare=true, ac=null;
-const ARCADE_FLASH = {flap:false, hop:false, air:false, ballies:false};
+const ARCADE_FLASH = {flap:false, hop:false, air:false, ballies:false, memo:false};
 function beep(f,dur,type,vol){
   if (!audioOn) return;
   try{
@@ -353,6 +353,14 @@ const TUNES = {
     arp:   [[53,56,60,56,53,56,60,56, 58,62,65,62,58,62,65,62]],
     drums: ["k..hs..hk.k.s..h","k..hs..hk.k.s.ss"],
     leadType:"triangle", bassType:"square", arpType:"square"
+  },
+  // Bernard Says: a patient little music-box loop
+  memo: { bpm:96, swing:0,
+    bass:  [[45,0,0,0,52,0,0,0, 50,0,0,0,57,0,0,0],[47,0,0,0,54,0,0,0, 43,0,0,0,50,0,0,0]],
+    lead:  [[0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],[76,0,0,0,74,0,0,0, 72,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],[71,0,0,0,72,0,0,0, 74,0,0,0,0,0,0,0]],
+    arp:   [[69,72,76,72,69,72,76,72, 74,77,81,77,74,77,81,77],[71,74,78,74,71,74,78,74, 67,71,74,71,67,71,74,71]],
+    drums: ["....h.......h...","....h.......h.h."],
+    leadType:"triangle", bassType:"triangle", arpType:"sine"
   },
   // dogfight over the mothership: driving minor key
   air: { bpm:150, swing:0,
@@ -493,7 +501,8 @@ let pointer={down:false,x:0,y:0};
 const GP = { idx:null, id:"", prev:{}, focus:0, lastScreen:"", navHold:0, lastBtn:"" };
 
 const GP_ITEMS = {
-  home:     ["pickFlap","pickHop","pickAir","pickBallies"],
+  home:     ["pickFlap","pickHop","pickAir","pickBallies","pickMemo"],
+  memomenu: ["memoStartBtn","memoBack"],
   menu:     ["startBtn","menuBack"],
   titamenu: ["titaStartBtn","titaBack"],
   flapmenu: ["flapStartBtn","flapBack"],
@@ -514,6 +523,7 @@ function gpScreen(){
   if (on("paddlemenu")) return "paddlemenu";
   if (on("airmenu")) return "airmenu";
   if (on("hopmenu")) return "hopmenu";
+  if (on("memomenu")) return "memomenu";
   if (on("airstory")) return "airstory";
   if (on("gameover")) return "over";
   return "play";
@@ -593,9 +603,9 @@ function uiBack(){ const sc=gpScreen(); if (sc==="pause") quitToArcade(); else i
 
 // ---------------------------------------------------------------- lobby carousel
 const CAR = {
-  items:["pickFlap","pickHop","pickAir","pickBallies"],
-  flashKey:{pickFlap:"flap", pickHop:"hop", pickAir:"air", pickBallies:"ballies"},
-  spill:{pickFlap:"rgba(80,190,255,.32)", pickHop:"rgba(110,220,90,.30)", pickAir:"rgba(255,90,160,.32)", pickBallies:"rgba(255,207,58,.30)"},
+  items:["pickFlap","pickHop","pickAir","pickBallies","pickMemo"],
+  flashKey:{pickFlap:"flap", pickHop:"hop", pickAir:"air", pickBallies:"ballies", pickMemo:"memo"},
+  spill:{pickFlap:"rgba(80,190,255,.32)", pickHop:"rgba(110,220,90,.30)", pickAir:"rgba(255,90,160,.32)", pickBallies:"rgba(255,207,58,.30)", pickMemo:"rgba(170,110,255,.32)"},
   index:0, pos:0, vel:0, target:0, bounce:0,
   tiltX:0, tiltY:0, wantTiltX:0, wantTiltY:0,
   drag:null, lastIdx:-1, chaseT:0, ready:false
@@ -638,6 +648,7 @@ function carouselLaunch(){
   else if (id==="pickHop") openHop();
   else if (id==="pickAir") openAir();
   else if (id==="pickBallies") openBallies();
+  else if (id==="pickMemo") openMemo();
 }
 function carouselOnClick(id){
   const i=CAR.items.indexOf(id);
@@ -893,7 +904,7 @@ function keyName(e){
     ArrowUp:"ArrowUp", ArrowDown:"ArrowDown", ArrowLeft:"ArrowLeft", ArrowRight:"ArrowRight",
     Enter:"Enter", " ":"Space", Escape:"Escape", Backspace:"Backspace",
     a:"KeyA", A:"KeyA", w:"KeyW", W:"KeyW", s:"KeyS", S:"KeyS", d:"KeyD", D:"KeyD",
-    x:"KeyX", X:"KeyX", z:"KeyZ", Z:"KeyZ"
+    x:"KeyX", X:"KeyX", z:"KeyZ", Z:"KeyZ", b:"KeyB", B:"KeyB", y:"KeyY", Y:"KeyY"
   };
   if (named[k]) return named[k];
   const kc=e.keyCode||e.which||0;
@@ -1089,6 +1100,9 @@ function pollGamepad(){
     if (gasB) keys.add("KeyX"); else keys.delete("KeyX");
     if (brkB) keys.add("ShiftLeft"); else keys.delete("ShiftLeft");
     GP.prev.face=face;
+  } else if (MODE==="memo"){
+    memoPadInput(b,up,down,left,right);
+    GP.prev.face=face;
   } else {
     if (face && !GP.prev.face) actionDown();
     if (!face && GP.prev.face) actionUp();
@@ -1135,7 +1149,8 @@ addEventListener("keydown",e=>{
     return;
   }
   if (code==="Escape"||code==="KeyP"||code==="Backspace"){ togglePause(); e.preventDefault(); return; }
-  if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","KeyX","KeyZ","ShiftLeft","ShiftRight"].includes(code)) e.preventDefault();
+  if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","KeyX","KeyZ","KeyA","KeyB","KeyY","ShiftLeft","ShiftRight"].includes(code)) e.preventDefault();
+  if (MODE==="memo" && !e.repeat) memoKey(code);
   if ((code==="Space"||code==="KeyX") && !keys.has("Space") && !keys.has("KeyX")) actionDown();
   keys.add(code);
   if (code==="KeyX") keys.add("Space");
@@ -1157,6 +1172,7 @@ cv.addEventListener("pointerdown",e=>{
   const p=canvasPos(e);
   if (MODE==="flap"||MODE==="paddle"||MODE==="air"||MODE==="jeep"){ actionDown(); return; }
   if (MODE==="hop"){ hCanvasTap(p); return; }
+  if (MODE==="memo"){ memoTap(p); return; }
   if (MODE==="tita"){ pointer={down:true,x:p.x,y:p.y}; actionDown(); return; }
   if (G && G.carry.length && Math.hypot(p.x-THROW_BTN.x,p.y-THROW_BTN.y)<THROW_BTN.r){
     pointer={down:false,x:p.x,y:p.y}; startCharge(); return;
@@ -1224,6 +1240,7 @@ function actionDown(){
   else if (MODE==="air") airFire();
   else if (MODE==="hop") hFerry();
   else if (MODE==="jeep"){ if (J) J.touchGas=true; }
+  else if (MODE==="memo"){ /* Bernard Says reads its buttons itself */ }
   else startCharge();
 }
 function actionUp(){
@@ -7895,6 +7912,7 @@ function frame(now){
       else if (MODE==="air"){ if (A){ if(!PAUSED) updateAir(d); drawAir(); } }
       else if (MODE==="hop"){ if (LH){ if(!PAUSED) updateHop(d); drawHop(); } }
       else if (MODE==="jeep"){ if (J){ if(!PAUSED) updateJeep(d); drawJeep(); } }
+      else if (MODE==="memo"){ if (M){ if(!PAUSED) updateMemo(d); drawMemo(); } }
       else { if (G){ if(!PAUSED) update(d); draw(); } }
     }
   }catch(err){
@@ -7908,12 +7926,340 @@ const homeEl=document.getElementById("home");
 const menuEl=document.getElementById("menu");
 const titaEl=document.getElementById("titamenu");
 const flapEl=document.getElementById("flapmenu");
+const memoEl=document.getElementById("memomenu");
 const padEl=document.getElementById("paddlemenu");
 const airEl=document.getElementById("airmenu");
 const hopEl=document.getElementById("hopmenu");
 const jeepEl=document.getElementById("jeepmenu");
 const pauseEl=document.getElementById("pause");
 const overEl=document.getElementById("gameover");
+
+
+// ================================================================
+//  BERNARD SAYS  —  Simon on an SNES pad. He barks a run of buttons,
+//  you press them back. One more each round; a wrong press ends it.
+// ================================================================
+let M=null;
+const MEMO_KEYS = ["up","right","down","left","x","a","b","y"];
+const MEMO_INFO = {
+  up:   { label:"▲", note:523, col:"#8fa2b8", lit:"#ffffff", key:"ArrowUp" },
+  right:{ label:"▶", note:587, col:"#8fa2b8", lit:"#ffffff", key:"ArrowRight" },
+  down: { label:"▼", note:659, col:"#8fa2b8", lit:"#ffffff", key:"ArrowDown" },
+  left: { label:"◀", note:698, col:"#8fa2b8", lit:"#ffffff", key:"ArrowLeft" },
+  x:    { label:"X", note:784,  col:"#3d7fe0", lit:"#9ec8ff", key:"KeyX" },
+  a:    { label:"A", note:880,  col:"#d8303a", lit:"#ff9aa0", key:"KeyA" },
+  b:    { label:"B", note:988,  col:"#e9b31a", lit:"#fff0a0", key:"KeyB" },
+  y:    { label:"Y", note:1047, col:"#3aa85a", lit:"#a6f2b8", key:"KeyY" }
+};
+// standard gamepad mapping: 0 bottom, 1 right, 2 left, 3 top
+const MEMO_PAD_FACE = { 0:"b", 1:"a", 2:"y", 3:"x" };
+const MEMO_PAD = { x:450, y:410, w:640, h:250, dpad:{x:255,y:410,arm:44}, face:{x:650,y:410,r:34,off:54} };
+const MEMO_POS = {
+  up:   ()=>({x:MEMO_PAD.dpad.x, y:MEMO_PAD.dpad.y-MEMO_PAD.dpad.arm}),
+  down: ()=>({x:MEMO_PAD.dpad.x, y:MEMO_PAD.dpad.y+MEMO_PAD.dpad.arm}),
+  left: ()=>({x:MEMO_PAD.dpad.x-MEMO_PAD.dpad.arm, y:MEMO_PAD.dpad.y}),
+  right:()=>({x:MEMO_PAD.dpad.x+MEMO_PAD.dpad.arm, y:MEMO_PAD.dpad.y}),
+  x:    ()=>({x:MEMO_PAD.face.x, y:MEMO_PAD.face.y-MEMO_PAD.face.off}),
+  b:    ()=>({x:MEMO_PAD.face.x, y:MEMO_PAD.face.y+MEMO_PAD.face.off}),
+  y:    ()=>({x:MEMO_PAD.face.x-MEMO_PAD.face.off, y:MEMO_PAD.face.y}),
+  a:    ()=>({x:MEMO_PAD.face.x+MEMO_PAD.face.off, y:MEMO_PAD.face.y})
+};
+function newMemo(best){
+  return {
+    running:true, started:false, over:false, t:0, pulse:0,
+    seq:[], step:0, phase:"idle", showI:0, showT:0, waitT:0,
+    lit:null, litT:0, wrong:null, score:0, best:best||0, bestRun:0,
+    toasts:[], sparks:[], bark:null, wag:0, mood:"idle", prevKey:{}
+  };
+}
+function saveMemoBest(v){ try{ const o=+localStorage.getItem("memo_best")||0; if(v>o){ ARCADE_FLASH.memo=true; localStorage.setItem("memo_best",String(v)); } }catch(e){} }
+function loadMemoBest(){ try{ const v=+localStorage.getItem("memo_best"); if(v&&M) M.best=v; }catch(e){} }
+function memoShowDur(){ return Math.max(.22, .5 - M.seq.length*.018); }
+function memoToast(text,col,y){ M.toasts.push({text,col:col||"#fff6c9",x:W/2,y:y||170,life:1.2}); }
+function memoLight(k,dur){
+  M.lit=k; M.litT=dur||memoShowDur();
+  const info=MEMO_INFO[k];
+  beep(info.note,Math.max(.12,M.litT*.9),"square",.06);
+  const p=MEMO_POS[k]();
+  for (let i=0;i<6;i++) M.sparks.push({x:p.x,y:p.y,vx:rand(-90,90),vy:rand(-120,-20),life:.5,col:info.lit});
+}
+function memoNextRound(){
+  M.seq.push(MEMO_KEYS[Math.floor(rand(0,MEMO_KEYS.length))]);
+  M.phase="wait"; M.waitT=.9; M.step=0;
+  M.mood="show";
+}
+function memoStartShowing(){
+  M.phase="show"; M.showI=0; M.showT=0; M.lit=null;
+  M.bark={text:["Watch!","Like this…","Ready?","Pay attention!"][Math.floor(rand(0,4))],life:1.4};
+}
+function memoPress(k){
+  if (!M || !M.running) return;
+  if (!M.started){ M.started=true; memoNextRound(); return; }
+  if (M.phase!=="input") return;
+  const want=M.seq[M.step];
+  if (k===want){
+    memoLight(k,.28);
+    M.step++;
+    if (M.step>=M.seq.length){
+      M.score=M.seq.length;
+      M.bestRun=Math.max(M.bestRun,M.score);
+      if (M.score>M.best){ M.best=M.score; saveMemoBest(M.best); }
+      M.phase="wait"; M.waitT=.85;
+      M.mood="happy"; M.wag=1.2;
+      memoToast(["GOOD DOG!","WOOF!","HE'S IMPRESSED","NAILED IT"][Math.floor(rand(0,4))],"#c9f24d");
+      sfx.bank(Math.min(3,1+(M.seq.length%3)));
+      M.bark={text:["Woof!","Again!","Nice!"][Math.floor(rand(0,3))],life:1};
+      setTimeout(()=>{ if (M && M.running && M.phase==="wait") memoNextRound(); }, 700);
+    }
+  } else {
+    M.wrong=k; M.lit=k; M.litT=.6;
+    beep(160,.35,"sawtooth",.07);
+    memoOver(want);
+  }
+}
+function memoOver(wanted){
+  if (!M.running) return;
+  M.running=false; M.over=true; M.phase="over"; M.mood="sad";
+  sfx.over();
+  const over=document.getElementById("gameover");
+  over.classList.remove("won","lost"); over.classList.add("lost");
+  document.getElementById("overShot").style.backgroundImage="var(--ph-memo)";
+  const info=MEMO_INFO[wanted];
+  document.getElementById("overTitle").textContent = M.score>=12 ? "Bernard is amazed" : M.score>=6 ? "Not bad at all" : "He got you";
+  document.getElementById("finalLine").textContent =
+    "You remembered "+M.score+" button"+(M.score===1?"":"s")+" in a row. It was "+
+    (MEMO_KEYS.indexOf(wanted)<4 ? "d-pad "+({up:"up",down:"down",left:"left",right:"right"})[wanted] : info.label)+
+    " next. Best so far: "+M.best+".";
+  over.classList.add("on");
+}
+// keyboard presses arrive straight from keydown, so a quick tap is never missed
+const MEMO_BY_KEY={};
+for (const k of MEMO_KEYS) MEMO_BY_KEY[MEMO_INFO[k].key]=k;
+function memoKey(code){ const k=MEMO_BY_KEY[code]; if (k) memoPress(k); }
+// the pad: d-pad by direction, the four face buttons by position rather than by letter
+function memoPadInput(b,up,down,left,right){
+  const now={up,down,left,right};
+  for (const k in now){ if (now[k] && !GP.prev["md"+k]) memoPress(k); GP.prev["md"+k]=now[k]; }
+  for (let i=0;i<4;i++){
+    const on=gpBtn(b,i);
+    if (on && !GP.prev["mf"+i]) memoPress(MEMO_PAD_FACE[i]);
+    GP.prev["mf"+i]=on;
+  }
+}
+function memoTap(p){
+  if (!M) return;
+  let best=null,bd=1e9;
+  for (const k of MEMO_KEYS){
+    const q=MEMO_POS[k](), d=Math.hypot(p.x-q.x,p.y-q.y);
+    if (d<bd){ bd=d; best=k; }
+  }
+  if (bd<46) memoPress(best);
+  else if (!M.started) memoPress("up");
+}
+function updateMemo(dt){
+  if (!M) return;
+  pollGamepad();
+  M.t+=dt; M.pulse+=dt*3;
+  M.wag=Math.max(0,M.wag-dt);
+  if (M.bark){ M.bark.life-=dt; if (M.bark.life<=0) M.bark=null; }
+  for (const t of M.toasts){ t.y-=dt*30; t.life-=dt*.9; }
+  M.toasts=M.toasts.filter(t=>t.life>0);
+  for (const s of M.sparks){ s.x+=s.vx*dt; s.y+=s.vy*dt; s.vy+=260*dt; s.life-=dt*1.6; }
+  M.sparks=M.sparks.filter(s=>s.life>0);
+  if (M.litT>0){ M.litT-=dt; if (M.litT<=0 && M.phase!=="over"){ M.lit=null; } }
+  if (!M.running) return;
+  if (M.phase==="wait"){
+    M.waitT-=dt;
+    if (M.waitT<=0 && M.mood==="show") memoStartShowing();
+  } else if (M.phase==="show"){
+    M.showT-=dt;
+    if (M.showT<=0){
+      if (M.showI>=M.seq.length){
+        M.phase="input"; M.lit=null; M.mood="listen";
+        M.bark={text:"Your turn!",life:1.1};
+      } else {
+        const d=memoShowDur();
+        memoLight(M.seq[M.showI],d);
+        M.showT=d+Math.max(.08,.18-M.seq.length*.006);
+        M.showI++;
+      }
+    }
+  }
+}
+// ---- drawing
+const mbg=document.createElement("canvas"); mbg.width=W; mbg.height=H;
+function bakeMemoRoom(){
+  const g=mbg.getContext("2d");
+  const sky=g.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,"#1b1030"); sky.addColorStop(.6,"#2c1a4a"); sky.addColorStop(1,"#120b1f");
+  g.fillStyle=sky; g.fillRect(0,0,W,H);
+  // a carpet of soft arcade light
+  const glow=g.createRadialGradient(W/2,H*.62,40,W/2,H*.62,520);
+  glow.addColorStop(0,"rgba(255,110,168,.28)"); glow.addColorStop(.5,"rgba(90,60,160,.18)"); glow.addColorStop(1,"rgba(0,0,0,0)");
+  g.fillStyle=glow; g.fillRect(0,0,W,H);
+  const R=seeded(777);
+  for (let i=0;i<90;i++){
+    g.fillStyle="rgba(255,230,160,"+(.15+R()*.5)+")";
+    g.beginPath(); g.arc(R()*W,R()*H*.55,R()*2+.6,0,Math.PI*2); g.fill();
+  }
+  // floor
+  const fl=g.createLinearGradient(0,H*.78,0,H);
+  fl.addColorStop(0,"#3a2a5a"); fl.addColorStop(1,"#1a1230");
+  g.fillStyle=fl; g.fillRect(0,H*.78,W,H*.22);
+  g.strokeStyle="rgba(255,255,255,.06)"; g.lineWidth=2;
+  for (let x=-200;x<W+200;x+=70){ g.beginPath(); g.moveTo(x,H); g.lineTo(x+120,H*.78); g.stroke(); }
+}
+function drawMemoPad(){
+  const P=MEMO_PAD;
+  ctx.save();
+  // body
+  softShadow(ctx,P.x+6,P.y+P.h/2+20,P.w*.5,26,.55);
+  const body=ctx.createLinearGradient(0,P.y-P.h/2,0,P.y+P.h/2);
+  body.addColorStop(0,"#dcdde2"); body.addColorStop(.5,"#b9bcc6"); body.addColorStop(1,"#8d909c");
+  ctx.fillStyle=body;
+  ctx.beginPath(); ctx.roundRect(P.x-P.w/2,P.y-P.h/2,P.w,P.h,110); ctx.fill();
+  ctx.strokeStyle="rgba(255,255,255,.55)"; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.roundRect(P.x-P.w/2+6,P.y-P.h/2+6,P.w-12,P.h-12,104); ctx.stroke();
+  // grips
+  for (const sx of [-1,1]){
+    const gx=P.x+sx*(P.w/2-70);
+    const gg=ctx.createRadialGradient(gx-10,P.y-20,10,gx,P.y+10,120);
+    gg.addColorStop(0,"#eef0f4"); gg.addColorStop(1,"#a6a9b4");
+    ctx.fillStyle=gg;
+    ctx.beginPath(); ctx.ellipse(gx,P.y+16,84,116,sx*.25,0,Math.PI*2); ctx.fill();
+  }
+  // cable
+  ctx.strokeStyle="#4c4f5a"; ctx.lineWidth=9; ctx.lineCap="round";
+  ctx.beginPath(); ctx.moveTo(P.x,P.y-P.h/2+4); ctx.quadraticCurveTo(P.x-40,P.y-P.h/2-70,P.x-160,P.y-P.h/2-120); ctx.stroke();
+  // centre plate, select/start
+  const cp=ctx.createLinearGradient(0,P.y-40,0,P.y+60);
+  cp.addColorStop(0,"#c5c8d2"); cp.addColorStop(1,"#9a9da9");
+  ctx.fillStyle=cp;
+  ctx.beginPath(); ctx.roundRect(P.x-90,P.y-44,180,110,26); ctx.fill();
+  ctx.save(); ctx.translate(P.x,P.y+28); ctx.rotate(-.5);
+  for (const dx of [-28,14]){
+    ctx.fillStyle="#3b3d47"; ctx.beginPath(); ctx.roundRect(dx-16,-7,32,14,7); ctx.fill();
+    ctx.fillStyle="rgba(255,255,255,.18)"; ctx.beginPath(); ctx.roundRect(dx-14,-6,28,5,3); ctx.fill();
+  }
+  ctx.restore();
+  ctx.font="700 9px Fredoka, system-ui, sans-serif"; ctx.fillStyle="#3b3d47"; ctx.textAlign="center";
+  ctx.fillText("SELECT",P.x-28,P.y+56); ctx.fillText("START",P.x+18,P.y+56);
+  ctx.font="700 13px Fredoka, system-ui, sans-serif"; ctx.fillStyle="#6b6e7a";
+  ctx.fillText("BERNARD",P.x,P.y-22);
+  // d-pad
+  const D=P.dpad, a=D.arm, t=19;
+  ctx.fillStyle="#1e2028";
+  ctx.beginPath(); ctx.roundRect(D.x-t,D.y-a-t,t*2,a*2+t*2,7); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(D.x-a-t,D.y-t,a*2+t*2,t*2,7); ctx.fill();
+  ctx.fillStyle="rgba(255,255,255,.08)";
+  ctx.beginPath(); ctx.arc(D.x,D.y,11,0,Math.PI*2); ctx.fill();
+  // face buttons
+  for (const k of ["x","y","a","b"]) drawMemoButton(k);
+  for (const k of ["up","right","down","left"]) drawMemoButton(k);
+  ctx.restore();
+}
+function drawMemoButton(k){
+  const info=MEMO_INFO[k], p=MEMO_POS[k](), lit=M && M.lit===k, wrong=M && M.wrong===k;
+  const isFace=MEMO_KEYS.indexOf(k)>=4;
+  const glowA = lit ? (M.litT>0 ? clamp(M.litT*3,0,1)*.9+.1 : 0) : 0;
+  ctx.save();
+  if (lit){
+    ctx.shadowColor=wrong?"#ff5a45":info.lit; ctx.shadowBlur=34;
+  }
+  if (isFace){
+    const r=MEMO_PAD.face.r;
+    const g=ctx.createRadialGradient(p.x-r*.35,p.y-r*.4,r*.1,p.x,p.y,r);
+    if (lit){ g.addColorStop(0,"#ffffff"); g.addColorStop(.45,info.lit); g.addColorStop(1,info.col); }
+    else { g.addColorStop(0,info.lit); g.addColorStop(.35,info.col); g.addColorStop(1,"#111"); }
+    ctx.fillStyle="rgba(0,0,0,.35)"; ctx.beginPath(); ctx.arc(p.x+2,p.y+4,r+2,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(p.x,p.y,r+(lit?3:0),0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    chunky(ctx,info.label,p.x,p.y+1,24,"#fff",lit?"#2a2a2a":"#1a1a1a",700);
+  } else {
+    const s=MEMO_PAD.dpad.arm*.9;
+    const g=ctx.createLinearGradient(0,p.y-s/2,0,p.y+s/2);
+    if (lit){ g.addColorStop(0,"#ffffff"); g.addColorStop(1,"#c8d2e0"); }
+    else { g.addColorStop(0,"#3a3d48"); g.addColorStop(1,"#1e2028"); }
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.roundRect(p.x-s/2+2,p.y-s/2+2,s-4,s-4,7); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle=lit?"#1e2028":"#8fa2b8";
+    ctx.font="700 18px system-ui, sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(info.label,p.x,p.y+1);
+  }
+  if (lit && glowA>0){
+    ctx.strokeStyle=(wrong?"rgba(255,90,69,":"rgba(255,255,255,")+glowA+")"; ctx.lineWidth=4;
+    ctx.beginPath(); ctx.arc(p.x,p.y,(isFace?MEMO_PAD.face.r:MEMO_PAD.dpad.arm*.5)+12+(1-glowA)*10,0,Math.PI*2); ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawMemoBernard(){
+  const x=118, y=H-118;
+  const bob=M.mood==="happy" ? Math.abs(Math.sin(M.t*12))*10 : Math.sin(M.t*2)*2;
+  const tilt=M.mood==="show" ? Math.sin(M.t*6)*.06 : M.mood==="sad" ? .12 : 0;
+  softShadow(ctx,x+8,y+8,60,16,.45);
+  if (sprReady("hopBernard")){
+    const im=SPR.hopBernard, hh=190, ww=hh*(im.naturalWidth/im.naturalHeight);
+    drawSprC("hopBernard",x,y-hh/2-bob,ww,hh,tilt,true);
+  } else {
+    drawDog({x,y:y-30,face:0,phase:M.t*3,wag:M.t*6,hasBall:null,bark:null,mood:M.mood==="happy"?"happy":undefined},M.t);
+  }
+  if (M.bark) bubble(x+62,y-238,M.bark,"#fff","#1e2a18");
+}
+function drawMemoHUD(){
+  goldPanel(ctx,16,12,168,60,14);
+  ctx.textAlign="left"; ctx.font="600 11px Fredoka, system-ui, sans-serif";
+  ctx.fillStyle="#ffe9b0"; ctx.fillText("ROUND",30,32);
+  chunky(ctx,String(M.seq.length),30,56,26,"#fff6c9","#4a2408");
+  goldPanel(ctx,W-176,12,160,60,14);
+  ctx.textAlign="left"; ctx.font="600 11px Fredoka, system-ui, sans-serif";
+  ctx.fillStyle="#ffe9b0"; ctx.fillText("BEST",W-162,32);
+  chunky(ctx,String(M.best),W-162,56,26,"#fff6c9","#4a2408");
+  // progress dots through this round's sequence
+  if (M.seq.length){
+    const n=M.seq.length, dw=Math.min(22,560/n), x0=W/2-(n-1)*dw/2, y=100;
+    for (let i=0;i<n;i++){
+      const done = M.phase==="input" ? i<M.step : M.phase==="show" ? i<M.showI : M.phase==="wait" && M.mood==="happy";
+      ctx.fillStyle= done ? "#c9f24d" : "rgba(255,255,255,.22)";
+      ctx.beginPath(); ctx.arc(x0+i*dw,y,Math.min(7,dw*.32),0,Math.PI*2); ctx.fill();
+    }
+  }
+  ctx.textAlign="center";
+  const pl=(Math.sin(M.pulse)+1)/2;
+  if (!M.started){
+    goldPanel(ctx,W/2-250,H-124,500,92,18);
+    ctx.globalAlpha=.75+pl*.25;
+    chunky(ctx,"PRESS ANY BUTTON",W/2,H-80,26,"#fff6c9","#4a1f08",700);
+    ctx.globalAlpha=1;
+    ctx.font="600 13px Fredoka, system-ui, sans-serif"; ctx.fillStyle="#ffe9b0";
+    ctx.fillText("Bernard lights up the pad · press the same buttons back · one more each round",W/2,H-52);
+  } else if (M.phase==="input"){
+    ctx.globalAlpha=.6+pl*.4;
+    chunky(ctx,"YOUR TURN",W/2,H-48,22,"#c9f24d","#1f3a08",700);
+    ctx.globalAlpha=1;
+  } else if (M.phase==="show"){
+    chunky(ctx,"WATCH BERNARD",W/2,H-48,22,"#ffcf3a","#4a2408",700);
+  }
+  for (const t of M.toasts){
+    ctx.globalAlpha=clamp(t.life,0,1);
+    chunky(ctx,t.text,t.x,t.y,26,t.col,"#2a1810",700);
+  }
+  ctx.globalAlpha=1;
+}
+function drawMemo(){
+  ctx.drawImage(mbg,0,0);
+  ctx.save();
+  drawMemoPad();
+  drawMemoBernard();
+  for (const s of M.sparks){
+    ctx.globalAlpha=clamp(s.life*2,0,1); ctx.fillStyle=s.col;
+    ctx.beginPath(); ctx.arc(s.x,s.y,3,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  ctx.restore();
+  if (!POSTER) drawMemoHUD();
+  if (glare) drawGlass();
+}
 
 const MARKS={
   home:  ["Bernard's","ARCADE"],
@@ -7923,6 +8269,7 @@ const MARKS={
   paddle:["Giulia & Nick","PADDLE"],
   air:   ["Flying with","BERNARD"],
   hop:   ["Lane Hoppers","BERNARD"],
+  memo:  ["Bernard","SAYS"],
   jeep:  ["Bernard Goes","OFF ROAD"]
 };
 function setMark(which){
@@ -7936,6 +8283,7 @@ function hideAll(){
   titaEl.classList.remove("on"); flapEl.classList.remove("on"); padEl.classList.remove("on");
   airEl.classList.remove("on");
   if (hopEl) hopEl.classList.remove("on");
+  if (memoEl) memoEl.classList.remove("on");
   if (jeepEl) jeepEl.classList.remove("on");
   pauseEl.classList.remove("on"); PAUSED=false;
   const storyEl=document.getElementById("airstory"); if (storyEl) storyEl.classList.remove("on");
@@ -7947,6 +8295,7 @@ function refreshBests(){
   const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent = v ? "\u2605 "+v : ""; };
   set("bestBallies",get("ballies_best")); set("bestTita",get("tita_best")); set("bestFlap",get("flap_best"));
   set("bestPaddle",get("paddle_best")); set("bestAir",get("air_best")); set("bestHop",get("hop_best")); set("bestJeep",get("jeep_best"));
+  set("bestMemo",get("memo_best"));
 }
 function goHome(){
   refreshBests();
@@ -7959,6 +8308,7 @@ function goHome(){
   if (A) A.running=false;
   if (LH) LH.running=false;
   if (J) J.running=false;
+  if (M) M.running=false;
   initCarousel();
   applyNewHighRibbons();
   carouselSyncFocus();
@@ -7983,6 +8333,19 @@ function openFlap(){
   MODE="flap";
   if (!F){ F=newFlap(0); loadFlapBest(); }
   F.running=false; drawFlap();
+}
+function openMemo(){
+  hideAll(); memoEl.classList.add("on"); setMark("memo");
+  MODE="memo";
+  if (!M){ M=newMemo(0); loadMemoBest(); }
+  M.running=false; drawMemo();
+}
+function startMemo(){
+  const best=M?M.best:0;
+  M=newMemo(best);
+  MODE="memo"; setMark("memo");
+  hideAll();
+  if (!ac) beep(1,.01);
 }
 function startFlap(){
   const best=F?F.best:0;
@@ -8045,14 +8408,14 @@ function updateStar(){
   const id=(GP_ITEMS.home||[])[GP.focus]||"pickFlap";
   const air=id==="pickAir";
   const hop=id==="pickHop";
-  const yard=id==="pickBallies";
-  const which=yard?"yard":hop?"hop":air?(A_PLANE==="jet"?"jet":"air"):"flap";
+  const yard=id==="pickBallies", memo=id==="pickMemo";
+  const which=memo?"memo":yard?"yard":hop?"hop":air?(A_PLANE==="jet"?"jet":"air"):"flap";
   if (img.getAttribute("data-which")===which){ img.style.opacity="1"; return; }
   img.style.opacity="0";
   setTimeout(()=>{
     img.src=hop?"/art/bernard-portrait.jpg":air?(which==="jet"?"/art/bernard-jet-portrait.jpg":"/art/bernard-pilot-portrait.jpg"):"/art/bernard-portrait.jpg";
     img.setAttribute("data-which",which);
-    if (cap) cap.textContent=yard?"Ball thief":hop?"The hoppers":air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
+    if (cap) cap.textContent=memo?"Simon says":yard?"Ball thief":hop?"The hoppers":air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
     img.style.opacity="1";
   },90);
 }
@@ -8068,7 +8431,8 @@ function startAir(opts){
 function gameRunning(){
   return (MODE==="tita"&&T&&T.running)||(MODE==="flap"&&F&&F.running)||
          (MODE==="paddle"&&P&&P.running)||(MODE==="air"&&A&&A.running)||
-         (MODE==="hop"&&LH&&LH.running)||(MODE==="jeep"&&J&&J.running)||(MODE==="ballies"&&G&&G.running);
+         (MODE==="hop"&&LH&&LH.running)||(MODE==="jeep"&&J&&J.running)||(MODE==="ballies"&&G&&G.running)||
+         (MODE==="memo"&&M&&M.running);
 }
 function togglePause(){
   if (!gameRunning()) return;
@@ -8106,7 +8470,7 @@ function startTita(){
   hideAll();
   if (!ac) beep(1,.01);
 }
-function startCurrent(){ if (MODE==="tita") startTita(); else if (MODE==="flap") startFlap(); else if (MODE==="paddle") startPaddle(); else if (MODE==="air") startAir({skipStory:true}); else if (MODE==="hop") startHop(); else if (MODE==="jeep") startJeep(); else start(); }
+function startCurrent(){ if (MODE==="tita") startTita(); else if (MODE==="flap") startFlap(); else if (MODE==="paddle") startPaddle(); else if (MODE==="air") startAir({skipStory:true}); else if (MODE==="hop") startHop(); else if (MODE==="jeep") startJeep(); else if (MODE==="memo") startMemo(); else start(); }
 
 document.getElementById("goalNum").textContent=WIN_SCORE;
 document.getElementById("titaGoal").textContent=T_WIN;
@@ -8121,6 +8485,7 @@ document.getElementById("padStartBtn").addEventListener("click",startPaddle);
 document.getElementById("padGiulia").addEventListener("click",()=>setChar("giulia"));
 document.getElementById("padNic").addEventListener("click",()=>setChar("nic"));
 document.getElementById("hopStartBtn").addEventListener("click",startHop);
+document.getElementById("memoStartBtn").addEventListener("click",startMemo);
 document.getElementById("hopGiulia").addEventListener("click",()=>setHopChar("giulia"));
 document.getElementById("hopNic").addEventListener("click",()=>setHopChar("nic"));
 document.getElementById("hopGiulia").addEventListener("mouseenter",()=>setHopChar("giulia"));
@@ -8194,6 +8559,7 @@ document.addEventListener("webkitfullscreenchange", syncFs);
 
 ambInit();
 bakeBackground();
+bakeMemoRoom();
 bakeTitaRoom();
 bakeFlapSky();
 bakePaddleSea();
@@ -8232,7 +8598,8 @@ P=newPaddle(0); P.running=false;
 A=newAir(0); A.running=false;
 J=newJeep(0); J.running=false;
 LH=newHop(0); LH.running=false;
-loadBest(); loadTitaBest(); loadFlapBest(); loadPBest(); loadABest(); loadJeepBest(); loadHopBest();
+M=newMemo(0); M.running=false;
+loadBest(); loadTitaBest(); loadFlapBest(); loadPBest(); loadABest(); loadJeepBest(); loadHopBest(); loadMemoBest();
 
 // Bernardy Flap's card art, rendered from a posed frame of the game
 function makeFlapPoster(){
@@ -8296,7 +8663,15 @@ function makeBalliesPoster(){
   try{ draw(); document.documentElement.style.setProperty("--ph-ballies","url("+cv.toDataURL("image/jpeg",.82)+")"); }catch(e){}
   POSTER=false; G=keep; MODE=keepMode;
 }
-function makePosters(){ makeTitaPoster(); makeFlapPoster(); makePaddlePoster(); makeAirPoster(); makeBalliesPoster(); }
+function makeMemoPoster(){
+  const keep=M, keepMode=MODE;
+  M=newMemo(0); M.running=false; M.t=1; M.started=true; M.seq=["a","up","b"]; M.lit="a"; M.litT=.3; M.mood="show";
+  M.bark={text:"Watch!",life:1};
+  POSTER=true;
+  try{ drawMemo(); document.documentElement.style.setProperty("--ph-memo","url("+cv.toDataURL("image/jpeg",.82)+")"); }catch(e){}
+  POSTER=false; M=keep; MODE=keepMode;
+}
+function makePosters(){ makeTitaPoster(); makeFlapPoster(); makePaddlePoster(); makeAirPoster(); makeBalliesPoster(); makeMemoPoster(); }
 makePosters();
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(makePosters);
 setMark("home");

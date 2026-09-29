@@ -526,6 +526,9 @@ body:not([data-screen="home"]) .chase{ display:none }
 #pickAir .thumb{background-image:url("/art/card-air.jpg") !important;background-position:center 42% !important}
 #pickHop .thumb{background-image:url("/art/card-hop.jpg") !important;background-position:center 40% !important}
 #pickBallies .thumb{background-image:var(--ph-ballies,var(--ph-bernard)) !important;background-position:center 58% !important}
+#pickMemo .thumb{background-image:var(--ph-memo,var(--ph-bernard)) !important;background-position:center 60% !important}
+#memomenu .shot{background-image:var(--ph-memo,var(--ph-bernard));background-size:cover;background-position:center 40%}
+#memomenu .scrim{background:linear-gradient(180deg, rgba(20,10,40,.1) 0%, rgba(20,10,40,.35) 50%, rgba(12,6,24,.95) 100%)}
 #airmenu .shot{background-image:url("/art/card-air.jpg");background-size:cover;background-position:center;transition:opacity .18s ease}
 #airmenu.jet .shot{background-image:url("/art/card-air-jet.jpg")}
 #flapmenu .shot{background-image:url("/art/card-flap.jpg")}
