@@ -589,7 +589,7 @@ function uiActivate(){
   if (el) el.click();
   gpApplyFocus();
 }
-function uiBack(){ const sc=gpScreen(); if (sc==="pause") resumeGame(); else if (sc!=="home") goHome(); }
+function uiBack(){ const sc=gpScreen(); if (sc==="pause") quitToArcade(); else if (sc!=="home") goHome(); }
 
 // ---------------------------------------------------------------- lobby carousel
 const CAR = {
@@ -1096,12 +1096,7 @@ function pollGamepad(){
   }
 
   if (gpEdge("pausePlay",startB)) togglePause();
-  if (gpEdge("selPlay",selB)){
-    audioOn=!audioOn;
-    const btn=document.getElementById("soundBtn");
-    btn.textContent="Sound: "+(audioOn?"on":"off");
-    btn.setAttribute("aria-pressed",String(audioOn));
-  }
+  if (gpEdge("selPlay",selB)) togglePause();      // SELECT again on the pause menu quits to the arcade
   // keep menu edges primed so they don't fire the moment a round ends
   gpEdge("navRight",right); gpEdge("navDown",down);
   gpEdge("navLeft",left);   gpEdge("navUp",up);
@@ -6328,6 +6323,7 @@ const H_TW = 100, H_TH = 76, H_LIP = 0, H_SKEW = 0;
 const H_ORIGIN = 548;
 const H_FERRY_CD = 6;
 const H_HOP_DUR = 0.18;
+const H_BIKE_HOPS = 8;
 const H_CAR_PAL = [
   {body:"#e44545", dark:"#9a1c1c", win:"#d7f1ff", chrome:"#e8e4dc"},
   {body:"#f0c12e", dark:"#b07a10", win:"#fff4c8", chrome:"#efeae0"},
@@ -6383,7 +6379,7 @@ function newHop(best){
     player:{ c:4, r:2, face:1, hop:null, ride:null, squash:0, bob:0 },
     dog:{ c:4, r:0, face:1, hop:null, squash:0, glow:0 },
     path: [{c:4,r:2}],
-    cars: [], floats: [], pickups: [],
+    cars: [], floats: [], pickups: [], bike:0,
     particles: [], toasts: [], ripples: [],
     camC:4, camR:1.15,
     ferry:null, sinceFerry: H_FERRY_CD,
@@ -6472,13 +6468,15 @@ function hBuildLane(row){
 }
 function hSpawnCars(lane){
   const dist = Math.max(0, lane.row-4);
-  const speed = 1.35 + dist*0.055 + LH.rng()*0.32;
-  const gap = Math.max(3.0, 5.0 - dist*0.04);
+  const speed = Math.min(2.3, 1.05 + dist*0.035 + LH.rng()*0.25);
+  const gap = Math.max(3.6, 5.6 - dist*0.03);
   let col = LH.rng()*gap;
   const dir = lane.dir;
   const row = lane.row|0;
+  let palI = (LH.rng()*H_CAR_PAL.length)|0;
+  const palStep = 1 + ((LH.rng()*(H_CAR_PAL.length-1))|0);
   while (col < H_COLS+4){
-    const palI = (LH.rng()*H_CAR_PAL.length)|0;
+    palI = (palI + palStep) % H_CAR_PAL.length;
     LH.cars.push({
       row, col: dir>0 ? col-2 : H_COLS+2-col,
       dir, speed, w: 1.25,
@@ -6507,7 +6505,8 @@ function hSpawnFloats(lane){
 }
 function hSpawnPickup(row){
   const c = H_PLAY0 + ((LH.rng()*(H_PLAY1-H_PLAY0+1))|0);
-  const kind = LH.rng()<0.55 ? "ball" : "bone";
+  const roll = LH.rng();
+  const kind = (row>6 && roll<0.14) ? "bike" : roll<0.6 ? "ball" : "bone";
   LH.pickups.push({row, c, kind, taken:false, bob:LH.rng()*4});
 }
 
@@ -6523,12 +6522,13 @@ function hSprayOn(sp, t){
   const u = (t + sp.phase) % sp.period;
   return u < sp.period * 0.42;
 }
-function hCarHits(c, r){
+function hCarHits(c, r, margin){
   r = Math.round(r);
+  const m = margin===undefined ? 0.18 : margin;
   for (const car of LH.cars){
     if ((car.row|0)!==r) continue;
     if (hLane(car.row).type!=="street") continue;
-    if (Math.abs(car.col - c) < car.w*0.52 + 0.30) return car;
+    if (Math.abs(car.col - c) < car.w*0.5 + m) return car;
   }
   return null;
 }
@@ -6553,7 +6553,7 @@ function hCanStand(c, r){
   if (c < H_PLAY0-0.2 || c > H_PLAY1+0.2) return false;
   if (r < 0) return false;
   const lane = hLane(r);
-  if (lane.type==="street") return !hCarHits(c,r);
+  if (lane.type==="street") return !hCarHits(c,r,0.02);   // landing: only a real overlap counts
   if (lane.type==="tracks") return !hTrainHits(c,r);
   if (lane.type==="water") return !!hPadAt(c,r,0.62);
   if (lane.type==="yard"){
@@ -6570,6 +6570,7 @@ function hTryHop(dc, dr){
   if (p.hop) return;
   let nc = (p.ride ? p.ride.col : p.c) + dc;
   let nr = p.r + dr;
+  if (LH.bike>0 && dr>0) nr = p.r + 2;         // on the bike you clear a row
   if (dr===0) nc = Math.round(nc);
   if (nr < 0) return;
   if (nc < H_PLAY0) nc = H_PLAY0;
@@ -6593,6 +6594,7 @@ function hLand(){
   const hop=p.hop; if (!hop) return;
   p.c = hop.tc; p.r = hop.tr; p.hop=null; p.squash=1;
   p.ride = null;
+  if (LH.bike>0 && hop.tr-hop.fr>1){ LH.bike--; if (!LH.bike) hToast("BIKE'S DONE","#cfe9ff"); }
   const lane = hLane(p.r);
   if (lane.type==="water"){
     const pad = hPadAt(p.c, p.r, 0.75);
@@ -6614,6 +6616,14 @@ function hLand(){
     if (pk.taken) continue;
     if (pk.row===p.r && Math.abs(pk.c - p.c)<0.55){
       pk.taken=true;
+      if (pk.kind==="bike"){
+        LH.bike = H_BIKE_HOPS;
+        const pos=hIso(pk.c, pk.row);
+        hPuff(pos.x, pos.y-20, "#9be5ff", 14);
+        hToast("BIKE! UP HOPS GO TWO ROWS", "#9be5ff");
+        sfx.carGo();
+        continue;
+      }
       const pts = pk.kind==="ball"?25:10;
       LH.bonus += pts;
       const pos=hIso(pk.c, pk.row);
@@ -6632,7 +6642,7 @@ function hLand(){
 function hNudgeDog(){
   const d=LH.dog;
   if (d.hop || LH.ferry) return;
-  const target = LH.path[Math.max(0, LH.path.length-3)];
+  const target = LH.path[Math.max(0, LH.path.length-2)];
   if (!target) return;
   if (target.r===d.r && Math.abs(target.c-d.c)<0.2) return;
   d.hop = { fc:d.c, fr:d.r, tc:target.c, tr:target.r, t:0 };
@@ -7484,7 +7494,7 @@ function hDrawTrainArt(lane,x,y){
   if (!lane.trainOn) return;
   const p=hIso(lane.trainCol, lane.row);
   if (sprReady("hopTrain")){
-    drawSprC("hopTrain", p.x, p.y+6, 460, 82, 0, lane.dir<0);
+    drawSprC("hopTrain", p.x, p.y+6, 460, 82, 0, lane.dir>0);
   } else {
     ctx.fillStyle="#c45a18";
     ctx.fillRect(p.x-200, p.y-18, 400, 40);
@@ -7511,6 +7521,7 @@ function hDrawSignalArt(x,y,warn,t){
 }
 function hDrawPickupArt(pk,x,y){
   const bob=Math.sin(LH.t*4+pk.bob)*5;
+  if (pk.kind==="bike"){ hDrawBike(x, y-6+bob*.5, 1.05, LH.t*6); return; }
   const n=pk.kind==="ball"?"hopBall":"hopBone";
   if (sprReady(n)){
     drawSprC(n, x, y-18+bob, 34, 34);
@@ -7520,6 +7531,26 @@ function hDrawPickupArt(pk,x,y){
   hBlit(pk.kind==="ball"?"ball":"bone", x, y-8+bob, false);
 }
 
+// a little red bike, drawn under the rider or bobbing on the grass as a pickup
+function hDrawBike(x,y,s,spin){
+  ctx.save(); ctx.translate(x,y); ctx.scale(s,s);
+  ctx.lineCap="round";
+  ctx.fillStyle="rgba(16,32,20,.28)";
+  ctx.beginPath(); ctx.ellipse(0,10,26,6,0,0,Math.PI*2); ctx.fill();
+  for (const wx of [-17,17]){
+    ctx.strokeStyle="#2a2a2e"; ctx.lineWidth=4.5;
+    ctx.beginPath(); ctx.arc(wx,2,10,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle="#c9ccd2"; ctx.lineWidth=1.2;
+    for (let i=0;i<4;i++){ const a=spin+i*Math.PI/4; ctx.beginPath(); ctx.moveTo(wx-Math.cos(a)*9,2-Math.sin(a)*9); ctx.lineTo(wx+Math.cos(a)*9,2+Math.sin(a)*9); ctx.stroke(); }
+  }
+  ctx.strokeStyle="#e0352c"; ctx.lineWidth=3.6;
+  ctx.beginPath(); ctx.moveTo(-17,2); ctx.lineTo(-6,-12); ctx.lineTo(9,-12); ctx.lineTo(17,2); ctx.lineTo(1,4); ctx.lineTo(-6,-12); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(9,-12); ctx.lineTo(14,-19); ctx.stroke();
+  ctx.strokeStyle="#3a3a40"; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(10,-19); ctx.lineTo(19,-19); ctx.stroke();      // bars
+  ctx.beginPath(); ctx.moveTo(-9,-16); ctx.lineTo(-3,-16); ctx.stroke();      // saddle
+  ctx.restore();
+}
 function hDrawBernard(x,y,flip,sx,sy,swim,t){
   const name = swim && sprReady("hopSwim") ? "hopSwim" : "hopBernard";
   if (hBlitActor(name, x, y+4, swim?58:72, flip, sx, sy)) return;
@@ -7721,7 +7752,12 @@ function drawHop(){
       const p=hActorPos(LH.player);
       const sq=hSquash(LH.player);
       const hopU=LH.player.hop?LH.player.hop.t:0;
-      hDrawKidArt(p.x, p.y+H_TH*0.28, LH.player.face<0, sq.sx, sq.sy, H_CHAR!=="nic", hopU);
+      if (LH.bike>0){
+        ctx.save(); if (LH.player.face<0){ ctx.translate(p.x*2,0); ctx.scale(-1,1); }
+        hDrawBike(p.x, p.y+H_TH*0.28+2, 1.15, LH.t*(LH.player.hop?22:4));
+        ctx.restore();
+      }
+      hDrawKidArt(p.x, p.y+H_TH*0.28-(LH.bike>0?10:0), LH.player.face<0, sq.sx, sq.sy, H_CHAR!=="nic", hopU);
     }
   }
 
@@ -7757,6 +7793,12 @@ function drawHopHUD(){
   ctx.fillStyle="#ffe9b0";
   ctx.fillText("BEST", W-162, 32);
   chunky(ctx, String(LH.best), W-162, 58, 26, "#fff6c9", "#4a2408");
+  if (LH.bike>0){
+    goldPanel(ctx, W/2-70, 12, 140, 44, 14);
+    hDrawBike(W/2-38, 36, .55, LH.t*4);
+    ctx.textAlign="left";
+    chunky(ctx, "x"+LH.bike, W/2-12, 34, 20, "#9be5ff", "#4a2408", 700);
+  }
 
   for (const s of LH.toasts){
     ctx.globalAlpha=Math.max(0, s.life);
