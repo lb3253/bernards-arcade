@@ -79,12 +79,31 @@
                     <span class="sub">Goggles on. Rescue Nick and Giulia from the mothership.</span>
                   </span>
                 </button>
+                <button class="pick cab" id="pickBallies" type="button">
+                  <span class="badge">YARD</span><span class="best" id="bestBallies"></span>
+                  <span class="ribbon" aria-hidden="true">NEW HIGH SCORE!</span>
+                  <span class="thumb"></span>
+                  <span class="cab-bezel"></span>
+                  <span class="cap">
+                    <span class="nm">Ballies with Bernard</span>
+                    <span class="sub">Scoop his balls, get clear, throw them back to Giulia.</span>
+                  </span>
+                </button>
+                <button class="pick cab" id="pickMemo" type="button">
+                  <span class="badge">PAD</span><span class="best" id="bestMemo"></span>
+                  <span class="ribbon" aria-hidden="true">NEW HIGH SCORE!</span>
+                  <span class="thumb"></span>
+                  <span class="cab-bezel"></span>
+                  <span class="cap">
+                    <span class="nm">Bernard Says</span>
+                    <span class="sub">He lights up the SNES pad. Press it back, one more each round.</span>
+                  </span>
+                </button>
               </div>
             </div>
             <div class="car-dots" id="carDots" role="tablist" aria-label="Games"></div>
           </div>
           <div class="parked-wrap" hidden>
-            <button class="pick parked" id="pickBallies" tabindex="-1" aria-hidden="true"><span class="best" id="bestBallies"></span><span class="thumb"></span></button>
             <button class="pick parked" id="pickTita" tabindex="-1" aria-hidden="true"><span class="best" id="bestTita"></span><span class="thumb"></span></button>
             <button class="pick parked" id="pickPaddle" tabindex="-1" aria-hidden="true"><span class="best" id="bestPaddle"></span><span class="thumb"></span></button>
           </div>
@@ -118,6 +137,20 @@
             </div>
             <button class="play" id="hopStartBtn">Hop along</button>
             <div class="hint">D-pad hops &middot; A / B rides Bernard &middot; bones and balls are extra points</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay" id="memomenu">
+        <div class="shot" role="img" aria-label="Bernard beside a big SNES controller"></div>
+        <div class="scrim"></div>
+        <button class="backBtn" id="memoBack">&larr; Games</button>
+        <div class="panel">
+          <div class="menubar">
+            <div class="kicker">Simon, but the dog is in charge</div>
+            <div class="tagline">Bernard lights up buttons on the SNES pad. Press the same ones back on your controller. Each round adds one more, and he gets quicker.</div>
+            <button class="play" id="memoStartBtn">Play</button>
+            <div class="hint">D-pad and A, B, X, Y on the pad &middot; arrows and the A, B, X, Y keys on a keyboard &middot; or tap the buttons on the screen. One wrong press and the round is over.</div>
           </div>
         </div>
       </div>
@@ -161,6 +194,7 @@
             <button class="who chosen" id="pauseResume">Resume</button>
             <button class="who" id="pauseSound">Sound: on</button>
             <button class="who" id="pauseQuit">Quit to Arcade</button>
+            <div class="pausehint">START resumes &middot; SELECT quits to the arcade</div>
           </div>
         </div>
       </div>
@@ -227,9 +261,20 @@
         <div class="panel">
           <div class="menubar">
             <div class="kicker">He has never once given it back</div>
-            <div class="tagline">Scoop up his balls, get clear, throw them back. Bank <b id="goalNum">600</b> to beat him.</div>
+            <div class="tagline">Scoop up his balls, get clear, throw them back to Giulia. Bank <b id="goalNum">600</b> to beat him.</div>
             <button class="play" id="startBtn">Play</button>
-            <div class="hint">He only has to catch you once. And <span class="warn">watch out for Laura</span> &mdash; get too close to the house and she'll come out swinging the broom.</div>
+            <div class="hint">D-pad runs &middot; hold A or B to wind up, let go in the green to throw &middot; <span class="warn">watch out for Laura</span> by the house.</div>
+            <div class="strategy" aria-label="Strategy">
+              <div class="strategy-h">Strategy</div>
+              <ul>
+                <li><b>Fill your arms.</b> Three balls thrown together pay +40, and a PERFECT release doubles every ball.</li>
+                <li><b>Chase gold.</b> A gold ball is 75, a green 30, a red only 10. Sprint for the glowing one.</li>
+                <li><b>Get clear first.</b> He steals from your arms up close. Wait for the ring to turn green, then wind up.</li>
+                <li><b>Throw from far out.</b> Bank from beyond the fire pit for a long-ball bonus on every ball.</li>
+                <li><b>Grab the bone.</b> He drops everything to chew it &mdash; that's your free volley.</li>
+                <li><b>Save one for last call.</b> The final 15 seconds bank double.</li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>

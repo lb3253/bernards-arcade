@@ -99,6 +99,15 @@
   .hint{font-size:11.5px;font-weight:500;color:#c2dcc0;line-height:1.45;max-width:460px;
     text-shadow:0 2px 8px rgba(0,0,0,.95)}
   .hint .warn{color:#ffb0d2;font-weight:600}
+  .strategy{width:min(560px,100%);margin-top:4px;padding:8px 12px 9px;border-radius:12px;
+    background:rgba(6,16,10,.62);border:1px solid rgba(255,207,58,.22);box-shadow:0 6px 18px rgba(0,0,0,.4)}
+  .strategy-h{font-size:10px;font-weight:700;letter-spacing:.28em;text-indent:.28em;color:#ffe07a;
+    text-align:center;margin-bottom:5px}
+  .strategy ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:3px 14px}
+  .strategy li{font-size:10.5px;line-height:1.35;color:#d9ead6;padding-left:12px;position:relative}
+  .strategy li::before{content:"\25CF";position:absolute;left:0;top:0;color:#c9f24d;font-size:8px;line-height:1.7}
+  .strategy li b{color:#fff6c9;font-weight:700}
+  @media (max-width:620px){ .strategy ul{grid-template-columns:1fr} .strategy li:nth-child(n+4){display:none} }
 
   /* results screen still needs its words, so it keeps a proper card */
   .card{max-width:520px;margin:0 auto}
@@ -197,6 +206,7 @@
     box-shadow:0 10px 30px rgba(0,0,0,.55)}
   .pausecard h2{margin:0 0 4px;color:#ffe07a;font-size:28px;-webkit-text-stroke:3px #56230d;paint-order:stroke fill}
   .pausecard .who{min-width:180px;text-align:center}
+  .pausehint{font-size:11px;color:#bcd7bb;letter-spacing:.04em;text-shadow:0 2px 6px rgba(0,0,0,.9)}
   #pauseQuit.who{border-color:rgba(255,120,120,.5)}
   #pauseBtn{position:absolute;right:12px;top:12px;z-index:5;display:none;
     width:38px;height:38px;border-radius:50%;border:2px solid rgba(255,255,255,.35);
@@ -515,6 +525,10 @@ body:not([data-screen="home"]) .chase{ display:none }
 #pickFlap .thumb{background-image:url("/art/card-flap.jpg") !important;background-position:center 35% !important}
 #pickAir .thumb{background-image:url("/art/card-air.jpg") !important;background-position:center 42% !important}
 #pickHop .thumb{background-image:url("/art/card-hop.jpg") !important;background-position:center 40% !important}
+#pickBallies .thumb{background-image:var(--ph-ballies,var(--ph-bernard)) !important;background-position:center 58% !important}
+#pickMemo .thumb{background-image:var(--ph-memo,var(--ph-bernard)) !important;background-position:center 60% !important}
+#memomenu .shot{background-image:var(--ph-memo,var(--ph-bernard));background-size:cover;background-position:center 40%}
+#memomenu .scrim{background:linear-gradient(180deg, rgba(20,10,40,.1) 0%, rgba(20,10,40,.35) 50%, rgba(12,6,24,.95) 100%)}
 #airmenu .shot{background-image:url("/art/card-air.jpg");background-size:cover;background-position:center;transition:opacity .18s ease}
 #airmenu.jet .shot{background-image:url("/art/card-air-jet.jpg")}
 #flapmenu .shot{background-image:url("/art/card-flap.jpg")}
