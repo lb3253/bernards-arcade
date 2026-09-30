@@ -1292,6 +1292,7 @@ function startCharge(){
   }
   G.charging=true; G.power=0;
   G.player.face=Math.atan2(G.npc.y-G.player.y, G.npc.x-G.player.x);
+  if (G.dog) G.dog.bark={text:["Throw it!","Yes!","Ooh!"][Math.floor(rand(0,3))],life:1.1};
 }
 function releaseCharge(){ if (!G||!G.charging) return; G.charging=false; throwVolley(G.power); }
 
@@ -1346,6 +1347,8 @@ function throwVolley(power){
   sfx.throw();
   G.player.follow=1;
   G.player.face=Math.atan2(n.y-G.player.y, n.x-G.player.x);
+  G.dog.bark={text:["I got it!","Mine!","Woof!"][Math.floor(rand(0,3))],life:1.2};
+  G.dog.delay=Math.min(G.dog.delay||0, 0.05);
   const d=Math.abs(power-SWEET);
   let mult, label, col;
   if (d<=SWEET_W){ mult=2; label="PERFECT"; col="#ffe07a"; sfx.perfect(); }
@@ -1651,7 +1654,10 @@ function update(dt){
 
   // ---- Bernard
   const d=G.dog;
-  d.wag+=dt*(6+G.banked*.15);
+  d.chat=Math.max(0,(d.chat||0)-dt);
+  const nearP=dist(d,p);
+  const excited=nearP<200 || !!d.hasBall || (d.bark&&d.bark.life>0);
+  d.wag+=dt*(excited?16:9);
   if (d.bark){ d.bark.life-=dt; if (d.bark.life<=0) d.bark=null; }
   d.delay=Math.max(0,d.delay-dt);
   d.carryT=Math.max(0,d.carryT-dt);
@@ -1672,6 +1678,10 @@ function update(dt){
     speed=236;
   } else if (G.carry.length && dist(d,p)<300){
     target={x:p.x,y:p.y}; speed*=.86;                    // he comes for your armful
+    if (d.chat<=0 && nearP<240){
+      d.bark={text:["Mine!","Gimme!","Hey!"][Math.floor(rand(0,3))],life:1.1};
+      d.chat=2.6;
+    }
   } else {
     let best=null,bd=1e9;
     for (const b of G.balls){
@@ -1681,8 +1691,18 @@ function update(dt){
       const dd=Math.hypot(tx-d.x,ty-d.y);
       if (dd<bd){ bd=dd; best={x:tx,y:ty}; }
     }
-    target = best || {x:p.x,y:p.y};
-    if (!best) speed*=.8;
+    if (!G.carry.length && nearP<240 && (!best || bd>170)){
+      const ang=G.t*1.8;
+      target={ x:p.x+Math.cos(ang)*74, y:p.y+Math.sin(ang*1.25)*50 };
+      speed=168;
+      if (d.chat<=0){
+        d.bark={text:["Play!","Throw one!","C'mon!","Hey!"][Math.floor(rand(0,4))],life:1.25};
+        d.chat=3.2;
+      }
+    } else {
+      target = best || {x:p.x,y:p.y};
+      if (!best) speed*=.8;
+    }
   }
   if (target && d.delay<=0){
     const ax=target.x-d.x, ay=target.y-d.y, L=Math.hypot(ax,ay);
@@ -1691,6 +1711,7 @@ function update(dt){
     d.x=clamp(d.x,FIELD.x0+d.r,FIELD.x1-d.r);
     d.y=clamp(d.y,FIELD.y0+d.r,FIELD.y1-d.r);
     pushOut(d);
+    if (nearP<140 && !d.hasBall && !G.carry.length) d.face=Math.atan2(p.y-d.y, p.x-d.x);
   }
   if (!d.hasBall && d.delay<=0 && d.chew<=0){
     if (G.carry.length && dist(d,p)<d.r+p.r+4) dogRobsPlayer();
@@ -2131,23 +2152,16 @@ function drawYardKid(h,name,shirtL,shirtD,capL,capD){
   const girl=name.indexOf("Giulia")>=0 || name.indexOf("giulia")>=0;
   const legs=girl
     ? [
-        {x:0.08,y:0.70,w:0.34,h:0.28, ax:0.55, ay:0.05, swing:0.55},
-        {x:0.50,y:0.72,w:0.36,h:0.26, ax:0.45, ay:0.05, swing:-0.55},
-        {x:0.02,y:0.48,w:0.18,h:0.18, ax:0.8, ay:0.2, swing:-0.35},
-        {x:0.78,y:0.46,w:0.18,h:0.16, ax:0.2, ay:0.25, swing:0.35}
+        {x:0.10,y:0.76,w:0.30,h:0.22, ax:0.5, ay:0.08, swing:0.4},
+        {x:0.52,y:0.76,w:0.32,h:0.22, ax:0.5, ay:0.08, swing:-0.4}
       ]
     : [
-        {x:0.18,y:0.66,w:0.24,h:0.32, ax:0.5, ay:0.06, swing:0.5},
-        {x:0.56,y:0.64,w:0.26,h:0.30, ax:0.45, ay:0.06, swing:-0.5},
-        {x:0.08,y:0.32,w:0.20,h:0.18, ax:0.75, ay:0.2, swing:-0.4},
-        {x:0.74,y:0.34,w:0.20,h:0.16, ax:0.2, ay:0.25, swing:0.4}
+        {x:0.18,y:0.76,w:0.22,h:0.22, ax:0.5, ay:0.06, swing:0.4},
+        {x:0.58,y:0.74,w:0.24,h:0.24, ax:0.5, ay:0.06, swing:-0.4}
       ];
-  const armPart=girl
-    ? {x:0.74,y:0.42,w:0.24,h:0.22, ax:0.12, ay:0.18}
-    : {x:0.70,y:0.30,w:0.26,h:0.26, ax:0.12, ay:0.16};
   yardAnim(name, h.x, h.y+26-hh/2-bob, ww, hh, Math.cos(h.face)<-.01, {
     walking:walk, phase:h.step, legs:walk?legs:null,
-    arm: pose?pose.arm:0, lean: pose?pose.lean:0, armPart
+    arm: 0, lean: pose ? pose.lean + pose.arm*0.32 : 0, armPart: null
   });
 }
 
@@ -2177,8 +2191,11 @@ function drawDog(d,tnow){
     const flip=Math.cos(d.face)>.01;          // the painting faces left
     const im=SPR.hopBernard, hh=90, ww=hh*(im.naturalWidth/im.naturalHeight);
     const walking=(d.moving||0)>0;
+    const excited=(d.hasBall || (d.bark&&d.bark.life>0) || (G&&G.player&&dist(d,G.player)<200));
     const bob=walking ? Math.sin(d.phase)*2.2 : 0;
-    const cy=d.y+20-hh/2+bob;
+    const bounce=excited ? Math.abs(Math.sin(d.wag))*6 : Math.abs(Math.sin(d.wag))*1.5;
+    const cy=d.y+20-hh/2+bob-bounce;
+    const amp=excited ? 1.25 : 0.9;
     yardAnim("hopBernard", d.x, cy, ww, hh, flip, {
       walking: walking,
       phase: d.phase,
@@ -2187,7 +2204,7 @@ function drawDog(d,tnow){
         {x:0.06,y:0.73,w:0.30,h:0.25, ax:0.55, ay:0.08, swing:0.5},
         {x:0.50,y:0.72,w:0.34,h:0.22, ax:0.35, ay:0.08, swing:-0.45}
       ],
-      tail: {x:0.80,y:0.58,w:0.20,h:0.16, ax:0, ay:0.5, rot: Math.sin(d.wag)*0.45},
+      tail: {x:0.74,y:0.52,w:0.26,h:0.24, ax:0, ay:0.55, rot: Math.sin(d.wag)*amp},
       ball: d.hasBall ? {kind:d.hasBall, x:0.12, y:0.48, r:9} : null
     });
     if (d.bark) bubble(d.x,d.y-84,d.bark,"#fff","#1e2a18");
