@@ -147,7 +147,7 @@ const PIT = { x:656, y:436, r:34 };
 const CHAIRS = [];
 for (let i=0;i<6;i++){
   const a = -Math.PI/2 + i*(Math.PI*2/6) + .4;
-  CHAIRS.push({ x:PIT.x+Math.cos(a)*108, y:PIT.y+Math.sin(a)*86, r:21, a:a+Math.PI/2 });
+  CHAIRS.push({ x:PIT.x+Math.cos(a)*108, y:PIT.y+Math.sin(a)*86, r:34, a:a+Math.PI/2 });
 }
 const TREES = [ {x:250,y:266,s:1.1}, {x:640,y:258,s:1.25} ];
 const OBSTACLES = [
@@ -1791,7 +1791,7 @@ function bush(c,x,y,s){
   }
 }
 function chairArt(c,ch){
-  c.save(); c.translate(ch.x,ch.y);
+  c.save(); c.translate(ch.x,ch.y); c.scale(1.75,1.75);
   softShadow(c,10,10,24,13,.34);
   c.rotate(ch.a);
   const back=c.createLinearGradient(0,-24,0,6);
@@ -2066,6 +2066,14 @@ function yardAnim(name, x, yCenter, w, h, flip, o){
       g.restore();
     });
   }
+  if (o.keepTop){
+    g.save();
+    g.beginPath();
+    g.rect(pad-8, pad-8, w+16, o.keepTop*h+4);
+    g.clip();
+    g.drawImage(im, pad, pad, w, h);
+    g.restore();
+  }
   if (o.armPart && Math.abs(arm)>0.04){
     const leg=o.armPart;
     const dx=pad+leg.x*w, dy=pad+leg.y*h, dw=leg.w*w, dh=leg.h*h;
@@ -2128,17 +2136,32 @@ function drawYardKid(h,name,shirtL,shirtD,capL,capD){
   if (!sprReady(name)){ drawHuman(h,shirtL,shirtD,"#e0a877",capL,capD); return; }
   const pose=throwPose(h);
   const walk=!pose && (h.moving||0)>0;
-  const bob=walk ? Math.abs(Math.sin(h.step))*3 : 0;
-  const lean=pose ? Math.max(-0.16, Math.min(0.2, pose.lean*0.22)) : (walk ? Math.sin(h.step)*0.035 : 0);
+  const bob=walk ? Math.abs(Math.sin(h.step))*4 : 0;
   const im=SPR[name];
-  const hh=132, ww=hh*(im.naturalWidth/im.naturalHeight);
+  const girl=name.indexOf("Giulia")>=0 || name.indexOf("giulia")>=0;
+  const hh=112, ww=hh*(im.naturalWidth/im.naturalHeight);
   const footY=h.y+18;
-  ctx.save();
-  ctx.imageSmoothingEnabled=true;
-  ctx.imageSmoothingQuality="high";
-  softShadow(ctx, h.x+6, footY+2, ww*0.42, 9, .28);
-  drawSprC(name, h.x, footY-hh/2-bob, ww, hh, lean, Math.cos(h.face)<-.01);
-  ctx.restore();
+  const legs=girl
+    ? [
+        {x:0.14,y:0.72,w:0.26,h:0.26, ax:0.55, ay:0.04, swing:0.7},
+        {x:0.48,y:0.72,w:0.22,h:0.26, ax:0.45, ay:0.04, swing:-0.7}
+      ]
+    : [
+        {x:0.04,y:0.70,w:0.32,h:0.28, ax:0.62, ay:0.04, swing:0.72},
+        {x:0.54,y:0.68,w:0.30,h:0.28, ax:0.40, ay:0.04, swing:-0.72}
+      ];
+  const armPart=girl
+    ? {x:0.04,y:0.42,w:0.24,h:0.24, ax:1, ay:0}
+    : {x:0.00,y:0.34,w:0.24,h:0.24, ax:1, ay:0};
+  const rawArm=pose ? pose.arm : (walk ? -Math.sin(h.step)*0.55 : 0);
+  const arm=Math.max(-1.05, Math.min(1.15, rawArm));
+  softShadow(ctx, h.x+6, footY+2, ww*0.38, 8, .28);
+  yardAnim(name, h.x, footY-hh/2-bob, ww, hh, Math.cos(h.face)<-.01, {
+    walking:walk, phase:h.step, legs:walk?legs:null,
+    arm:arm, armPart:(Math.abs(arm)>0.04?armPart:null),
+    lean: pose ? pose.lean*0.28 : (walk ? Math.sin(h.step)*0.04 : 0),
+    keepTop: girl ? 0.36 : 0.32
+  });
 }
 
 // fringe strokes that read as long fur along an edge
@@ -2165,15 +2188,21 @@ function drawDog(d,tnow){
   softShadow(ctx,d.x+11,d.y+20,29,11,.4);
   if (sprReady("hopBernard")){
     const flip=Math.cos(d.face)>.01;          // the painting faces left
-    const im=SPR.hopBernard, hh=90, ww=hh*(im.naturalWidth/im.naturalHeight);
+    const im=SPR.hopBernard, hh=104, ww=hh*(im.naturalWidth/im.naturalHeight);
     const walking=(d.moving||0)>0;
     const excited=(d.hasBall || (d.bark&&d.bark.life>0) || (G&&G.player&&dist(d,G.player)<200));
     const bob=walking ? Math.sin(d.phase)*2.2 : 0;
-    const bounce=excited ? Math.abs(Math.sin(d.wag))*6 : Math.abs(Math.sin(d.wag))*1.5;
-    const cy=d.y+20-hh/2+bob-bounce;
-    const amp=excited ? 1.25 : 0.9;
+    const bounce=excited ? Math.abs(Math.sin(d.wag))*5 : Math.abs(Math.sin(d.wag))*1.2;
+    const cy=d.y+18-hh/2+bob-bounce;
+    const amp=excited ? 1.15 : 0.8;
     yardAnim("hopBernard", d.x, cy, ww, hh, flip, {
-      walking: false,
+      walking: walking,
+      phase: d.phase,
+      legs: walking ? [
+        {x:0.08,y:0.74,w:0.28,h:0.24, ax:0.55, ay:0.06, swing:0.55},
+        {x:0.52,y:0.74,w:0.30,h:0.22, ax:0.35, ay:0.06, swing:-0.5}
+      ] : null,
+      keepTop: 0.62,
       tail: {x:0.78,y:0.54,w:0.22,h:0.20, ax:0, ay:0.5, rot: Math.sin(d.wag)*amp},
       ball: d.hasBall ? {kind:d.hasBall, x:0.08, y:0.50, r:8} : null
     });
