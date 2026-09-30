@@ -1038,7 +1038,13 @@ function pollGamepad(){
   if (pressed!==GP.lastBtn){ GP.lastBtn=pressed; gpChip(); }
 
   const screen=gpScreen();
-  if (screen!==GP.lastScreen){ GP.lastScreen=screen; GP.focus = (screen==="home") ? CAR.index : 0; gpApplyFocus(); }
+  if (screen!==GP.lastScreen){
+    GP.lastScreen=screen;
+    if (screen==="home") GP.focus=CAR.index;
+    else if (screen==="hopmenu") GP.focus = (typeof H_CHAR!=="undefined" && H_CHAR==="nic") ? 1 : 0;
+    else GP.focus=0;
+    gpApplyFocus();
+  }
 
   // ================================================ menus
   if (screen!=="play"){
@@ -1065,6 +1071,25 @@ function pollGamepad(){
       }
       if (!(right||left||up||down)) GP.holdDir=0;
       if (eC||eS) carouselLaunch();
+      if (eB) uiBack();
+      gpEdge("face",face);
+      gpEdge("pausePlay",startB);
+      gpEdge("selPlay",selB);
+      return;
+    }
+
+    if (screen==="hopmenu"){
+      // Left is always Giulia, right is always Nick. A pad that also sends
+      // an arrow key used to skip Nick in one press.
+      UI_FOCUS=true;
+      if (eL||eSL){ setHopChar("giulia"); GP.focus=0; }
+      else if (eR||eSR){ setHopChar("nic"); GP.focus=1; }
+      else if (eD){ GP.focus=2; }
+      else if (eU){ GP.focus=3; }
+      if (eL||eR||eU||eD||eSL||eSR) gpApplyFocus();
+      const hopId=(uiList()||[])[GP.focus];
+      if ((eC||eS) && hopId==="hopBack") goHome();
+      else if (eC||eS) startHop();
       if (eB) uiBack();
       gpEdge("face",face);
       gpEdge("pausePlay",startB);
@@ -1134,6 +1159,13 @@ addEventListener("keydown",e=>{
   if (gpScreen()!=="play"){
     const c=code;
     const home=gpScreen()==="home";
+    if (gpScreen()==="hopmenu" && (c==="ArrowLeft"||c==="KeyA"||c==="ArrowRight"||c==="KeyD")){
+      setHopChar((c==="ArrowLeft"||c==="KeyA") ? "giulia" : "nic");
+      GP.focus = H_CHAR==="nic" ? 1 : 0;
+      UI_FOCUS=true;
+      gpApplyFocus();
+      e.preventDefault(); return;
+    }
     if (c==="ArrowRight"||c==="ArrowDown"||c==="KeyD"||c==="KeyS"){
       if (home){ if (!e.repeat){ carouselNudge(1); CAR.keyDir=1; CAR.keyT=0; } }
       else uiNav(1);
@@ -1517,7 +1549,9 @@ function update(dt){
     if (L>0){
       p.x+=dx/L*spd*dt; p.y+=dy/L*spd*dt;
       p.face=Math.atan2(dy,dx); p.step+=dt*(p.slow>0?5:11);
-    } else p.step+=dt*2.4;
+      p.moving=0.12;
+    }
+    p.moving=Math.max(0,(p.moving||0)-dt);
     p.x=clamp(p.x,FIELD.x0+p.r,FIELD.x1-p.r);
     p.y=clamp(p.y,FIELD.y0+p.r,FIELD.y1-p.r);
     pushOut(p);
@@ -1600,8 +1634,8 @@ function update(dt){
   n.windup=Math.max(0,n.windup-dt);
   {
     const ax=n.hx-n.x, ay=n.hy-n.y, L=Math.hypot(ax,ay);
-    if (L>4){ n.x+=ax/L*NPC_SPEED*dt; n.y+=ay/L*NPC_SPEED*dt; n.step+=dt*10; n.face=Math.atan2(ay,ax); }
-    else n.step+=dt*1.8;
+    if (L>4){ n.x+=ax/L*NPC_SPEED*dt; n.y+=ay/L*NPC_SPEED*dt; n.step+=dt*10; n.face=Math.atan2(ay,ax); n.moving=0.12; }
+    n.moving=Math.max(0,(n.moving||0)-dt);
   }
 
   // ---- Bernard
@@ -1641,12 +1675,12 @@ function update(dt){
   }
   if (target && d.delay<=0){
     const ax=target.x-d.x, ay=target.y-d.y, L=Math.hypot(ax,ay);
-    if (L>2){ d.x+=ax/L*speed*dt; d.y+=ay/L*speed*dt; d.face=Math.atan2(ay,ax); d.phase+=dt*13; }
-    else d.phase+=dt*2.6;
+    if (L>2){ d.x+=ax/L*speed*dt; d.y+=ay/L*speed*dt; d.face=Math.atan2(ay,ax); d.phase+=dt*13; d.moving=0.12; }
+    d.moving=Math.max(0,(d.moving||0)-dt);
     d.x=clamp(d.x,FIELD.x0+d.r,FIELD.x1-d.r);
     d.y=clamp(d.y,FIELD.y0+d.r,FIELD.y1-d.r);
     pushOut(d);
-  } else d.phase+=dt*2.2;
+  }
   if (!d.hasBall && d.delay<=0 && d.chew<=0){
     if (G.carry.length && dist(d,p)<d.r+p.r+4) dogRobsPlayer();
     else {
@@ -1961,11 +1995,11 @@ function drawHuman(h,shirtL,shirtD,skin,capL,capD){
 // The paintings face the camera. Limbs swing from the joints so they stay attached.
 function drawYardKid(h,name,shirtL,shirtD,capL,capD){
   if (!sprReady(name)){ drawHuman(h,shirtL,shirtD,"#e0a877",capL,capD); return; }
-  const bob=Math.abs(Math.sin(h.step))*3.2 + (h.wave>.05 ? h.wave*8 : 0);
+  const walk=(h.moving||0)>0;
+  const bob=walk ? Math.abs(Math.sin(h.step))*3.2 : 0;
   softShadow(ctx,h.x+2,h.y+24,22,8,.34);
-  const im=SPR[name], hh=86, ww=hh*(im.naturalWidth/im.naturalHeight);
-  const girl=name.indexOf("giulia")>=0 || name.indexOf("Giulia")>=0;
-  hPose(name, h.x, h.y+26-hh/2-bob, ww, hh, Math.cos(h.face)<-.01, 0, hKidParts(girl, h.step*2.2, h.wave));
+  const im=SPR[name], hh=84, ww=hh*(im.naturalWidth/im.naturalHeight);
+  drawSprC(name, h.x, h.y+26-hh/2-bob, ww, hh, walk?Math.sin(h.step)*0.04:0, Math.cos(h.face)<-.01);
 }
 
 // fringe strokes that read as long fur along an edge
@@ -1992,14 +2026,10 @@ function drawDog(d,tnow){
   softShadow(ctx,d.x+11,d.y+20,29,11,.4);
   if (sprReady("hopBernard")){
     const flip=Math.cos(d.face)>.01;          // the painting faces left
-    const im=SPR.hopBernard, hh=92, ww=hh*(im.naturalWidth/im.naturalHeight);
-    const wag=Math.sin(d.wag)*0.85;
-    const step=Math.sin(d.phase);
-    hPose("hopBernard", d.x, d.y+20-hh/2+bob*.5, ww, hh, flip, 0, [
-      {x:0.08,y:0.73,w:0.26,h:0.25, ax:0.5, ay:0.06, rot: step*0.5},
-      {x:0.48,y:0.71,w:0.34,h:0.22, ax:0.4, ay:0.08, rot:-step*0.45},
-      {x:0.00,y:0.00,w:0.42,h:0.46, ax:0.78, ay:0.90, rot: Math.sin(tnow*2.5)*0.1},
-      {x:0.68,y:0.52,w:0.32,h:0.20, ax:0.0, ay:0.55, rot: wag}
+    const im=SPR.hopBernard, hh=88, ww=hh*(im.naturalWidth/im.naturalHeight);
+    const wag=Math.sin(d.wag)*0.55;
+    hPose("hopBernard", d.x, d.y+20-hh/2+bob*.4, ww, hh, flip, 0, [
+      {x:0.78,y:0.54,w:0.22,h:0.16, ax:0.0, ay:0.55, rot: wag}
     ]);
     if (d.hasBall){
       const fx=d.x+(flip?32:-32), fy=d.y-38+bob*.6;
@@ -7670,14 +7700,14 @@ function hDrawBernard(x,y,flip,sx,sy,swim,t){
   if (sprReady(name)){
     const hh=(swim?62:78)*((sy||1));
     const ww=hh*(SPR[name].naturalWidth/Math.max(1,SPR[name].naturalHeight))*(sx||1);
-    const yFeet=y+4+bob;
-    const wag=Math.sin((t||0)*8)*0.9;
-    const step=Math.sin((t||0)*3.4);
+    const yFeet=y+bob;
+    const wag=Math.sin((t||0)*7.2)*0.55;
+    const moving=!!(LH&&LH.dog&&LH.dog.hop);
     drawDrop(x, yFeet+5, Math.max(10, ww*0.28), 6);
     const parts = swim
-      ? [{x:0.00,y:0.42,w:0.22,h:0.32, ax:0.95, ay:0.5, rot: wag}]
-      : hBernardParts(t||0, step, wag);
-    hPose(name, x, yFeet-hh*0.46, ww, hh, flip, 0, parts);
+      ? [{x:0.00,y:0.42,w:0.18,h:0.28, ax:0.95, ay:0.5, rot: wag}]
+      : [{x:0.78,y:0.54,w:0.22,h:0.16, ax:0.0, ay:0.55, rot: wag}];
+    hPose(name, x, yFeet-hh*0.46, ww, hh, flip, moving?Math.sin((t||0)*9)*0.04:0, parts);
     return;
   }
   ctx.save();
@@ -7734,20 +7764,12 @@ function hDrawPaw(x,y,s){
   ctx.restore();
 }
 function hDrawKidArt(x,y,flip,sx,sy,girl,hopU){
-  const t=(LH&&LH.t)||0;
   const hopping = hopU>0.12 && hopU<0.88;
-  const bob=Math.sin(t*3.2)*2 - Math.sin(Math.min(1,hopU||0)*Math.PI)*8;
+  const bob = hopping ? Math.sin(Math.min(1,hopU)*Math.PI)*10 : 0;
+  const hopName = girl ? "hopGiuliaHop" : "hopNicHop";
   const stand = girl ? "hopGiulia" : "hopNic";
-  const name = sprReady(stand) ? stand : (girl ? "hopGiuliaHop" : "hopNicHop");
-  if (sprReady(name)){
-    const hh=(hopping?108:102)*((sy||1));
-    const ww=hh*(SPR[name].naturalWidth/Math.max(1,SPR[name].naturalHeight))*(sx||1);
-    const yFeet=y+4+bob;
-    drawDrop(x, yFeet+5, Math.max(10, ww*0.22), 6);
-    const wave=(hopU||0)*0.8;
-    hPose(name, x, yFeet-hh*0.46, ww, hh, flip, 0, hKidParts(!!girl, t*3.2, wave));
-    return;
-  }
+  const name = (hopping && sprReady(hopName)) ? hopName : stand;
+  if (hBlitActor(name, x, y+bob, hopping?106:100, flip, sx, sy, 0)) return;
   ctx.save();
   ctx.translate(x,y);
   ctx.scale(flip?-1:1, 1);
@@ -8607,8 +8629,6 @@ const memoStartBtn=document.getElementById("memoStartBtn");
 if (memoStartBtn) memoStartBtn.addEventListener("click",startMemo);
 document.getElementById("hopGiulia").addEventListener("click",()=>setHopChar("giulia"));
 document.getElementById("hopNic").addEventListener("click",()=>setHopChar("nic"));
-document.getElementById("hopGiulia").addEventListener("mouseenter",()=>setHopChar("giulia"));
-document.getElementById("hopNic").addEventListener("mouseenter",()=>setHopChar("nic"));
 document.getElementById("airStartBtn").addEventListener("click",startAir);
 document.getElementById("storyNext").addEventListener("click",storyAdvance);
 document.getElementById("airstory").addEventListener("click",e=>{ if (e.target.id==="storyNext"||e.target.closest(".play")) return; storyAdvance(); });
