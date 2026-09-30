@@ -163,8 +163,8 @@ const POOPS = [
 
 // ---------------------------------------------------------------- tuning
 const PLAYER_SPEED = 210, NPC_SPEED = 170, LAURA_SPEED = 150;
-const CHARGE_TIME = 1.5, SWEET = .74, SWEET_W = .11, OK_W = .24;
-const SAFE_DIST = 150;
+const CHARGE_TIME = 1.15, SWEET = .74, SWEET_W = .11, OK_W = .24;
+const SAFE_DIST = 118;
 const CARRY_MAX = 3;
 /* ===== TUNING DIALS =========================================
    Change these numbers if a game feels too easy or too hard.
@@ -1291,6 +1291,7 @@ function startCharge(){
     return;
   }
   G.charging=true; G.power=0;
+  G.player.face=Math.atan2(G.npc.y-G.player.y, G.npc.x-G.player.x);
 }
 function releaseCharge(){ if (!G||!G.charging) return; G.charging=false; throwVolley(G.power); }
 
@@ -1332,7 +1333,9 @@ function npcServe(){
   const b=newBall(n.x,n.y-8,rollKind());
   launch(b,t.x,t.y,1.05,185,"flight",null);
   G.balls.push(b);
-  n.windup=.35; n.wave=1;
+  n.throwT=0.5;
+  n.face=Math.atan2(t.y-n.y, t.x-n.x);
+  n.wave=1;
   sfx.throw();
 }
 // hurl the whole armful back to bank it
@@ -1341,6 +1344,8 @@ function throwVolley(power){
   if (!held.length) return;
   G.carry.length=0;
   sfx.throw();
+  G.player.follow=1;
+  G.player.face=Math.atan2(n.y-G.player.y, n.x-G.player.x);
   const d=Math.abs(power-SWEET);
   let mult, label, col;
   if (d<=SWEET_W){ mult=2; label="PERFECT"; col="#ffe07a"; sfx.perfect(); }
@@ -1531,9 +1536,14 @@ function update(dt){
     G.power+=dt/CHARGE_TIME;
     if (G.power>=1){ G.power=1; G.charging=false; throwVolley(1.4); }
   }
-
-  // ---- player
   const p=G.player;
+  if (G.charging){
+    p.heave=G.power;
+    p.face=Math.atan2(G.npc.y-p.y, G.npc.x-p.x);
+  } else {
+    p.heave=0;
+    p.follow=Math.max(0,(p.follow||0)-dt*2.6);
+  }
   if (!G.charging){
     let dx=0,dy=0;
     if (keys.has("ArrowLeft")||keys.has("KeyA"))  dx-=1;
@@ -1566,7 +1576,7 @@ function update(dt){
   // ---- balls
   G.spawnT-=dt;
   const loose=G.balls.filter(b=>!b.dead && b.mode!=="bank").length;
-  if (G.spawnT<=0 && loose<MAX_LOOSE && G.npc.windup<=0){ npcServe(); G.spawnT=SPAWN_EVERY; }
+  if (G.spawnT<=0 && loose<MAX_LOOSE && G.npc.windup<=0 && !(G.npc.throwT>0)){ npcServe(); G.spawnT=SPAWN_EVERY; }
 
   for (const b of G.balls){
     if (b.dead) continue;
@@ -1632,6 +1642,7 @@ function update(dt){
   const n=G.npc;
   n.wave=Math.max(0,n.wave-dt*1.6);
   n.windup=Math.max(0,n.windup-dt);
+  n.throwT=Math.max(0,(n.throwT||0)-dt);
   {
     const ax=n.hx-n.x, ay=n.hy-n.y, L=Math.hypot(ax,ay);
     if (L>4){ n.x+=ax/L*NPC_SPEED*dt; n.y+=ay/L*NPC_SPEED*dt; n.step+=dt*10; n.face=Math.atan2(ay,ax); n.moving=0.12; }
@@ -2000,11 +2011,13 @@ function yardAnim(name, x, yCenter, w, h, flip, o){
   const walking=!!o.walking && o.legs && o.legs.length;
   const tail=o.tail;
   const ball=o.ball;
-  if (!walking && !(tail && Math.abs(tail.rot)>0.02) && !ball){
+  const arm=o.arm||0;
+  const lean=o.lean||0;
+  if (!walking && !(tail && Math.abs(tail.rot)>0.02) && !ball && Math.abs(arm)<0.04 && Math.abs(lean)<0.02){
     drawSprC(name, x, yCenter, w, h, 0, flip);
     return;
   }
-  const pad=Math.ceil(Math.max(12, (o.lift||8)+6));
+  const pad=Math.ceil(Math.max(w,h)*0.62);
   const oc=yardAnim.c||(yardAnim.c=document.createElement("canvas"));
   const ow=Math.ceil(w)+pad*2, oh=Math.ceil(h)+pad*2;
   if (oc.width!==ow || oc.height!==oh){ oc.width=ow; oc.height=oh; }
@@ -2023,9 +2036,10 @@ function yardAnim(name, x, yCenter, w, h, flip, o){
       const px=dx+dw*ax, py=dy+dh*ay;
       g.save();
       g.globalCompositeOperation="destination-out";
+      g.fillStyle="#000";
       g.beginPath();
-      g.rect(dx, dy+Math.max(3, dh*0.12), dw, dh);
-      g.arc(px, py, 5, 0, Math.PI*2);
+      g.rect(dx, dy+dh*0.16, dw, dh*0.84);
+      g.arc(px, py, 7, 0, Math.PI*2);
       g.fill("evenodd");
       g.restore();
       g.save();
@@ -2034,6 +2048,25 @@ function yardAnim(name, x, yCenter, w, h, flip, o){
       g.drawImage(im, leg.x*im.naturalWidth, ly*im.naturalHeight, leg.w*im.naturalWidth, lh*im.naturalHeight, -dw*ax, -dh*ay, dw, dh);
       g.restore();
     });
+  }
+  if (o.armPart && Math.abs(arm)>0.04){
+    const leg=o.armPart;
+    const dx=pad+leg.x*w, dy=pad+leg.y*h, dw=leg.w*w, dh=leg.h*h;
+    const ax=leg.ax==null?0.2:leg.ax, ay=leg.ay==null?0.15:leg.ay;
+    const px=dx+dw*ax, py=dy+dh*ay;
+    g.save();
+    g.globalCompositeOperation="destination-out";
+    g.fillStyle="#000";
+    g.beginPath();
+    g.rect(dx, dy+dh*0.18, dw, dh*0.82);
+    g.arc(px, py, 6, 0, Math.PI*2);
+    g.fill("evenodd");
+    g.restore();
+    g.save();
+    g.translate(px, py);
+    g.rotate(arm);
+    g.drawImage(im, leg.x*im.naturalWidth, leg.y*im.naturalHeight, leg.w*im.naturalWidth, leg.h*im.naturalHeight, -dw*ax, -dh*ay, dw, dh);
+    g.restore();
   }
   if (tail && Math.abs(tail.rot)>0.02){
     const dx=pad+tail.x*w, dy=pad+tail.y*h, dw=tail.w*w, dh=tail.h*h;
@@ -2064,21 +2097,35 @@ function yardAnim(name, x, yCenter, w, h, flip, o){
     g.globalCompositeOperation="destination-out";
     g.fillStyle="#000";
     g.beginPath();
-    g.ellipse(bx+r*0.15, by, r*0.72, r*0.42, 0, 0, Math.PI*2);
+    g.ellipse(bx+r*0.05, by, Math.max(3, r*0.38), Math.max(2, r*0.26), 0, 0, Math.PI*2);
     g.fill();
     g.restore();
   }
   ctx.save();
   ctx.translate(x, yCenter);
   if (flip) ctx.scale(-1,1);
-  if (walking) ctx.rotate(Math.sin(o.phase||0)*0.04);
+  if (lean) ctx.rotate(lean);
+  else if (walking) ctx.rotate(Math.sin(o.phase||0)*0.04);
   ctx.drawImage(oc, -w/2-pad, -h/2-pad);
   ctx.restore();
 }
+function throwPose(h){
+  const heave=h.heave||0, follow=h.follow||0, t=h.throwT||0;
+  if (heave>0.02) return { arm:-1.25*heave, lean:-0.22*heave };
+  if (follow>0.02) return { arm:1.5*follow, lean:0.34*follow };
+  if (t>0.02){
+    const u=1-t/0.5;
+    if (u<0.42){ const k=u/0.42; return { arm:-1.2*k, lean:-0.2*k }; }
+    const f=Math.sin(Math.min(1,(u-0.42)/0.58)*Math.PI);
+    return { arm:1.55*f, lean:0.36*f };
+  }
+  return null;
+}
 function drawYardKid(h,name,shirtL,shirtD,capL,capD){
   if (!sprReady(name)){ drawHuman(h,shirtL,shirtD,"#e0a877",capL,capD); return; }
-  const walk=(h.moving||0)>0;
-  const bob=walk ? Math.abs(Math.sin(h.step))*3 : 0;
+  const pose=throwPose(h);
+  const walk=!pose && (h.moving||0)>0;
+  const bob=walk ? Math.abs(Math.sin(h.step))*3 : (pose ? Math.abs(pose.lean)*6 : 0);
   softShadow(ctx,h.x+2,h.y+24,22,8,.34);
   const im=SPR[name], hh=86, ww=hh*(im.naturalWidth/im.naturalHeight);
   const girl=name.indexOf("Giulia")>=0 || name.indexOf("giulia")>=0;
@@ -2086,17 +2133,21 @@ function drawYardKid(h,name,shirtL,shirtD,capL,capD){
     ? [
         {x:0.08,y:0.70,w:0.34,h:0.28, ax:0.55, ay:0.05, swing:0.55},
         {x:0.50,y:0.72,w:0.36,h:0.26, ax:0.45, ay:0.05, swing:-0.55},
-        {x:0.00,y:0.46,w:0.20,h:0.20, ax:0.85, ay:0.2, swing:-0.4},
-        {x:0.76,y:0.44,w:0.22,h:0.16, ax:0.15, ay:0.3, swing:0.4}
+        {x:0.02,y:0.48,w:0.18,h:0.18, ax:0.8, ay:0.2, swing:-0.35},
+        {x:0.78,y:0.46,w:0.18,h:0.16, ax:0.2, ay:0.25, swing:0.35}
       ]
     : [
-        {x:0.16,y:0.64,w:0.26,h:0.34, ax:0.5, ay:0.06, swing:0.55},
-        {x:0.55,y:0.62,w:0.28,h:0.32, ax:0.45, ay:0.06, swing:-0.55},
-        {x:0.06,y:0.30,w:0.24,h:0.22, ax:0.8, ay:0.2, swing:-0.45},
-        {x:0.72,y:0.32,w:0.24,h:0.18, ax:0.15, ay:0.3, swing:0.45}
+        {x:0.18,y:0.66,w:0.24,h:0.32, ax:0.5, ay:0.06, swing:0.5},
+        {x:0.56,y:0.64,w:0.26,h:0.30, ax:0.45, ay:0.06, swing:-0.5},
+        {x:0.08,y:0.32,w:0.20,h:0.18, ax:0.75, ay:0.2, swing:-0.4},
+        {x:0.74,y:0.34,w:0.20,h:0.16, ax:0.2, ay:0.25, swing:0.4}
       ];
+  const armPart=girl
+    ? {x:0.74,y:0.42,w:0.24,h:0.22, ax:0.12, ay:0.18}
+    : {x:0.70,y:0.30,w:0.26,h:0.26, ax:0.12, ay:0.16};
   yardAnim(name, h.x, h.y+26-hh/2-bob, ww, hh, Math.cos(h.face)<-.01, {
-    walking:walk, phase:h.step, legs:legs
+    walking:walk, phase:h.step, legs:walk?legs:null,
+    arm: pose?pose.arm:0, lean: pose?pose.lean:0, armPart
   });
 }
 
