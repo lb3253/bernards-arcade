@@ -1991,15 +1991,90 @@ function drawHuman(h,shirtL,shirtD,skin,capL,capD){
   ctx.restore();
 }
 
-// Nick and Giulia from the Lane Hoppers paintings, feet planted at y+26.
-// The paintings face the camera. Limbs swing from the joints so they stay attached.
+// Painted characters. Legs are the real painted legs, shifted up from the hip
+// only while walking, so standing still stays a clean picture.
+function yardAnim(name, x, yCenter, w, h, flip, o){
+  const im=SPR[name];
+  if (!im) return;
+  o=o||{};
+  const walking=!!o.walking && o.legs && o.legs.length;
+  const tail=o.tail;
+  const ball=o.ball;
+  if (!walking && !(tail && Math.abs(tail.rot)>0.02) && !ball){
+    drawSprC(name, x, yCenter, w, h, 0, flip);
+    return;
+  }
+  const pad=Math.ceil(Math.max(12, (o.lift||8)+6));
+  const oc=yardAnim.c||(yardAnim.c=document.createElement("canvas"));
+  const ow=Math.ceil(w)+pad*2, oh=Math.ceil(h)+pad*2;
+  if (oc.width!==ow || oc.height!==oh){ oc.width=ow; oc.height=oh; }
+  const g=oc.getContext("2d");
+  g.clearRect(0,0,ow,oh);
+  g.drawImage(im, pad, pad, w, h);
+  if (walking){
+    const s=Math.sin(o.phase||0);
+    const liftMax=o.lift||8;
+    o.legs.forEach((leg,i)=>{
+      const lift=Math.max(0, (i%2?-s:s))*liftMax;
+      if (lift<0.4) return;
+      const dx=pad+leg.x*w, dy=pad+leg.top*h, dw=leg.w*w, dh=(1-leg.top)*h+2;
+      g.save();
+      g.globalCompositeOperation="destination-out";
+      g.fillRect(dx, dy+3, dw, dh);
+      g.restore();
+      g.save();
+      g.beginPath();
+      g.rect(dx-1, dy-lift, dw+2, dh+lift+6);
+      g.clip();
+      g.drawImage(im, pad, pad-lift, w, h);
+      g.restore();
+    });
+  }
+  if (tail && Math.abs(tail.rot)>0.02){
+    const dx=pad+tail.x*w, dy=pad+tail.y*h, dw=tail.w*w, dh=tail.h*h;
+    const ax=tail.ax||0, ay=tail.ay==null?0.5:tail.ay;
+    const px=dx+dw*ax, py=dy+dh*ay;
+    g.save();
+    g.globalCompositeOperation="destination-out";
+    g.fillRect(dx+dw*0.18, dy, dw, dh);
+    g.restore();
+    g.save();
+    g.translate(px, py);
+    g.rotate(tail.rot);
+    g.drawImage(im, tail.x*im.naturalWidth, tail.y*im.naturalHeight, tail.w*im.naturalWidth, tail.h*im.naturalHeight, -dw*ax, -dh*ay, dw, dh);
+    g.restore();
+  }
+  if (ball && BALL_SPR[ball.kind]){
+    const r=ball.r||10;
+    const bx=pad+ball.x*w, by=pad+ball.y*h;
+    g.drawImage(BALL_SPR[ball.kind], bx-r, by-r, r*2, r*2);
+    g.save();
+    g.beginPath();
+    // cover the half of the ball that sits inside the muzzle
+    g.rect(bx, by-r, r+0.16*w, r*2);
+    g.clip();
+    g.drawImage(im, pad, pad, w, h);
+    g.restore();
+  }
+  ctx.save();
+  ctx.translate(x, yCenter);
+  if (flip) ctx.scale(-1,1);
+  ctx.drawImage(oc, -w/2-pad, -h/2-pad);
+  ctx.restore();
+}
 function drawYardKid(h,name,shirtL,shirtD,capL,capD){
   if (!sprReady(name)){ drawHuman(h,shirtL,shirtD,"#e0a877",capL,capD); return; }
   const walk=(h.moving||0)>0;
-  const bob=walk ? Math.abs(Math.sin(h.step))*3.2 : 0;
+  const bob=walk ? Math.abs(Math.sin(h.step))*3 : 0;
   softShadow(ctx,h.x+2,h.y+24,22,8,.34);
-  const im=SPR[name], hh=84, ww=hh*(im.naturalWidth/im.naturalHeight);
-  drawSprC(name, h.x, h.y+26-hh/2-bob, ww, hh, walk?Math.sin(h.step)*0.04:0, Math.cos(h.face)<-.01);
+  const im=SPR[name], hh=86, ww=hh*(im.naturalWidth/im.naturalHeight);
+  const girl=name.indexOf("Giulia")>=0 || name.indexOf("giulia")>=0;
+  const legs=girl
+    ? [{x:0.06,w:0.38,top:0.70},{x:0.48,w:0.40,top:0.70}]
+    : [{x:0.14,w:0.32,top:0.63},{x:0.54,w:0.34,top:0.63}];
+  yardAnim(name, h.x, h.y+26-hh/2-bob, ww, hh, Math.cos(h.face)<-.01, {
+    walking:walk, phase:h.step, lift:10, legs:legs
+  });
 }
 
 // fringe strokes that read as long fur along an edge
@@ -2026,16 +2101,18 @@ function drawDog(d,tnow){
   softShadow(ctx,d.x+11,d.y+20,29,11,.4);
   if (sprReady("hopBernard")){
     const flip=Math.cos(d.face)>.01;          // the painting faces left
-    const im=SPR.hopBernard, hh=88, ww=hh*(im.naturalWidth/im.naturalHeight);
-    const wag=Math.sin(d.wag)*0.55;
-    hPose("hopBernard", d.x, d.y+20-hh/2+bob*.4, ww, hh, flip, 0, [
-      {x:0.78,y:0.54,w:0.22,h:0.16, ax:0.0, ay:0.55, rot: wag}
-    ]);
-    if (d.hasBall){
-      const fx=d.x+(flip?32:-32), fy=d.y-38+bob*.6;
-      const k=KINDS[d.hasBall];
-      if (!drawBallSpr(ctx,d.hasBall,fx,fy,11,tnow*3)) orb(ctx,fx,fy,8,k.light,k.dark);
-    }
+    const im=SPR.hopBernard, hh=90, ww=hh*(im.naturalWidth/im.naturalHeight);
+    const walking=(d.moving||0)>0;
+    const bob=walking ? Math.sin(d.phase)*2.2 : 0;
+    const cy=d.y+20-hh/2+bob;
+    yardAnim("hopBernard", d.x, cy, ww, hh, flip, {
+      walking: walking,
+      phase: d.phase,
+      lift: 11,
+      legs: [{x:0.05,w:0.34,top:0.72},{x:0.50,w:0.36,top:0.72}],
+      tail: {x:0.80,y:0.58,w:0.20,h:0.16, ax:0, ay:0.5, rot: Math.sin(d.wag)*0.45},
+      ball: d.hasBall ? {kind:d.hasBall, x:0.075, y:0.49, r:10} : null
+    });
     if (d.bark) bubble(d.x,d.y-84,d.bark,"#fff","#1e2a18");
     return;
   }
