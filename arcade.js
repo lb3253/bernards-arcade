@@ -1880,33 +1880,29 @@ function bakeBackground(){
   ws.addColorStop(0,"rgba(18,52,20,.42)"); ws.addColorStop(1,"rgba(18,52,20,0)");
   bx.fillStyle=ws; bx.fillRect(0,WALL_BOTTOM,W,34);
 
-  // ---- the lawn, lush and saturated
+  // ---- the lawn: layered color, not a flat fill
   const lawn=bx.createLinearGradient(0,WALL_BOTTOM,0,H);
-  lawn.addColorStop(0,"#3f8a33"); lawn.addColorStop(.45,"#57a83c"); lawn.addColorStop(1,"#3d7f2c");
+  lawn.addColorStop(0,"#2f6a28"); lawn.addColorStop(.35,"#4c9a38"); lawn.addColorStop(.7,"#3e862c"); lawn.addColorStop(1,"#2c6424");
   bx.fillStyle=lawn; bx.fillRect(0,WALL_BOTTOM,W,H-WALL_BOTTOM);
-  const crown=bx.createRadialGradient(440,460,40,440,460,440);
-  crown.addColorStop(0,"rgba(140,210,80,.5)"); crown.addColorStop(1,"rgba(140,210,80,0)");
+  const crown=bx.createRadialGradient(420,500,30,480,520,520);
+  crown.addColorStop(0,"rgba(168,214,92,.42)"); crown.addColorStop(1,"rgba(168,214,92,0)");
   bx.fillStyle=crown; bx.fillRect(0,WALL_BOTTOM,W,H-WALL_BOTTOM);
-  for (let i=0;i<10;i++){
-    if (i%2) continue;
-    bx.fillStyle="rgba(255,255,255,.045)";
-    bx.fillRect(0,WALL_BOTTOM+i*((H-WALL_BOTTOM)/10),W,(H-WALL_BOTTOM)/10);
+  for (let i=0;i<420;i++){
+    const x=R()*W, y=WALL_BOTTOM+R()*(H-WALL_BOTTOM);
+    const shade=R();
+    bx.fillStyle=shade<.33?"rgba(24,70,22,.28)":shade<.66?"rgba(186,220,96,.22)":"rgba(90,150,48,.18)";
+    bx.beginPath(); bx.ellipse(x,y,8+R()*28,3+R()*8,R()*Math.PI,0,Math.PI*2); bx.fill();
   }
-  // sun-baked patch under the fire pit
-  const dry=bx.createRadialGradient(PIT.x-10,PIT.y+50,26,PIT.x-10,PIT.y+50,258);
-  dry.addColorStop(0,"rgba(212,190,112,.85)"); dry.addColorStop(.5,"rgba(198,178,108,.5)");
-  dry.addColorStop(1,"rgba(198,178,108,0)");
+  for (let i=0;i<700;i++){
+    const x=R()*W, y=WALL_BOTTOM+8+R()*(H-WALL_BOTTOM-8);
+    const h=5+R()*9, lean=(R()-.5)*3.2;
+    bx.strokeStyle=R()>.55?"rgba(214,236,120,.55)":"rgba(28,82,26,.45)";
+    bx.lineWidth=R()>.7?1.4:1;
+    bx.beginPath(); bx.moveTo(x,y); bx.quadraticCurveTo(x+lean*.4,y-h*.6,x+lean,y-h); bx.stroke();
+  }
+  const dry=bx.createRadialGradient(PIT.x-10,PIT.y+50,20,PIT.x-10,PIT.y+50,220);
+  dry.addColorStop(0,"rgba(196,168,96,.55)"); dry.addColorStop(1,"rgba(196,168,96,0)");
   bx.fillStyle=dry; bx.fillRect(0,WALL_BOTTOM,W,H-WALL_BOTTOM);
-  for (let i=0;i<20;i++){
-    const x=R()*W,y=WALL_BOTTOM+R()*(H-WALL_BOTTOM),r=16+R()*56;
-    bx.fillStyle="rgba(198,182,110,"+(.05+R()*.1)+")";
-    bx.beginPath(); bx.ellipse(x,y,r,r*.5,R()*3,0,Math.PI*2); bx.fill();
-  }
-  // grass tufts for that hand-modelled look
-  for (let i=0;i<150;i++){
-    const x=R()*W, y=WALL_BOTTOM+14+R()*(H-WALL_BOTTOM-14);
-    tuft(bx,x,y,.6+R()*.55, R()>.5?"rgba(120,200,80,.5)":"rgba(46,110,34,.4)");
-  }
   // decorative bushes hugging the wall
   for (const bxp of [72,300,830]) bush(bx,bxp,WALL_BOTTOM+16,.85);
 
@@ -2106,21 +2102,7 @@ function yardAnim(name, x, yCenter, w, h, flip, o){
   if (ball && BALL_SPR[ball.kind]){
     const r=ball.r||8;
     const bx=pad+ball.x*w, by=pad+ball.y*h;
-    // Keep the ball behind the muzzle. Only a little of it peeks out of the lips.
-    g.save();
-    g.beginPath();
-    g.rect(bx-r*0.15, by-r, r*2.2, r*2);
-    g.clip();
-    g.globalCompositeOperation="destination-over";
-    g.drawImage(BALL_SPR[ball.kind], bx-r*0.15, by-r*0.85, r*1.7, r*1.7);
-    g.restore();
-    g.save();
-    g.globalCompositeOperation="destination-out";
-    g.fillStyle="#000";
-    g.beginPath();
-    g.ellipse(bx+r*0.05, by, Math.max(3, r*0.38), Math.max(2, r*0.26), 0, 0, Math.PI*2);
-    g.fill();
-    g.restore();
+    g.drawImage(BALL_SPR[ball.kind], bx-r*0.2, by-r*0.55, r*1.35, r*1.35);
   }
   ctx.save();
   ctx.translate(x, yCenter);
@@ -2146,23 +2128,17 @@ function drawYardKid(h,name,shirtL,shirtD,capL,capD){
   if (!sprReady(name)){ drawHuman(h,shirtL,shirtD,"#e0a877",capL,capD); return; }
   const pose=throwPose(h);
   const walk=!pose && (h.moving||0)>0;
-  const bob=walk ? Math.abs(Math.sin(h.step))*3 : (pose ? Math.abs(pose.lean)*6 : 0);
-  softShadow(ctx,h.x+2,h.y+24,22,8,.34);
-  const im=SPR[name], hh=86, ww=hh*(im.naturalWidth/im.naturalHeight);
-  const girl=name.indexOf("Giulia")>=0 || name.indexOf("giulia")>=0;
-  const legs=girl
-    ? [
-        {x:0.10,y:0.76,w:0.30,h:0.22, ax:0.5, ay:0.08, swing:0.4},
-        {x:0.52,y:0.76,w:0.32,h:0.22, ax:0.5, ay:0.08, swing:-0.4}
-      ]
-    : [
-        {x:0.18,y:0.76,w:0.22,h:0.22, ax:0.5, ay:0.06, swing:0.4},
-        {x:0.58,y:0.74,w:0.24,h:0.24, ax:0.5, ay:0.06, swing:-0.4}
-      ];
-  yardAnim(name, h.x, h.y+26-hh/2-bob, ww, hh, Math.cos(h.face)<-.01, {
-    walking:walk, phase:h.step, legs:walk?legs:null,
-    arm: 0, lean: pose ? pose.lean + pose.arm*0.32 : 0, armPart: null
-  });
+  const bob=walk ? Math.abs(Math.sin(h.step))*3 : 0;
+  const lean=pose ? Math.max(-0.16, Math.min(0.2, pose.lean*0.22)) : (walk ? Math.sin(h.step)*0.035 : 0);
+  const im=SPR[name];
+  const hh=132, ww=hh*(im.naturalWidth/im.naturalHeight);
+  const footY=h.y+18;
+  ctx.save();
+  ctx.imageSmoothingEnabled=true;
+  ctx.imageSmoothingQuality="high";
+  softShadow(ctx, h.x+6, footY+2, ww*0.42, 9, .28);
+  drawSprC(name, h.x, footY-hh/2-bob, ww, hh, lean, Math.cos(h.face)<-.01);
+  ctx.restore();
 }
 
 // fringe strokes that read as long fur along an edge
@@ -2197,15 +2173,9 @@ function drawDog(d,tnow){
     const cy=d.y+20-hh/2+bob-bounce;
     const amp=excited ? 1.25 : 0.9;
     yardAnim("hopBernard", d.x, cy, ww, hh, flip, {
-      walking: walking,
-      phase: d.phase,
-      lift: 11,
-      legs: [
-        {x:0.06,y:0.73,w:0.30,h:0.25, ax:0.55, ay:0.08, swing:0.5},
-        {x:0.50,y:0.72,w:0.34,h:0.22, ax:0.35, ay:0.08, swing:-0.45}
-      ],
-      tail: {x:0.74,y:0.52,w:0.26,h:0.24, ax:0, ay:0.55, rot: Math.sin(d.wag)*amp},
-      ball: d.hasBall ? {kind:d.hasBall, x:0.12, y:0.48, r:9} : null
+      walking: false,
+      tail: {x:0.78,y:0.54,w:0.22,h:0.20, ax:0, ay:0.5, rot: Math.sin(d.wag)*amp},
+      ball: d.hasBall ? {kind:d.hasBall, x:0.08, y:0.50, r:8} : null
     });
     if (d.bark) bubble(d.x,d.y-84,d.bark,"#fff","#1e2a18");
     return;
