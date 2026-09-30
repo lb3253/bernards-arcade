@@ -275,7 +275,7 @@ function chunky(c,txt,x,y,size,fill,stroke,weight){
 
 // ---------------------------------------------------------------- audio
 let audioOn=true, glare=true, ac=null;
-const ARCADE_FLASH = {flap:false, hop:false, air:false, ballies:false, memo:false};
+const ARCADE_FLASH = {flap:false, hop:false, air:false, ballies:false, memo:false, catch:false};
 function beep(f,dur,type,vol){
   if (!audioOn) return;
   try{
@@ -361,6 +361,15 @@ const TUNES = {
     arp:   [[69,72,76,72,69,72,76,72, 74,77,81,77,74,77,81,77],[71,74,78,74,71,74,78,74, 67,71,74,71,67,71,74,71]],
     drums: ["....h.......h...","....h.......h.h."],
     leadType:"triangle", bassType:"triangle", arpType:"sine"
+  },
+  catch: { bpm:132, swing:.08,
+    bass:  [[48,0,48,0,55,0,48,0, 53,0,53,0,60,0,53,0],
+            [50,0,50,0,57,0,50,0, 55,0,55,0,62,0,55,0]],
+    lead:  [[72,0,76,0,79,0,76,0, 74,0,72,0,69,0,0,0],
+            [74,0,77,0,81,0,77,0, 76,0,74,0,72,0,0,0]],
+    arp:   [[60,64,67,64,60,64,67,64, 65,69,72,69,65,69,72,69]],
+    drums: ["k.h.s.h.k.h.s.hh","k.h.s.h.k.k.s.h."],
+    leadType:"square", bassType:"triangle", arpType:"triangle"
   },
   // dogfight over the mothership: driving minor key
   air: { bpm:150, swing:0,
@@ -501,8 +510,9 @@ let pointer={down:false,x:0,y:0};
 const GP = { idx:null, id:"", prev:{}, focus:0, lastScreen:"", navHold:0, lastBtn:"" };
 
 const GP_ITEMS = {
-  home:     ["pickFlap","pickHop","pickAir","pickBallies","pickMemo"],
+  home:     ["pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickCatch"],
   memomenu: ["memoStartBtn","memoBack"],
+  catchmenu: ["catchStartBtn","catchBack"],
   menu:     ["startBtn","menuBack"],
   titamenu: ["titaStartBtn","titaBack"],
   flapmenu: ["flapStartBtn","flapBack"],
@@ -524,6 +534,7 @@ function gpScreen(){
   if (on("airmenu")) return "airmenu";
   if (on("hopmenu")) return "hopmenu";
   if (on("memomenu")) return "memomenu";
+  if (on("catchmenu")) return "catchmenu";
   if (on("airstory")) return "airstory";
   if (on("gameover")) return "over";
   return "play";
@@ -603,9 +614,9 @@ function uiBack(){ const sc=gpScreen(); if (sc==="pause") quitToArcade(); else i
 
 // ---------------------------------------------------------------- lobby carousel
 const CAR = {
-  items:["pickFlap","pickHop","pickAir","pickBallies","pickMemo"],
-  flashKey:{pickFlap:"flap", pickHop:"hop", pickAir:"air", pickBallies:"ballies", pickMemo:"memo"},
-  spill:{pickFlap:"rgba(80,190,255,.32)", pickHop:"rgba(110,220,90,.30)", pickAir:"rgba(255,90,160,.32)", pickBallies:"rgba(255,207,58,.30)", pickMemo:"rgba(170,110,255,.32)"},
+  items:["pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickCatch"],
+  flashKey:{pickFlap:"flap", pickHop:"hop", pickAir:"air", pickBallies:"ballies", pickMemo:"memo", pickCatch:"catch"},
+  spill:{pickFlap:"rgba(80,190,255,.32)", pickHop:"rgba(110,220,90,.30)", pickAir:"rgba(255,90,160,.32)", pickBallies:"rgba(255,207,58,.30)", pickMemo:"rgba(170,110,255,.32)", pickCatch:"rgba(255,140,60,.34)"},
   index:0, pos:0, vel:0, target:0, bounce:0,
   tiltX:0, tiltY:0, wantTiltX:0, wantTiltY:0,
   drag:null, lastIdx:-1, chaseT:0, ready:false
@@ -649,6 +660,7 @@ function carouselLaunch(){
   else if (id==="pickAir") openAir();
   else if (id==="pickBallies") openBallies();
   else if (id==="pickMemo") openMemo();
+  else if (id==="pickCatch") openCatch();
 }
 function carouselOnClick(id){
   const i=CAR.items.indexOf(id);
@@ -1205,6 +1217,7 @@ cv.addEventListener("pointerdown",e=>{
   if (MODE==="flap"||MODE==="paddle"||MODE==="air"||MODE==="jeep"){ actionDown(); return; }
   if (MODE==="hop"){ hCanvasTap(p); return; }
   if (MODE==="memo"){ memoTap(p); return; }
+  if (MODE==="catch"){ pointer={down:true,x:p.x,y:p.y}; if (p.y<520) catchJump(); return; }
   if (MODE==="tita"){ pointer={down:true,x:p.x,y:p.y}; actionDown(); return; }
   if (G && G.carry.length && Math.hypot(p.x-THROW_BTN.x,p.y-THROW_BTN.y)<THROW_BTN.r){
     pointer={down:false,x:p.x,y:p.y}; startCharge(); return;
@@ -1222,11 +1235,12 @@ function syncHud(){
   const hud=document.getElementById("hudpad");
   if (!hud) return;
   const hopOn = MODE==="hop" && LH && LH.running && !PAUSED;
-  const play = IS_TOUCH && ((MODE==="air" && A && A.running && !PAUSED) || hopOn);
+  const catchOn = MODE==="catch" && C && C.running && !PAUSED;
+  const play = IS_TOUCH && ((MODE==="air" && A && A.running && !PAUSED) || hopOn || catchOn);
   hud.classList.toggle("on", !!play);
   hud.setAttribute("aria-hidden", play ? "false" : "true");
   const fire=document.getElementById("hudFire");
-  if (fire) fire.textContent = MODE==="hop" ? "RIDE" : "FIRE";
+  if (fire) fire.textContent = MODE==="hop" ? "RIDE" : MODE==="catch" ? "JUMP" : "FIRE";
 }
 (function setupTouchHud(){
   const stick=document.getElementById("stick");
@@ -1273,6 +1287,7 @@ function actionDown(){
   else if (MODE==="hop") hFerry();
   else if (MODE==="jeep"){ if (J) J.touchGas=true; }
   else if (MODE==="memo"){ /* Bernard Says reads its buttons itself */ }
+  else if (MODE==="catch") catchJump();
   else startCharge();
 }
 function actionUp(){
@@ -8383,6 +8398,365 @@ function startHop(){
   syncHud();
 }
 
+// ---------------------------------------------------------------- Catch with Bernard
+let C=null;
+const CATCH_FEET=608;
+function newCatch(best){
+  return {
+    running:false, t:0, score:0, best:best||0, lives:3, combo:0, fever:0,
+    spawn:0.8, beeT:6, mudT:4, windT:9, wind:0, windDir:1,
+    pulse:0, hint:3.2, inv:0, pops:[], toasts:[], leaves:[],
+    dog:{x:450, y:CATCH_FEET, vx:0, vy:0, on:true, face:1, step:0, wag:1, stun:0, land:0},
+    balls:[], mud:[], bees:[],
+    spr:[
+      {x:210, ph:0.2, on:false},
+      {x:690, ph:2.4, on:false}
+    ],
+    clouds:[
+      {x:120,y:90,w:150,s:1},
+      {x:420,y:60,w:190,s:.8},
+      {x:700,y:110,w:140,s:1.1}
+    ]
+  };
+}
+function saveCatchBest(v){ try{ const o=+localStorage.getItem("catch_best")||0; if(v>o){ ARCADE_FLASH.catch=true; localStorage.setItem("catch_best",String(v)); } }catch(e){} }
+function loadCatchBest(){ try{ const v=+localStorage.getItem("catch_best"); if(v&&C) C.best=v; }catch(e){} }
+function catchToast(text,col,x,y){ C.toasts.push({text,col:col||"#fff6c9",x:x||W/2,y:y||150,life:1.05}); }
+function catchHurt(why){
+  if (C.inv>0 || !C.running) return;
+  C.lives--; C.combo=0; C.fever=0; C.inv=1.05; C.dog.stun=0.45;
+  sfx.yelp();
+  catchToast(why,"#ff8a72", C.dog.x, C.dog.y-150);
+  if (C.lives<=0) catchOver();
+}
+function catchOver(){
+  if (!C.running) return;
+  C.running=false;
+  if (C.score>C.best){ C.best=C.score; saveCatchBest(C.best); }
+  sfx.over();
+  const over=document.getElementById("gameover");
+  over.classList.remove("won","lost"); over.classList.add("lost");
+  document.getElementById("overShot").style.backgroundImage="var(--ph-catch)";
+  document.getElementById("overTitle").textContent = C.score>=400 ? "Good boy!" : C.score>=150 ? "Nice catches" : "The yard won";
+  document.getElementById("finalLine").textContent =
+    "Bernard banked "+C.score+" points. Best so far: "+C.best+". Jump the high ones, let the mud hit the grass, and stay out of the bees.";
+  over.classList.add("on");
+}
+function catchJump(){
+  if (!C || !C.running || C.dog.stun>0) return;
+  if (C.dog.on){ C.dog.vy=-640; C.dog.on=false; sfx.flap(); }
+}
+function catchSpawnBall(){
+  const r=Math.random();
+  const kind = (C.score>40 && r<0.09) ? "gold" : r<0.42 ? "green" : "red";
+  const fast = kind==="gold" ? 1.35 : kind==="green" ? 1.12 : 1;
+  C.balls.push({
+    x:rand(70,W-70), y:-24, kind, r: kind==="gold"?15:17,
+    vx:rand(-40,40), vy:(78+Math.min(160,C.score*0.22))*fast, spin:rand(0,6)
+  });
+}
+function updateCatch(dt){
+  if (!C) return;
+  C.t+=dt; C.pulse+=dt; C.hint=Math.max(0,C.hint-dt);
+  C.dog.wag+=dt*(C.fever>0?16:9);
+  for (const cl of C.clouds){ cl.x-=dt*(12+cl.s*8); if (cl.x<-200) cl.x=W+80; }
+  for (const s of C.spr) s.on=Math.sin(C.t*1.35+s.ph)>0.15;
+  if (!C.running) return;
+  const d=C.dog;
+  d.stun=Math.max(0,d.stun-dt);
+  C.inv=Math.max(0,C.inv-dt);
+  C.fever=Math.max(0,C.fever-dt);
+  C.wind=Math.max(0,C.wind-dt);
+  let dir=0;
+  if (keys.has("ArrowLeft")||keys.has("KeyA")) dir-=1;
+  if (keys.has("ArrowRight")||keys.has("KeyD")) dir+=1;
+  if (STICK.x<-0.3) dir-=1; else if (STICK.x>0.3) dir+=1;
+  const up=keys.has("ArrowUp")||keys.has("KeyW");
+  if (up && !C.wasUp) catchJump();
+  C.wasUp=up;
+  if (pointer.down && Math.abs(dir)<0.1){
+    const dx=pointer.x-d.x;
+    d.vx = Math.abs(dx)<14 ? d.vx*0.8 : clamp(dx*6.5,-380,380);
+  } else if (dir) d.vx=dir*(d.stun>0?120:360);
+  else d.vx*=0.82;
+  if (d.stun<=0){
+    for (const s of C.spr){
+      if (!s.on || !d.on) continue;
+      if (Math.abs(d.x-s.x)<48) d.vx += (d.x<s.x?-1:1)*220*dt*8;
+    }
+  }
+  d.vy += 1680*dt;
+  d.x=clamp(d.x+d.vx*dt, 64, W-64);
+  d.y+=d.vy*dt;
+  if (d.y>=CATCH_FEET){
+    if (!d.on) d.land=0.16;
+    d.y=CATCH_FEET; d.vy=0; d.on=true;
+  }
+  d.land=Math.max(0,d.land-dt);
+  if (Math.abs(d.vx)>40 && d.on){ d.step+=dt*Math.abs(d.vx)*0.03; d.face=d.vx>0?1:-1; }
+  const cap=1+Math.min(3, Math.floor(C.score/140));
+  C.spawn-=dt;
+  if (C.spawn<=0 && C.balls.length<cap){
+    catchSpawnBall();
+    C.spawn=Math.max(0.38, 1.05-C.score/500);
+  }
+  C.beeT-=dt;
+  if (C.beeT<=0){
+    const fromL=Math.random()<0.5;
+    C.bees.push({x:fromL?-30:W+30, y:rand(150,430), dir:fromL?1:-1, v:rand(150,230), t:0});
+    C.beeT=rand(3.2, 6.2-Math.min(2.4,C.score/200));
+  }
+  C.mudT-=dt;
+  if (C.mudT<=0){
+    C.mud.push({x:rand(80,W-80), y:-20, vy:rand(150,210), vx:rand(-30,30), r:16, spin:0});
+    C.mudT=rand(3.4, 6.5);
+  }
+  C.windT-=dt;
+  if (C.windT<=0){
+    C.wind=2.3; C.windDir=Math.random()<0.5?-1:1; C.windT=rand(11,16);
+    catchToast(C.windDir<0?"WIND  ←":"WIND  →","#d7f4ff", W/2, 120);
+    for (let i=0;i<10;i++) C.leaves.push({x:rand(0,W), y:rand(40,280), v:C.windDir*rand(80,160), life:2.2});
+  }
+  const gust=C.wind>0 ? C.windDir*70 : 0;
+  const mouth={x:d.x+d.face*16, y:d.y-86, r:36};
+  const body={x:d.x, y:d.y-48, r:30};
+  for (const b of C.balls){
+    b.spin+=dt*4; b.vx += gust*dt*1.4;
+    for (const s of C.spr) if (s.on && Math.abs(b.x-s.x)<36 && b.y>180 && b.y<520) b.vx += (b.x<s.x?-1:1)*90*dt*6;
+    b.x+=b.vx*dt; b.y+=b.vy*dt;
+    if (!b.dead && Math.hypot(b.x-mouth.x, b.y-mouth.y)<mouth.r+b.r){
+      b.dead=true;
+      const mult=1+Math.min(4,Math.floor(C.combo/4))+(C.fever>0?1:0);
+      const val=KINDS[b.kind].value*mult;
+      C.score+=val; C.combo++;
+      if (C.combo===8){ C.fever=6; catchToast("GOOD BOY!","#ffcf3a"); sfx.perfect(); }
+      else if (C.combo%5===0) catchToast("x"+C.combo,"#c9f24d", b.x, b.y-20);
+      sfx.pick(b.kind);
+      catchToast("+"+val, KINDS[b.kind].rim, b.x, b.y-16);
+      for (let i=0;i<8;i++) C.pops.push({x:b.x,y:b.y,vx:rand(-80,80),vy:rand(-140,-20),life:.5,col:KINDS[b.kind].rim});
+    } else if (b.y>CATCH_FEET-6){
+      b.dead=true; C.combo=0; C.fever=0;
+      catchHurt("MISSED!");
+    }
+  }
+  C.balls=C.balls.filter(b=>!b.dead && b.y<H+40);
+  for (const m of C.mud){
+    m.spin+=dt*3; m.x+= (m.vx+gust)*dt; m.y+=m.vy*dt;
+    if (!m.dead && Math.hypot(m.x-mouth.x, m.y-mouth.y)<mouth.r+m.r){
+      m.dead=true; sfx.squish(); catchHurt("MUD!");
+    } else if (m.y>CATCH_FEET) m.dead=true;
+  }
+  C.mud=C.mud.filter(m=>!m.dead);
+  for (const bee of C.bees){
+    bee.t+=dt; bee.x+=bee.dir*bee.v*dt; bee.y+=Math.sin(bee.t*6)*18*dt;
+    if (!bee.dead && C.inv<=0 && Math.hypot(bee.x-body.x, bee.y-body.y)<body.r+14){
+      bee.dead=true; d.vx=bee.dir*260; catchHurt("BZZT!");
+    }
+  }
+  C.bees=C.bees.filter(b=>!b.dead && b.x>-60 && b.x<W+60);
+  for (const p of C.pops){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=300*dt; p.life-=dt; }
+  C.pops=C.pops.filter(p=>p.life>0);
+  for (const t of C.toasts) t.life-=dt;
+  C.toasts=C.toasts.filter(t=>t.life>0);
+  for (const lf of C.leaves){ lf.x+=lf.v*dt; lf.y+=20*dt; lf.life-=dt; }
+  C.leaves=C.leaves.filter(lf=>lf.life>0);
+}
+const catchBg=document.createElement("canvas"); catchBg.width=W; catchBg.height=H;
+let catchBaked=false;
+function bakeCatchBg(){
+  if (catchBaked) return;
+  catchBaked=true;
+  const g=catchBg.getContext("2d");
+  const sky=g.createLinearGradient(0,0,0,520);
+  sky.addColorStop(0,"#3aa0e0"); sky.addColorStop(.55,"#8fd0f2"); sky.addColorStop(1,"#e7f6c8");
+  g.fillStyle=sky; g.fillRect(0,0,W,H);
+  g.fillStyle="#ffe9a0";
+  g.beginPath(); g.arc(760,78,36,0,Math.PI*2); g.fill();
+  g.fillStyle="rgba(255,244,190,.35)";
+  g.beginPath(); g.arc(760,78,58,0,Math.PI*2); g.fill();
+  const hill=g.createLinearGradient(0,300,0,470);
+  hill.addColorStop(0,"#7dbe4a"); hill.addColorStop(1,"#3e7a28");
+  g.fillStyle=hill;
+  g.beginPath(); g.moveTo(0,430); g.quadraticCurveTo(220,340,460,400); g.quadraticCurveTo(700,450,900,360); g.lineTo(900,520); g.lineTo(0,520); g.fill();
+  g.fillStyle="#6b4a2a";
+  for (let x=20;x<W;x+=46){
+    g.fillRect(x,468,8,52);
+    g.fillStyle="#d8c29a"; g.fillRect(x-16,462,40,10); g.fillStyle="#6b4a2a";
+  }
+  const lawn=g.createLinearGradient(0,500,0,H);
+  lawn.addColorStop(0,"#8ed24a"); lawn.addColorStop(.4,"#4ea328"); lawn.addColorStop(1,"#2f7a1c");
+  g.fillStyle=lawn; g.fillRect(0,500,W,H-500);
+  g.strokeStyle="rgba(255,255,255,.18)"; g.lineWidth=2;
+  for (let i=0;i<80;i++){
+    const x=(i*97)%W, y=520+(i*53)%140;
+    g.beginPath(); g.moveTo(x,y); g.lineTo(x+4,y-10); g.stroke();
+  }
+}
+function drawCatchCloud(cl){
+  ctx.save(); ctx.translate(cl.x, cl.y); ctx.scale(cl.s, cl.s);
+  ctx.fillStyle="rgba(255,255,255,.92)";
+  ctx.beginPath(); ctx.ellipse(0,0,70,28,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-30,-14,34,26,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(28,-12,40,24,0,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function drawCatchBee(b){
+  ctx.save(); ctx.translate(b.x, b.y); ctx.scale(b.dir,1);
+  const wing=Math.sin(b.t*30)*6;
+  ctx.fillStyle="rgba(220,240,255,.75)";
+  ctx.beginPath(); ctx.ellipse(-2,-10-wing,10,5,-.4,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(6,-8-wing,8,4,.3,0,Math.PI*2); ctx.fill();
+  const body=ctx.createLinearGradient(0,-8,0,8);
+  body.addColorStop(0,"#ffe56a"); body.addColorStop(1,"#e0a020");
+  ctx.fillStyle=body;
+  ctx.beginPath(); ctx.ellipse(0,0,16,9,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle="#1c1408";
+  ctx.fillRect(-6,-8,4,16); ctx.fillRect(2,-8,4,16);
+  ctx.fillStyle="#2a1c10";
+  ctx.beginPath(); ctx.moveTo(14,0); ctx.lineTo(22,3); ctx.lineTo(14,6); ctx.fill();
+  ctx.restore();
+}
+function drawCatchMud(m){
+  ctx.save(); ctx.translate(m.x,m.y); ctx.rotate(m.spin);
+  const g=ctx.createRadialGradient(-4,-4,2,0,0,m.r);
+  g.addColorStop(0,"#a97848"); g.addColorStop(1,"#5c3a22");
+  ctx.fillStyle=g;
+  ctx.beginPath(); ctx.ellipse(0,0,m.r,m.r*.86,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle="#3e2616";
+  ctx.beginPath(); ctx.arc(-4,2,3.2,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(5,-2,2.4,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function drawCatchSprinkler(s){
+  ctx.save(); ctx.translate(s.x, 548);
+  ctx.fillStyle="#8d97a3";
+  ctx.beginPath(); ctx.roundRect(-10,8,20,28,4); ctx.fill();
+  ctx.fillStyle="#d5dde6";
+  ctx.beginPath(); ctx.arc(0,6,9,0,Math.PI*2); ctx.fill();
+  if (s.on){
+    ctx.strokeStyle="rgba(180,230,255,.55)"; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(0,4,54,Math.PI*1.15,Math.PI*1.85); ctx.stroke();
+    ctx.fillStyle="rgba(210,245,255,.8)";
+    for (let i=0;i<7;i++){
+      const a=Math.PI*1.2+i*0.12+Math.sin(C.t*8+i)*0.05;
+      ctx.beginPath(); ctx.arc(Math.cos(a)*48, Math.sin(a)*36, 2.4, 0, Math.PI*2); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+function drawCatchDog(){
+  const d=C.dog;
+  const hh=124, im=SPR.hopBernard;
+  const ww=im&&im.naturalWidth? hh*(im.naturalWidth/im.naturalHeight) : 90;
+  const bob=d.on && Math.abs(d.vx)>40 ? Math.abs(Math.sin(d.step))*5 : 0;
+  const squash=d.land>0 ? 0.9 : (!d.on && d.vy<0 ? 1.06 : 1);
+  const cy=d.y-hh/2+10-bob;
+  if (C.inv>0 && Math.sin(C.t*30)>0) return;
+  softShadow(ctx, d.x+8, CATCH_FEET+4, 36*(d.on?1:0.6), 9, .3);
+  ctx.save();
+  ctx.translate(d.x, cy);
+  ctx.scale(squash, 1/squash);
+  ctx.translate(-d.x, -cy);
+  if (C.fever>0){
+    ctx.shadowColor="#ffcf3a"; ctx.shadowBlur=18;
+  }
+  const lean=!d.on ? clamp(-d.vy*0.0004,-0.2,0.25)*d.face : d.vx*0.00015;
+  if (typeof gaitDraw==="function" && d.on && Math.abs(d.vx)>30){
+    gaitDraw("hopBernard", d.x, cy, ww, hh, d.face>0, {
+      lean,
+      keep:0.5,
+      parts:[
+        {x:0.76,y:0.50,w:0.22,h:0.22,ax:0,ay:0.55, rot:Math.sin(d.wag)*0.55},
+        {x:0.12,y:0.76,w:0.26,h:0.20,ax:0.5,ay:0, rot:Math.sin(d.step)*0.4},
+        {x:0.50,y:0.76,w:0.24,h:0.20,ax:0.4,ay:0, rot:-Math.sin(d.step)*0.35}
+      ]
+    });
+  } else {
+    drawSprC("hopBernard", d.x, cy, ww, hh, lean, d.face>0);
+  }
+  ctx.restore();
+}
+function drawCatchHUD(){
+  goldPanel(ctx,16,12,168,64,14);
+  ctx.textAlign="left"; ctx.font="600 11px Fredoka, system-ui, sans-serif";
+  ctx.fillStyle="#ffe9b0"; ctx.fillText("SCORE",30,32);
+  chunky(ctx,String(C.score),30,60,26,"#fff6c9","#4a2408");
+  goldPanel(ctx,W-176,12,160,64,14);
+  ctx.fillStyle="#ffe9b0"; ctx.fillText("BEST",W-162,32);
+  chunky(ctx,String(C.best),W-162,60,26,"#fff6c9","#4a2408");
+  for (let i=0;i<3;i++){
+    ctx.fillStyle=i<C.lives?"#ff5a4a":"rgba(255,255,255,.25)";
+    ctx.beginPath(); ctx.arc(40+i*22, 92, 7, 0, Math.PI*2); ctx.fill();
+  }
+  if (C.combo>1){
+    chunky(ctx,"x"+C.combo, W/2, 48, 22, C.fever>0?"#ffcf3a":"#c9f24d", "#1f3a08");
+  }
+  if (C.fever>0){
+    ctx.globalAlpha=.7+Math.sin(C.t*8)*.3;
+    chunky(ctx,"GOOD BOY", W/2, 78, 18, "#fff6c9", "#6a3a08");
+    ctx.globalAlpha=1;
+  }
+  if (C.hint>0 && C.running){
+    ctx.globalAlpha=clamp(C.hint,0,1);
+    goldPanel(ctx, W/2-230, H-86, 460, 58, 16);
+    ctx.font="600 14px Fredoka, system-ui, sans-serif"; ctx.fillStyle="#ffe9b0"; ctx.textAlign="center";
+    ctx.fillText("Run with the d-pad  ·  jump with A  ·  dodge mud and bees", W/2, H-52);
+    ctx.globalAlpha=1;
+  }
+  for (const t of C.toasts){
+    ctx.globalAlpha=clamp(t.life,0,1);
+    chunky(ctx,t.text,t.x,t.y,22,t.col,"#2a1810",700);
+  }
+  ctx.globalAlpha=1;
+}
+function drawCatch(){
+  if (!C) return;
+  bakeCatchBg();
+  ctx.drawImage(catchBg,0,0);
+  for (const cl of C.clouds) drawCatchCloud(cl);
+  for (const lf of C.leaves){
+    ctx.globalAlpha=clamp(lf.life,0,1); ctx.fillStyle="#7fbf45";
+    ctx.beginPath(); ctx.ellipse(lf.x, lf.y, 5, 3, lf.x*.01, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  for (const s of C.spr) drawCatchSprinkler(s);
+  for (const m of C.mud) drawCatchMud(m);
+  for (const b of C.balls){
+    if (!drawBallSpr(ctx,b.kind,b.x,b.y,b.r,b.spin)){
+      const k=KINDS[b.kind];
+      orb(ctx,b.x,b.y,b.r,k.light,k.dark);
+    }
+  }
+  for (const bee of C.bees) drawCatchBee(bee);
+  drawCatchDog();
+  for (const p of C.pops){
+    ctx.globalAlpha=clamp(p.life*2,0,1); ctx.fillStyle=p.col;
+    ctx.beginPath(); ctx.arc(p.x,p.y,3.2,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  if (!POSTER) drawCatchHUD();
+  if (glare && !POSTER) drawGlass();
+}
+function openCatch(){
+  hideAll();
+  if (catchEl) catchEl.classList.add("on");
+  setMark("catch");
+  MODE="catch";
+  if (!C){ C=newCatch(0); loadCatchBest(); }
+  C.running=false;
+  drawCatch();
+}
+function startCatch(){
+  const best=C?C.best:0;
+  C=newCatch(best);
+  loadCatchBest();
+  C.running=true; C.hint=3.4;
+  MODE="catch"; setMark("catch");
+  hideAll();
+  if (!ac) beep(1,.01);
+  syncHud();
+}
+
 // ---------------------------------------------------------------- loop
 let last=performance.now();
 let frameErr=0;
@@ -8410,6 +8784,7 @@ function frame(now){
       else if (MODE==="hop"){ if (LH){ if(!PAUSED) updateHop(d); drawHop(); } }
       else if (MODE==="jeep"){ if (J){ if(!PAUSED) updateJeep(d); drawJeep(); } }
       else if (MODE==="memo"){ if (M){ if(!PAUSED) updateMemo(d); drawMemo(); } }
+      else if (MODE==="catch"){ if (C){ if(!PAUSED) updateCatch(d); drawCatch(); } }
       else { if (G){ if(!PAUSED) update(d); draw(); } }
     }
   }catch(err){
@@ -8424,6 +8799,7 @@ const menuEl=document.getElementById("menu");
 const titaEl=document.getElementById("titamenu");
 const flapEl=document.getElementById("flapmenu");
 const memoEl=document.getElementById("memomenu");
+const catchEl=document.getElementById("catchmenu");
 const padEl=document.getElementById("paddlemenu");
 const airEl=document.getElementById("airmenu");
 const hopEl=document.getElementById("hopmenu");
@@ -8766,6 +9142,7 @@ const MARKS={
   paddle:["Giulia & Nick","PADDLE"],
   air:   ["Flying with","BERNARD"],
   hop:   ["Lane Hoppers","BERNARD"],
+  catch: ["Catch with","BERNARD"],
   memo:  ["Bernard","SAYS"],
   jeep:  ["Bernard Goes","OFF ROAD"]
 };
@@ -8781,6 +9158,7 @@ function hideAll(){
   airEl.classList.remove("on");
   if (hopEl) hopEl.classList.remove("on");
   if (memoEl) memoEl.classList.remove("on");
+  if (catchEl) catchEl.classList.remove("on");
   if (jeepEl) jeepEl.classList.remove("on");
   pauseEl.classList.remove("on"); PAUSED=false;
   const storyEl=document.getElementById("airstory"); if (storyEl) storyEl.classList.remove("on");
@@ -8793,6 +9171,7 @@ function refreshBests(){
   set("bestBallies",get("ballies_best")); set("bestTita",get("tita_best")); set("bestFlap",get("flap_best"));
   set("bestPaddle",get("paddle_best")); set("bestAir",get("air_best")); set("bestHop",get("hop_best")); set("bestJeep",get("jeep_best"));
   set("bestMemo",get("memo_best"));
+  set("bestCatch",get("catch_best"));
 }
 function goHome(){
   refreshBests();
@@ -8806,6 +9185,7 @@ function goHome(){
   if (LH) LH.running=false;
   if (J) J.running=false;
   if (M) M.running=false;
+  if (C) C.running=false;
   initCarousel();
   applyNewHighRibbons();
   carouselSyncFocus();
@@ -8905,14 +9285,14 @@ function updateStar(){
   const id=(GP_ITEMS.home||[])[GP.focus]||"pickFlap";
   const air=id==="pickAir";
   const hop=id==="pickHop";
-  const yard=id==="pickBallies", memo=id==="pickMemo";
-  const which=memo?"memo":yard?"yard":hop?"hop":air?(A_PLANE==="jet"?"jet":"air"):"flap";
+  const yard=id==="pickBallies", memo=id==="pickMemo", cat=id==="pickCatch";
+  const which=cat?"catch":memo?"memo":yard?"yard":hop?"hop":air?(A_PLANE==="jet"?"jet":"air"):"flap";
   if (img.getAttribute("data-which")===which){ img.style.opacity="1"; return; }
   img.style.opacity="0";
   setTimeout(()=>{
     img.src=hop?"/art/bernard-portrait.jpg":air?(which==="jet"?"/art/bernard-jet-portrait.jpg":"/art/bernard-pilot-portrait.jpg"):"/art/bernard-portrait.jpg";
     img.setAttribute("data-which",which);
-    if (cap) cap.textContent=memo?"Simon says":yard?"Ball thief":hop?"The hoppers":air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
+    if (cap) cap.textContent=cat?"Catch!":memo?"Simon says":yard?"Ball thief":hop?"The hoppers":air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
     img.style.opacity="1";
   },90);
 }
@@ -8929,7 +9309,7 @@ function gameRunning(){
   return (MODE==="tita"&&T&&T.running)||(MODE==="flap"&&F&&F.running)||
          (MODE==="paddle"&&P&&P.running)||(MODE==="air"&&A&&A.running)||
          (MODE==="hop"&&LH&&LH.running)||(MODE==="jeep"&&J&&J.running)||(MODE==="ballies"&&G&&G.running)||
-         (MODE==="memo"&&M&&M.running);
+         (MODE==="memo"&&M&&M.running)||(MODE==="catch"&&C&&C.running);
 }
 function togglePause(){
   if (!gameRunning()) return;
@@ -8949,6 +9329,7 @@ function quitToArcade(){
     if (MODE==="hop"&&LH&&LH.score>LH.best){ LH.best=LH.score; saveHopBest(LH.best); }
     if (MODE==="jeep"&&J&&J.score>J.best){ J.best=J.score; saveJeepBest(J.best); }
     if (MODE==="ballies"&&G&&G.score>G.best){ G.best=G.score; saveBest(G.best); }
+    if (MODE==="catch"&&C&&C.score>C.best){ C.best=C.score; saveCatchBest(C.best); }
   }catch(e){}
   PAUSED=false; goHome();
 }
@@ -8967,7 +9348,7 @@ function startTita(){
   hideAll();
   if (!ac) beep(1,.01);
 }
-function startCurrent(){ if (MODE==="tita") startTita(); else if (MODE==="flap") startFlap(); else if (MODE==="paddle") startPaddle(); else if (MODE==="air") startAir({skipStory:true}); else if (MODE==="hop") startHop(); else if (MODE==="jeep") startJeep(); else if (MODE==="memo") startMemo(); else start(); }
+function startCurrent(){ if (MODE==="tita") startTita(); else if (MODE==="flap") startFlap(); else if (MODE==="paddle") startPaddle(); else if (MODE==="air") startAir({skipStory:true}); else if (MODE==="hop") startHop(); else if (MODE==="jeep") startJeep(); else if (MODE==="memo") startMemo(); else if (MODE==="catch") startCatch(); else start(); }
 
 document.getElementById("goalNum").textContent=WIN_SCORE;
 document.getElementById("titaGoal").textContent=T_WIN;
@@ -8984,6 +9365,10 @@ document.getElementById("padNic").addEventListener("click",()=>setChar("nic"));
 document.getElementById("hopStartBtn").addEventListener("click",startHop);
 const memoStartBtn=document.getElementById("memoStartBtn");
 if (memoStartBtn) memoStartBtn.addEventListener("click",startMemo);
+const catchStartBtn=document.getElementById("catchStartBtn");
+if (catchStartBtn) catchStartBtn.addEventListener("click",startCatch);
+const catchBackBtn=document.getElementById("catchBack");
+if (catchBackBtn) catchBackBtn.addEventListener("click",goHome);
 document.getElementById("hopGiulia").addEventListener("click",()=>setHopChar("giulia"));
 document.getElementById("hopNic").addEventListener("click",()=>setHopChar("nic"));
 document.getElementById("airStartBtn").addEventListener("click",startAir);
@@ -9095,7 +9480,8 @@ A=newAir(0); A.running=false;
 J=newJeep(0); J.running=false;
 LH=newHop(0); LH.running=false;
 M=newMemo(0); M.running=false;
-loadBest(); loadTitaBest(); loadFlapBest(); loadPBest(); loadABest(); loadJeepBest(); loadHopBest(); loadMemoBest();
+C=newCatch(0); C.running=false;
+loadBest(); loadTitaBest(); loadFlapBest(); loadPBest(); loadABest(); loadJeepBest(); loadHopBest(); loadMemoBest(); loadCatchBest();
 
 // Bernardy Flap's card art, rendered from a posed frame of the game
 function makeFlapPoster(){
@@ -9167,7 +9553,23 @@ function makeMemoPoster(){
   try{ drawMemo(); document.documentElement.style.setProperty("--ph-memo","url("+cv.toDataURL("image/jpeg",.82)+")"); }catch(e){}
   POSTER=false; M=keep; MODE=keepMode;
 }
-function makePosters(){ makeTitaPoster(); makeFlapPoster(); makePaddlePoster(); makeAirPoster(); makeBalliesPoster(); makeMemoPoster(); }
+function makeCatchPoster(){
+  const keep=C, keepMode=MODE;
+  C=newCatch(0); C.t=1.4; C.score=180; C.combo=6; C.lives=3; C.running=false;
+  C.dog.x=430; C.dog.y=CATCH_FEET-70; C.dog.on=false; C.dog.vy=-80; C.dog.face=1;
+  C.balls=[
+    {x:470,y:360,kind:"gold",r:15,spin:1,vx:0,vy:80},
+    {x:250,y:180,kind:"red",r:17,spin:.4,vx:0,vy:90},
+    {x:640,y:240,kind:"green",r:17,spin:2,vx:0,vy:100}
+  ];
+  C.bees=[{x:760,y:300,dir:-1,v:0,t:1}];
+  C.mud=[{x:180,y:420,vy:0,vx:0,r:16,spin:.5}];
+  C.spr[0].on=true;
+  POSTER=true;
+  try{ drawCatch(); document.documentElement.style.setProperty("--ph-catch","url("+cv.toDataURL("image/jpeg",.82)+")"); }catch(e){}
+  POSTER=false; C=keep; MODE=keepMode;
+}
+function makePosters(){ makeTitaPoster(); makeFlapPoster(); makePaddlePoster(); makeAirPoster(); makeBalliesPoster(); makeMemoPoster(); makeCatchPoster(); }
 makePosters();
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(makePosters);
 setMark("home");
