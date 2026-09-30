@@ -1957,13 +1957,15 @@ function drawHuman(h,shirtL,shirtD,skin,capL,capD){
   ctx.restore();
 }
 
-// Nick and Giulia from the Lane Hoppers paintings, feet planted at y+26
+// Nick and Giulia from the Lane Hoppers paintings, feet planted at y+26.
+// The paintings face the camera. Limbs swing from the joints so they stay attached.
 function drawYardKid(h,name,shirtL,shirtD,capL,capD){
   if (!sprReady(name)){ drawHuman(h,shirtL,shirtD,"#e0a877",capL,capD); return; }
-  const bob=Math.abs(Math.sin(h.step))*2.4 + (h.wave>.05 ? h.wave*6 : 0);
+  const bob=Math.abs(Math.sin(h.step))*3.2 + (h.wave>.05 ? h.wave*8 : 0);
   softShadow(ctx,h.x+2,h.y+24,22,8,.34);
-  const im=SPR[name], hh=84, ww=hh*(im.naturalWidth/im.naturalHeight);
-  drawSprC(name,h.x,h.y+26-hh/2-bob,ww,hh,Math.sin(h.step)*.05,Math.cos(h.face)<-.01);
+  const im=SPR[name], hh=86, ww=hh*(im.naturalWidth/im.naturalHeight);
+  const girl=name.indexOf("giulia")>=0 || name.indexOf("Giulia")>=0;
+  hPose(name, h.x, h.y+26-hh/2-bob, ww, hh, Math.cos(h.face)<-.01, 0, hKidParts(girl, h.step*2.2, h.wave));
 }
 
 // fringe strokes that read as long fur along an edge
@@ -1990,9 +1992,15 @@ function drawDog(d,tnow){
   softShadow(ctx,d.x+11,d.y+20,29,11,.4);
   if (sprReady("hopBernard")){
     const flip=Math.cos(d.face)>.01;          // the painting faces left
-    const im=SPR.hopBernard, hh=88, ww=hh*(im.naturalWidth/im.naturalHeight);
-    const happy=d.hasBall?Math.sin(tnow*14)*.05:0;
-    drawSprC("hopBernard",d.x,d.y+20-hh/2+bob*.6,ww,hh,Math.sin(d.phase)*.04+happy,flip);
+    const im=SPR.hopBernard, hh=92, ww=hh*(im.naturalWidth/im.naturalHeight);
+    const wag=Math.sin(d.wag)*0.85;
+    const step=Math.sin(d.phase);
+    hPose("hopBernard", d.x, d.y+20-hh/2+bob*.5, ww, hh, flip, 0, [
+      {x:0.08,y:0.73,w:0.26,h:0.25, ax:0.5, ay:0.06, rot: step*0.5},
+      {x:0.48,y:0.71,w:0.34,h:0.22, ax:0.4, ay:0.08, rot:-step*0.45},
+      {x:0.00,y:0.00,w:0.42,h:0.46, ax:0.78, ay:0.90, rot: Math.sin(tnow*2.5)*0.1},
+      {x:0.68,y:0.52,w:0.32,h:0.20, ax:0.0, ay:0.55, rot: wag}
+    ]);
     if (d.hasBall){
       const fx=d.x+(flip?32:-32), fy=d.y-38+bob*.6;
       const k=KINDS[d.hasBall];
@@ -7587,31 +7595,95 @@ function hDrawBike(x,y,s,spin){
   ctx.beginPath(); ctx.moveTo(-9,-16); ctx.lineTo(-3,-16); ctx.stroke();
   ctx.restore();
 }
-function hWagTail(x, y, flip, t){
-  const wag=Math.sin((t||0)*7.6);
+function hPose(name, x, yCenter, w, h, flip, rotWhole, parts){
+  if (!sprReady(name)) return false;
+  const im=SPR[name];
+  const sw=im.naturalWidth, sh=im.naturalHeight;
+  const pad=Math.ceil(Math.max(w,h)*0.45);
+  const oc=hPose.c || (hPose.c=document.createElement("canvas"));
+  const ow=Math.ceil(w)+pad*2, oh=Math.ceil(h)+pad*2;
+  if (oc.width<ow) oc.width=ow+4;
+  if (oc.height<oh) oc.height=oh+4;
+  const o=oc.getContext("2d");
+  o.clearRect(0,0,oc.width,oc.height);
+  o.drawImage(im, pad, pad, w, h);
+  for (const p of (parts||[])){
+    if (!p.rot) continue;
+    const ax=p.ax==null?0.5:p.ax, ay=p.ay==null?0.5:p.ay;
+    const dx=pad+p.x*w, dy=pad+p.y*h, dw=p.w*w, dh=p.h*h;
+    const px=dx+dw*ax, py=dy+dh*ay;
+    o.save();
+    o.globalCompositeOperation="destination-out";
+    o.fillStyle="#000";
+    o.beginPath();
+    o.rect(dx, dy, dw, dh);
+    o.moveTo(px+7, py);
+    o.arc(px, py, 7, 0, Math.PI*2);
+    o.fill("evenodd");
+    o.restore();
+    o.save();
+    o.translate(px, py);
+    o.rotate(p.rot);
+    o.drawImage(im, p.x*sw, p.y*sh, Math.max(1,p.w*sw), Math.max(1,p.h*sh), -dw*ax, -dh*ay, dw, dh);
+    o.restore();
+  }
   ctx.save();
-  ctx.translate(x+(flip?40:-40), y-22);
-  ctx.scale(flip?-1:1, 1);
-  ctx.rotate(-0.55+wag*1.05);
-  ctx.lineCap="round";
-  limb(ctx, 6, 4, -14, -8, 10, "#3c342e", "#1a1614");
-  limb(ctx, -12, -6, -30, -18+wag*4, 9, "#d9a257", "#8f6224");
-  fur(ctx, -28, -16, 9, 9, 7, 9, "rgba(253,250,240,.9)", Math.PI*1.5, 1.6);
+  ctx.translate(x, yCenter);
+  if (rotWhole) ctx.rotate(rotWhole);
+  if (flip) ctx.scale(-1,1);
+  ctx.drawImage(oc, 0, 0, ow, oh, -w/2-pad, -h/2-pad, ow, oh);
   ctx.restore();
+  return true;
+}
+function hKidParts(girl, phase, wave){
+  const step=Math.sin(phase||0);
+  const arm=step*0.55 + (wave||0)*1.1;
+  const nod=Math.sin((phase||0)*0.7)*0.08;
+  if (girl){
+    return [
+      {x:0.20,y:0.72,w:0.26,h:0.26, ax:0.55, ay:0.05, rot: step*0.5},
+      {x:0.52,y:0.74,w:0.34,h:0.26, ax:0.4, ay:0.05, rot:-step*0.5},
+      {x:0.00,y:0.46,w:0.22,h:0.20, ax:0.85, ay:0.25, rot:-arm},
+      {x:0.74,y:0.42,w:0.26,h:0.18, ax:0.12, ay:0.35, rot: arm},
+      {x:0.12,y:0.00,w:0.70,h:0.34, ax:0.5, ay:0.92, rot: nod}
+    ];
+  }
+  return [
+    {x:0.16,y:0.64,w:0.26,h:0.36, ax:0.55, ay:0.06, rot: step*0.5},
+    {x:0.55,y:0.62,w:0.28,h:0.32, ax:0.45, ay:0.06, rot:-step*0.5},
+    {x:0.08,y:0.28,w:0.24,h:0.22, ax:0.8, ay:0.3, rot:-arm},
+    {x:0.72,y:0.32,w:0.26,h:0.18, ax:0.12, ay:0.4, rot: arm},
+    {x:0.22,y:0.00,w:0.55,h:0.30, ax:0.5, ay:0.9, rot: nod}
+  ];
+}
+function hBernardParts(t, step, wag){
+  return [
+    {x:0.08,y:0.73,w:0.26,h:0.25, ax:0.5, ay:0.06, rot:(step||0)*0.5},
+    {x:0.48,y:0.71,w:0.34,h:0.22, ax:0.4, ay:0.08, rot:-(step||0)*0.45},
+    {x:0.00,y:0.00,w:0.42,h:0.46, ax:0.78, ay:0.90, rot: Math.sin((t||0)*2.5)*0.1},
+    {x:0.68,y:0.52,w:0.32,h:0.20, ax:0.0, ay:0.55, rot: wag||0}
+  ];
 }
 function hDrawBernard(x,y,flip,sx,sy,swim,t){
-  const bob=Math.sin((t||0)*2.6)*1.8;
-  const breathe=1+Math.sin((t||0)*3.1)*0.03;
-  const rock=Math.sin((t||0)*2.4)*0.05;
+  const bob=Math.sin((t||0)*2.6)*1.5;
   const name = swim && sprReady("hopSwim") ? "hopSwim" : "hopBernard";
-  if (hBlitActor(name, x, y+4+bob, (swim?58:72)*breathe, flip, sx, (sy||1), swim?Math.sin((t||0)*4)*0.08:rock)) {
-    if (!swim) hWagTail(x, y+bob, flip, t||0);
+  if (sprReady(name)){
+    const hh=(swim?62:78)*((sy||1));
+    const ww=hh*(SPR[name].naturalWidth/Math.max(1,SPR[name].naturalHeight))*(sx||1);
+    const yFeet=y+4+bob;
+    const wag=Math.sin((t||0)*8)*0.9;
+    const step=Math.sin((t||0)*3.4);
+    drawDrop(x, yFeet+5, Math.max(10, ww*0.28), 6);
+    const parts = swim
+      ? [{x:0.00,y:0.42,w:0.22,h:0.32, ax:0.95, ay:0.5, rot: wag}]
+      : hBernardParts(t||0, step, wag);
+    hPose(name, x, yFeet-hh*0.46, ww, hh, flip, 0, parts);
     return;
   }
   ctx.save();
   ctx.translate(x,y);
   ctx.scale(flip?-1:1, 1);
-  ctx.scale(sx*1.22, sy*1.22);
+  ctx.scale((sx||1)*1.22, (sy||1)*1.22);
   ctx.fillStyle="rgba(16,32,20,.32)";
   ctx.beginPath(); ctx.ellipse(2, 6, 24, 8, 0,0,Math.PI*2); ctx.fill();
   if (swim){
@@ -7664,12 +7736,18 @@ function hDrawPaw(x,y,s){
 function hDrawKidArt(x,y,flip,sx,sy,girl,hopU){
   const t=(LH&&LH.t)||0;
   const hopping = hopU>0.12 && hopU<0.88;
-  const bob=Math.sin(t*2.8)*1.8 - Math.sin(Math.min(1,hopU||0)*Math.PI)*6;
-  const rock=Math.sin(t*2.6)*0.045;
-  const name = girl
-    ? (hopping && sprReady("hopGiuliaHop") ? "hopGiuliaHop" : "hopGiulia")
-    : (hopping && sprReady("hopNicHop") ? "hopNicHop" : "hopNic");
-  if (hBlitActor(name, x, y+4+bob, hopping?108:100, flip, sx, sy, rock)) return;
+  const bob=Math.sin(t*3.2)*2 - Math.sin(Math.min(1,hopU||0)*Math.PI)*8;
+  const stand = girl ? "hopGiulia" : "hopNic";
+  const name = sprReady(stand) ? stand : (girl ? "hopGiuliaHop" : "hopNicHop");
+  if (sprReady(name)){
+    const hh=(hopping?108:102)*((sy||1));
+    const ww=hh*(SPR[name].naturalWidth/Math.max(1,SPR[name].naturalHeight))*(sx||1);
+    const yFeet=y+4+bob;
+    drawDrop(x, yFeet+5, Math.max(10, ww*0.22), 6);
+    const wave=(hopU||0)*0.8;
+    hPose(name, x, yFeet-hh*0.46, ww, hh, flip, 0, hKidParts(!!girl, t*3.2, wave));
+    return;
+  }
   ctx.save();
   ctx.translate(x,y);
   ctx.scale(flip?-1:1, 1);
@@ -8525,7 +8603,8 @@ document.getElementById("padStartBtn").addEventListener("click",startPaddle);
 document.getElementById("padGiulia").addEventListener("click",()=>setChar("giulia"));
 document.getElementById("padNic").addEventListener("click",()=>setChar("nic"));
 document.getElementById("hopStartBtn").addEventListener("click",startHop);
-document.getElementById("memoStartBtn").addEventListener("click",startMemo);
+const memoStartBtn=document.getElementById("memoStartBtn");
+if (memoStartBtn) memoStartBtn.addEventListener("click",startMemo);
 document.getElementById("hopGiulia").addEventListener("click",()=>setHopChar("giulia"));
 document.getElementById("hopNic").addEventListener("click",()=>setHopChar("nic"));
 document.getElementById("hopGiulia").addEventListener("mouseenter",()=>setHopChar("giulia"));
