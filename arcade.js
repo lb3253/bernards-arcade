@@ -2162,66 +2162,6 @@ function throwPose(h){
   }
   return null;
 }
-function lifeSmooth(t){ t=Math.max(0,Math.min(1,t)); return t*t*(3-2*t); }
-function lifeDeform(u, v, pose){
-  let x=0, y=0;
-  const s=Math.sin(pose.phase||0);
-  const walk=pose.walking?1:0;
-  const legV=lifeSmooth((v-0.60)/0.16);
-  const left=lifeSmooth((0.46-u)/0.14);
-  const right=lifeSmooth((u-0.54)/0.14);
-  y -= walk*legV*(left*Math.max(0,s)+right*Math.max(0,-s))*(pose.lift||13);
-  x += walk*legV*(left-right)*s*(pose.stride||8);
-  const armBand=lifeSmooth((v-0.28)/0.1)*(1-lifeSmooth((v-0.60)/0.1));
-  const armL=lifeSmooth((0.24-u)/0.12);
-  const armR=lifeSmooth((u-0.76)/0.12);
-  x += walk*armBand*(armL*(-s)+armR*s)*(pose.armSwing||11);
-  y -= walk*armBand*(armL*Math.max(0,-s)+armR*Math.max(0,s))*7;
-  x += walk*s*(0.42-v)*3.5;
-  if (pose.breath) y += Math.sin(pose.breath)*lifeSmooth(0.7-v)*1.6;
-  if (pose.throw){
-    const t=pose.throw;
-    const wgt=armL*lifeSmooth((v-0.30)/0.14);
-    const reach=lifeSmooth((v-0.36)/0.2);
-    y -= wgt*reach*Math.max(0,-t)*34;
-    x -= wgt*reach*Math.max(0,-t)*8;
-    x += wgt*reach*Math.max(0,t)*20;
-    y -= wgt*reach*Math.max(0,t)*16;
-  }
-  if (pose.wag){
-    const along=lifeSmooth((u-0.72)/0.2);
-    const tail=lifeSmooth((u-0.68)/0.08)*lifeSmooth((v-0.40)/0.1)*(1-lifeSmooth((v-0.78)/0.08));
-    const wag=Math.sin(pose.wag);
-    y += tail*along*wag*(pose.wagAmp||24);
-    x += tail*along*wag*5;
-  }
-  return {x:x, y:y};
-}
-function lifeDraw(name, x, yCenter, w, h, flip, pose){
-  const im=SPR[name];
-  if (!im) return;
-  pose=pose||{};
-  const cols=8, rows=12;
-  const sw=im.naturalWidth, sh=im.naturalHeight;
-  ctx.save();
-  ctx.imageSmoothingEnabled=true;
-  ctx.imageSmoothingQuality="high";
-  ctx.translate(x, yCenter);
-  if (flip) ctx.scale(-1,1);
-  if (pose.lean) ctx.rotate(pose.lean);
-  const ox=-w/2, oy=-h/2, pad=2;
-  for (let r=0;r<rows;r++){
-    for (let c=0;c<cols;c++){
-      const u0=c/cols, u1=(c+1)/cols, v0=r/rows, v1=(r+1)/rows;
-      const d=lifeDeform((u0+u1)/2, (v0+v1)/2, pose);
-      const sx=Math.max(0,u0*sw-1), sy=Math.max(0,v0*sh-1);
-      const sww=Math.min(sw-sx,(u1-u0)*sw+2), shh=Math.min(sh-sy,(v1-v0)*sh+2);
-      ctx.drawImage(im, sx, sy, sww, shh,
-        ox+u0*w-pad+d.x, oy+v0*h-pad+d.y, w/cols+pad*2, h/rows+pad*2);
-    }
-  }
-  ctx.restore();
-}
 function drawYardKid(h,name,shirtL,shirtD,capL,capD){
   if (!sprReady(name)){ drawHuman(h,shirtL,shirtD,"#e0a877",capL,capD); return; }
   const pose=throwPose(h);
@@ -2233,12 +2173,11 @@ function drawYardKid(h,name,shirtL,shirtD,capL,capD){
   const footY=h.y+18;
   const flip=Math.cos(h.face)<-.01;
   softShadow(ctx, h.x+6, footY+2, ww*0.38, 8, .28);
-  lifeDraw(name, h.x, footY-hh/2-bob, ww, hh, flip, {
-    phase:h.step, walking:walk, lean:lean,
-    throw: pose?pose.arm:0,
-    breath:(G&&G.t||0)*2.2,
-    lift:15, stride:9, armSwing:12
-  });
+  ctx.save();
+  ctx.imageSmoothingEnabled=true;
+  ctx.imageSmoothingQuality="high";
+  drawSprC(name, h.x, footY-hh/2-bob, ww, hh, lean, flip);
+  ctx.restore();
 }
 
 // fringe strokes that read as long fur along an edge
@@ -2271,18 +2210,16 @@ function drawDog(d,tnow){
     const bob=walking ? Math.sin(d.phase)*2.2 : 0;
     const bounce=excited ? Math.abs(Math.sin(d.wag))*5 : Math.abs(Math.sin(d.wag))*1.2;
     const cy=d.y+18-hh/2+bob-bounce;
-    const amp=excited ? 28 : 18;
-    lifeDraw("hopBernard", d.x, cy, ww, hh, flip, {
-      phase:d.phase, walking:walking,
-      breath:(tnow||0)*2.4,
-      wag:d.wag, wagAmp:amp,
-      lift:12, stride:10, armSwing:0
-    });
+    ctx.save();
+    ctx.imageSmoothingEnabled=true;
+    ctx.imageSmoothingQuality="high";
+    drawSprC("hopBernard", d.x, cy, ww, hh, 0, flip);
+    ctx.restore();
     if (d.hasBall && BALL_SPR[d.hasBall]){
       ctx.save();
       ctx.translate(d.x, cy);
       if (flip) ctx.scale(-1,1);
-      ctx.drawImage(BALL_SPR[d.hasBall], -ww*0.48, -hh*0.04, 16, 16);
+      ctx.drawImage(BALL_SPR[d.hasBall], -ww*0.42, -hh*0.02, 14, 14);
       ctx.restore();
     }
     if (d.bark) bubble(d.x,d.y-84,d.bark,"#fff","#1e2a18");
