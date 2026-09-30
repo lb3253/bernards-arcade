@@ -144,11 +144,15 @@ const ROOF  = { x:0, y:560, w:210, h:H-560 };
 const DOOR  = { x:224, y:596 }, DOOR_R = 160;
 
 const PIT = { x:656, y:436, r:34 };
-const CHAIRS = [];
-for (let i=0;i<6;i++){
-  const a = -Math.PI/2 + i*(Math.PI*2/6) + .4;
-  CHAIRS.push({ x:PIT.x+Math.cos(a)*108, y:PIT.y+Math.sin(a)*86, r:34, a:a+Math.PI/2 });
-}
+const CHAIRS = [
+  {x:128, y:310, a:0.5},
+  {x:360, y:268, a:1.3},
+  {x:560, y:300, a:-0.4},
+  {x:800, y:320, a:0.8},
+  {x:250, y:470, a:2.1},
+  {x:500, y:530, a:-1.1},
+  {x:760, y:500, a:0.3}
+].map(c=>({x:c.x, y:c.y, r:28, a:c.a}));
 const TREES = [ {x:250,y:266,s:1.1}, {x:640,y:258,s:1.25} ];
 const OBSTACLES = [
   { type:"circle", x:PIT.x, y:PIT.y, r:PIT.r },
@@ -484,7 +488,7 @@ function newGame(best){
     player:{x:430,y:604,r:16,face:-Math.PI/2,step:0,slow:0,shooCool:0},
     npc:{x:330,y:250,hx:330,hy:250,r:16,step:0,face:Math.PI/2,wave:0,windup:0},
     dog:{x:250,y:410,r:22,face:0,phase:0,wag:0,delay:1.2,bark:null,carryT:0,hasBall:null,chew:0},
-    laura:{x:DOOR.x,y:DOOR.y,r:17,mode:"inside",warn:0,patience:0,step:0,sweep:0,bark:null},
+    laura:{x:DOOR.x,y:DOOR.y,r:17,mode:"inside",warn:0,patience:0,step:0,sweep:0,bark:null,nap:6},
     charging:false, power:0, nagCool:0, pulse:0
   };
 }
@@ -1728,7 +1732,16 @@ function update(dt){
   const la=G.laura;
   la.sweep+=dt*7;
   if (la.bark){ la.bark.life-=dt; if (la.bark.life<=0) la.bark=null; }
+  if (la.nap==null) la.nap=6;
   const nearDoor=Math.hypot(p.x-DOOR.x,p.y-DOOR.y);
+  const lauraStep=(tx,ty,spd)=>{
+    const ax=tx-la.x, ay=ty-la.y, L=Math.hypot(ax,ay);
+    if (L>6){ la.x+=ax/L*spd*dt; la.y+=ay/L*spd*dt; la.step+=dt*9; la.face=Math.atan2(ay,ax); }
+    else la.step+=dt*2;
+    la.x=clamp(la.x,FIELD.x0+20,FIELD.x1-20);
+    la.y=clamp(la.y,FIELD.y0+20,FIELD.y1-20);
+    return L;
+  };
   if (la.mode==="inside"){
     la.x=DOOR.x; la.y=DOOR.y;
     if (nearDoor<DOOR_R){
@@ -1738,18 +1751,39 @@ function update(dt){
         la.bark={text:"Hey! Not by the house!",life:2.2};
         beep(520,.12,"square",.045);
       }
-    } else la.warn=Math.max(0,la.warn-dt*.8);
+    } else {
+      la.warn=Math.max(0,la.warn-dt*.8);
+      la.nap-=dt;
+      if (la.nap<=0){
+        la.mode="stroll"; la.patience=9; la.dwell=0; la.leg=0;
+        la.tx=360+Math.random()*280; la.ty=280+Math.random()*160;
+        la.nap=12+Math.random()*8;
+        la.bark={text:["I'm coming out!","Bernard!","Kids, careful!"][Math.floor(rand(0,3))],life:1.8};
+      }
+    }
+  } else if (la.mode==="stroll"){
+    la.patience-=dt;
+    if (nearDoor<DOOR_R*0.85){
+      la.mode="out"; la.patience=6;
+      la.bark={text:"Hey! Not by the house!",life:1.8};
+    } else if (lauraStep(la.tx,la.ty,LAURA_SPEED*0.72)<10){
+      la.dwell=(la.dwell||1.3)-dt;
+      if (la.dwell<=0){
+        if (!la.leg){
+          la.leg=1; la.dwell=1.2;
+          la.tx=clamp(la.tx+rand(-180,180),120,820);
+          la.ty=clamp(la.ty+rand(-80,120),260,520);
+        } else la.mode="returning";
+      }
+    }
+    if (la.patience<=0) la.mode="returning";
   } else if (la.mode==="out"){
     la.patience-=dt;
-    const ax=p.x-la.x, ay=p.y-la.y, L=Math.hypot(ax,ay);
-    if (L>3){ la.x+=ax/L*LAURA_SPEED*dt; la.y+=ay/L*LAURA_SPEED*dt; la.step+=dt*9; }
-    else la.step+=dt*2;
+    const L=lauraStep(p.x,p.y,LAURA_SPEED);
     if (L<la.r+p.r+8 && p.shooCool<=0) lauraShoos();
-    if (la.patience<=0 || nearDoor>DOOR_R*1.9) la.mode="returning";
+    if (la.patience<=0) la.mode="returning";
   } else {
-    const ax=DOOR.x-la.x, ay=DOOR.y-la.y, L=Math.hypot(ax,ay);
-    if (L>4){ la.x+=ax/L*LAURA_SPEED*.8*dt; la.y+=ay/L*LAURA_SPEED*.8*dt; la.step+=dt*7; }
-    else { la.step+=dt*1.6; la.mode="inside"; la.warn=0; }
+    if (lauraStep(DOOR.x,DOOR.y,LAURA_SPEED*0.8)<8){ la.step+=dt*1.6; la.mode="inside"; la.warn=0; la.x=DOOR.x; la.y=DOOR.y; }
   }
 }
 
@@ -2136,32 +2170,28 @@ function drawYardKid(h,name,shirtL,shirtD,capL,capD){
   if (!sprReady(name)){ drawHuman(h,shirtL,shirtD,"#e0a877",capL,capD); return; }
   const pose=throwPose(h);
   const walk=!pose && (h.moving||0)>0;
-  const bob=walk ? Math.abs(Math.sin(h.step))*4 : 0;
+  const bob=walk ? Math.abs(Math.sin(h.step))*5 : 0;
+  const lean=pose ? Math.max(-0.14, Math.min(0.18, (pose.lean||0)*0.22)) : (walk ? Math.sin(h.step)*0.045 : 0);
   const im=SPR[name];
-  const girl=name.indexOf("Giulia")>=0 || name.indexOf("giulia")>=0;
   const hh=112, ww=hh*(im.naturalWidth/im.naturalHeight);
   const footY=h.y+18;
-  const legs=girl
-    ? [
-        {x:0.14,y:0.72,w:0.26,h:0.26, ax:0.55, ay:0.04, swing:0.7},
-        {x:0.48,y:0.72,w:0.22,h:0.26, ax:0.45, ay:0.04, swing:-0.7}
-      ]
-    : [
-        {x:0.04,y:0.70,w:0.32,h:0.28, ax:0.62, ay:0.04, swing:0.72},
-        {x:0.54,y:0.68,w:0.30,h:0.28, ax:0.40, ay:0.04, swing:-0.72}
-      ];
-  const armPart=girl
-    ? {x:0.04,y:0.42,w:0.24,h:0.24, ax:1, ay:0}
-    : {x:0.00,y:0.34,w:0.24,h:0.24, ax:1, ay:0};
-  const rawArm=pose ? pose.arm : (walk ? -Math.sin(h.step)*0.55 : 0);
-  const arm=Math.max(-1.05, Math.min(1.15, rawArm));
+  const flip=Math.cos(h.face)<-.01;
   softShadow(ctx, h.x+6, footY+2, ww*0.38, 8, .28);
-  yardAnim(name, h.x, footY-hh/2-bob, ww, hh, Math.cos(h.face)<-.01, {
-    walking:walk, phase:h.step, legs:walk?legs:null,
-    arm:arm, armPart:(Math.abs(arm)>0.04?armPart:null),
-    lean: pose ? pose.lean*0.28 : (walk ? Math.sin(h.step)*0.04 : 0),
-    keepTop: girl ? 0.36 : 0.32
-  });
+  ctx.save();
+  ctx.imageSmoothingEnabled=true;
+  ctx.imageSmoothingQuality="high";
+  drawSprC(name, h.x, footY-hh/2-bob, ww, hh, lean, flip);
+  if (pose && Math.abs(pose.arm)>0.12){
+    const a=Math.max(-1.0, Math.min(1.1, pose.arm));
+    ctx.save();
+    ctx.translate(h.x, footY-hh*0.55);
+    if (flip) ctx.scale(-1,1);
+    const hx=8+Math.sin(a)*36, hy=6-Math.cos(a)*32;
+    limb(ctx, 2, 4, 2+(hx-2)*0.45, 4+(hy-4)*0.45, 8, shirtL, shirtD);
+    limb(ctx, 2+(hx-2)*0.45, 4+(hy-4)*0.45, hx, hy, 5, "#e7b48c", "#9a6840");
+    ctx.restore();
+  }
+  ctx.restore();
 }
 
 // fringe strokes that read as long fur along an edge
@@ -2196,14 +2226,8 @@ function drawDog(d,tnow){
     const cy=d.y+18-hh/2+bob-bounce;
     const amp=excited ? 1.15 : 0.8;
     yardAnim("hopBernard", d.x, cy, ww, hh, flip, {
-      walking: walking,
-      phase: d.phase,
-      legs: walking ? [
-        {x:0.08,y:0.74,w:0.28,h:0.24, ax:0.55, ay:0.06, swing:0.55},
-        {x:0.52,y:0.74,w:0.30,h:0.22, ax:0.35, ay:0.06, swing:-0.5}
-      ] : null,
-      keepTop: 0.62,
-      tail: {x:0.78,y:0.54,w:0.22,h:0.20, ax:0, ay:0.5, rot: Math.sin(d.wag)*amp},
+      walking: false,
+      tail: {x:0.80,y:0.56,w:0.20,h:0.16, ax:0, ay:0.45, rot: Math.sin(d.wag)*amp},
       ball: d.hasBall ? {kind:d.hasBall, x:0.08, y:0.50, r:8} : null
     });
     if (d.bark) bubble(d.x,d.y-84,d.bark,"#fff","#1e2a18");
