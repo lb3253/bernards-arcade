@@ -2013,20 +2013,25 @@ function yardAnim(name, x, yCenter, w, h, flip, o){
   g.drawImage(im, pad, pad, w, h);
   if (walking){
     const s=Math.sin(o.phase||0);
-    const liftMax=o.lift||8;
-    o.legs.forEach((leg,i)=>{
-      const lift=Math.max(0, (i%2?-s:s))*liftMax;
-      if (lift<0.4) return;
-      const dx=pad+leg.x*w, dy=pad+leg.top*h, dw=leg.w*w, dh=(1-leg.top)*h+2;
+    o.legs.forEach((leg)=>{
+      const rot=(leg.swing||0.4)*s;
+      if (Math.abs(rot)<0.03) return;
+      const ly=leg.y==null?leg.top:leg.y;
+      const lh=leg.h==null?(1-ly):leg.h;
+      const dx=pad+leg.x*w, dy=pad+ly*h, dw=leg.w*w, dh=lh*h;
+      const ax=leg.ax==null?0.5:leg.ax, ay=leg.ay==null?0.08:leg.ay;
+      const px=dx+dw*ax, py=dy+dh*ay;
       g.save();
       g.globalCompositeOperation="destination-out";
-      g.fillRect(dx, dy+3, dw, dh);
+      g.beginPath();
+      g.rect(dx, dy+Math.max(3, dh*0.12), dw, dh);
+      g.arc(px, py, 5, 0, Math.PI*2);
+      g.fill("evenodd");
       g.restore();
       g.save();
-      g.beginPath();
-      g.rect(dx-1, dy-lift, dw+2, dh+lift+6);
-      g.clip();
-      g.drawImage(im, pad, pad-lift, w, h);
+      g.translate(px, py);
+      g.rotate(rot);
+      g.drawImage(im, leg.x*im.naturalWidth, ly*im.naturalHeight, leg.w*im.naturalWidth, lh*im.naturalHeight, -dw*ax, -dh*ay, dw, dh);
       g.restore();
     });
   }
@@ -2045,20 +2050,28 @@ function yardAnim(name, x, yCenter, w, h, flip, o){
     g.restore();
   }
   if (ball && BALL_SPR[ball.kind]){
-    const r=ball.r||10;
+    const r=ball.r||8;
     const bx=pad+ball.x*w, by=pad+ball.y*h;
-    g.drawImage(BALL_SPR[ball.kind], bx-r, by-r, r*2, r*2);
+    // Keep the ball behind the muzzle. Only a little of it peeks out of the lips.
     g.save();
     g.beginPath();
-    // cover the half of the ball that sits inside the muzzle
-    g.rect(bx, by-r, r+0.16*w, r*2);
+    g.rect(bx-r*0.15, by-r, r*2.2, r*2);
     g.clip();
-    g.drawImage(im, pad, pad, w, h);
+    g.globalCompositeOperation="destination-over";
+    g.drawImage(BALL_SPR[ball.kind], bx-r*0.15, by-r*0.85, r*1.7, r*1.7);
+    g.restore();
+    g.save();
+    g.globalCompositeOperation="destination-out";
+    g.fillStyle="#000";
+    g.beginPath();
+    g.ellipse(bx+r*0.15, by, r*0.72, r*0.42, 0, 0, Math.PI*2);
+    g.fill();
     g.restore();
   }
   ctx.save();
   ctx.translate(x, yCenter);
   if (flip) ctx.scale(-1,1);
+  if (walking) ctx.rotate(Math.sin(o.phase||0)*0.04);
   ctx.drawImage(oc, -w/2-pad, -h/2-pad);
   ctx.restore();
 }
@@ -2070,10 +2083,20 @@ function drawYardKid(h,name,shirtL,shirtD,capL,capD){
   const im=SPR[name], hh=86, ww=hh*(im.naturalWidth/im.naturalHeight);
   const girl=name.indexOf("Giulia")>=0 || name.indexOf("giulia")>=0;
   const legs=girl
-    ? [{x:0.06,w:0.38,top:0.70},{x:0.48,w:0.40,top:0.70}]
-    : [{x:0.14,w:0.32,top:0.63},{x:0.54,w:0.34,top:0.63}];
+    ? [
+        {x:0.08,y:0.70,w:0.34,h:0.28, ax:0.55, ay:0.05, swing:0.55},
+        {x:0.50,y:0.72,w:0.36,h:0.26, ax:0.45, ay:0.05, swing:-0.55},
+        {x:0.00,y:0.46,w:0.20,h:0.20, ax:0.85, ay:0.2, swing:-0.4},
+        {x:0.76,y:0.44,w:0.22,h:0.16, ax:0.15, ay:0.3, swing:0.4}
+      ]
+    : [
+        {x:0.16,y:0.64,w:0.26,h:0.34, ax:0.5, ay:0.06, swing:0.55},
+        {x:0.55,y:0.62,w:0.28,h:0.32, ax:0.45, ay:0.06, swing:-0.55},
+        {x:0.06,y:0.30,w:0.24,h:0.22, ax:0.8, ay:0.2, swing:-0.45},
+        {x:0.72,y:0.32,w:0.24,h:0.18, ax:0.15, ay:0.3, swing:0.45}
+      ];
   yardAnim(name, h.x, h.y+26-hh/2-bob, ww, hh, Math.cos(h.face)<-.01, {
-    walking:walk, phase:h.step, lift:10, legs:legs
+    walking:walk, phase:h.step, legs:legs
   });
 }
 
@@ -2109,9 +2132,12 @@ function drawDog(d,tnow){
       walking: walking,
       phase: d.phase,
       lift: 11,
-      legs: [{x:0.05,w:0.34,top:0.72},{x:0.50,w:0.36,top:0.72}],
+      legs: [
+        {x:0.06,y:0.73,w:0.30,h:0.25, ax:0.55, ay:0.08, swing:0.5},
+        {x:0.50,y:0.72,w:0.34,h:0.22, ax:0.35, ay:0.08, swing:-0.45}
+      ],
       tail: {x:0.80,y:0.58,w:0.20,h:0.16, ax:0, ay:0.5, rot: Math.sin(d.wag)*0.45},
-      ball: d.hasBall ? {kind:d.hasBall, x:0.075, y:0.49, r:10} : null
+      ball: d.hasBall ? {kind:d.hasBall, x:0.12, y:0.48, r:9} : null
     });
     if (d.bark) bubble(d.x,d.y-84,d.bark,"#fff","#1e2a18");
     return;
@@ -6722,7 +6748,6 @@ function hTryHop(dc, dr){
   if (p.hop) return;
   let nc = (p.ride ? p.ride.col : p.c) + dc;
   let nr = p.r + dr;
-  if (LH.bike>0 && dr>0) nr = p.r + 2;         // on the bike you clear a row
   if (dr===0) nc = Math.round(nc);
   if (nr < 0) return;
   if (nc < H_PLAY0) nc = H_PLAY0;
@@ -6746,7 +6771,7 @@ function hLand(){
   const hop=p.hop; if (!hop) return;
   p.c = hop.tc; p.r = hop.tr; p.hop=null; p.squash=1;
   p.ride = null;
-  if (LH.bike>0 && hop.tr-hop.fr>1){ LH.bike--; if (!LH.bike) hToast("BIKE'S DONE","#cfe9ff"); }
+  if (LH.bike>0){ LH.bike--; if (!LH.bike) hToast("BIKE'S DONE","#cfe9ff"); }
   const lane = hLane(p.r);
   if (lane.type==="water"){
     const pad = hPadAt(p.c, p.r, 0.75);
@@ -6772,7 +6797,7 @@ function hLand(){
         LH.bike = H_BIKE_HOPS;
         const pos=hIso(pk.c, pk.row);
         hPuff(pos.x, pos.y-20, "#9be5ff", 14);
-        hToast("BIKE! UP HOPS GO TWO ROWS", "#9be5ff");
+        hToast("BIKE! HOPS ARE FASTER", "#9be5ff");
         sfx.carGo();
         continue;
       }
@@ -6987,7 +7012,7 @@ function updateHop(dt){
       sfx.bank(1);
     }
   } else {
-    if (hAnim(LH.player, dt, H_HOP_DUR)) hLand();
+    if (hAnim(LH.player, dt, LH.bike>0 ? H_HOP_DUR*0.48 : H_HOP_DUR)) hLand();
     if (hAnim(LH.dog, dt, H_HOP_DUR+0.04)){
       LH.dog.c = LH.dog.hop.tc; LH.dog.r = LH.dog.hop.tr; LH.dog.hop=null;
     }
@@ -7683,23 +7708,92 @@ function hDrawPickupArt(pk,x,y){
   hBlit(pk.kind==="ball"?"ball":"bone", x, y-8+bob, false);
 }
 
+function hBikeShape(spin){
+  ctx.fillStyle="rgba(16,30,16,.32)";
+  ctx.beginPath(); ctx.ellipse(0,18,30,5,0,0,Math.PI*2); ctx.fill();
+  const wheel=(wx)=>{
+    ctx.fillStyle="#14161a";
+    ctx.beginPath(); ctx.arc(wx,4,14,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle="#3a3e48"; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(wx,4,11,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle="#e4e7ee"; ctx.lineWidth=1.3;
+    for (let i=0;i<6;i++){
+      const a=spin+i*Math.PI/3;
+      ctx.beginPath();
+      ctx.moveTo(wx+Math.cos(a)*2.2, 4+Math.sin(a)*2.2);
+      ctx.lineTo(wx+Math.cos(a)*8, 4+Math.sin(a)*8);
+      ctx.stroke();
+    }
+    ctx.fillStyle="#f2f4f8";
+    ctx.beginPath(); ctx.arc(wx,3,2.4,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle="#9aa0aa";
+    ctx.beginPath(); ctx.arc(wx,4.5,1.2,0,Math.PI*2); ctx.fill();
+  };
+  wheel(-22); wheel(22);
+  ctx.strokeStyle="#d8252a"; ctx.lineWidth=4.2; ctx.lineCap="round"; ctx.lineJoin="round";
+  ctx.beginPath();
+  ctx.moveTo(-22,4); ctx.lineTo(-4,-14); ctx.lineTo(16,-14); ctx.lineTo(22,4);
+  ctx.moveTo(-4,-4); ctx.lineTo(-4,-14);
+  ctx.stroke();
+  ctx.strokeStyle="rgba(255,255,255,.4)"; ctx.lineWidth=1.3;
+  ctx.beginPath(); ctx.moveTo(-20,2); ctx.lineTo(-4,-12); ctx.lineTo(14,-12); ctx.stroke();
+  ctx.fillStyle="#1c1c1c";
+  ctx.beginPath(); ctx.ellipse(-6,-18,9,3.2,-0.15,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle="#3a3a3a";
+  ctx.beginPath(); ctx.ellipse(-7,-19,5,1.4,-0.2,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle="#2a2c30"; ctx.lineWidth=3.2;
+  ctx.beginPath(); ctx.moveTo(16,-14); ctx.lineTo(24,-24); ctx.stroke();
+  ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(16,-24); ctx.lineTo(30,-23); ctx.stroke();
+  ctx.fillStyle="#111";
+  ctx.beginPath(); ctx.arc(28,-23,2.2,0,Math.PI*2); ctx.fill();
+  const a=spin;
+  ctx.strokeStyle="#4a4e56"; ctx.lineWidth=2.4;
+  ctx.beginPath();
+  ctx.moveTo(-4+Math.cos(a)*10, -2+Math.sin(a)*6);
+  ctx.lineTo(-4-Math.cos(a)*10, -2-Math.sin(a)*6);
+  ctx.stroke();
+  ctx.fillStyle="#1a1a1a";
+  ctx.fillRect(-4+Math.cos(a)*9-3.5, -2+Math.sin(a)*5-1.6, 7, 3.2);
+  ctx.fillRect(-4-Math.cos(a)*9-3.5, -2-Math.sin(a)*5-1.6, 7, 3.2);
+}
 function hDrawBike(x,y,s,spin){
   ctx.save(); ctx.translate(x,y); ctx.scale(s,s);
-  ctx.lineCap="round";
-  ctx.fillStyle="rgba(16,32,20,.28)";
-  ctx.beginPath(); ctx.ellipse(0,10,26,6,0,0,Math.PI*2); ctx.fill();
-  for (const wx of [-17,17]){
-    ctx.strokeStyle="#2a2a2e"; ctx.lineWidth=4.5;
-    ctx.beginPath(); ctx.arc(wx,2,10,0,Math.PI*2); ctx.stroke();
-    ctx.strokeStyle="#c9ccd2"; ctx.lineWidth=1.2;
-    for (let i=0;i<4;i++){ const a=spin+i*Math.PI/4; ctx.beginPath(); ctx.moveTo(wx-Math.cos(a)*9,2-Math.sin(a)*9); ctx.lineTo(wx+Math.cos(a)*9,2+Math.sin(a)*9); ctx.stroke(); }
+  hBikeShape(spin);
+  ctx.restore();
+}
+function hDrawRider(x,y,flip,girl,spin){
+  ctx.save();
+  ctx.translate(x,y);
+  if (flip) ctx.scale(-1,1);
+  hBikeShape(spin);
+  const name=girl?"hopGiulia":"hopNic";
+  if (sprReady(name)){
+    const im=SPR[name];
+    const hh=74, ww=hh*(im.naturalWidth/im.naturalHeight);
+    const top=-hh+4;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-ww/2-6, top-4, ww+12, hh*0.60);
+    ctx.clip();
+    ctx.drawImage(im, -ww/2, top, ww, hh);
+    ctx.restore();
+    const pant=girl?"#5e646e":"#2c5ea6";
+    const shoe=girl?"#f4f1ea":"#f7f7f7";
+    const hipY=top+hh*0.56;
+    for (const side of [0,1]){
+      const a=spin+(side?Math.PI:0);
+      const px=-4+Math.cos(a)*10, py=-2+Math.sin(a)*6;
+      const hx=side?-8:6;
+      ctx.strokeStyle=pant; ctx.lineWidth=7; ctx.lineCap="round"; ctx.lineJoin="round";
+      ctx.beginPath();
+      ctx.moveTo(hx, hipY);
+      ctx.quadraticCurveTo((hx+px)/2, hipY+8, px, py);
+      ctx.stroke();
+      ctx.strokeStyle=shoe; ctx.lineWidth=4.5;
+      ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px+5, py+1); ctx.stroke();
+    }
   }
-  ctx.strokeStyle="#e0352c"; ctx.lineWidth=3.6;
-  ctx.beginPath(); ctx.moveTo(-17,2); ctx.lineTo(-6,-12); ctx.lineTo(9,-12); ctx.lineTo(17,2); ctx.lineTo(1,4); ctx.lineTo(-6,-12); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(9,-12); ctx.lineTo(14,-19); ctx.stroke();
-  ctx.strokeStyle="#3a3a40"; ctx.lineWidth=3;
-  ctx.beginPath(); ctx.moveTo(10,-19); ctx.lineTo(19,-19); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-9,-16); ctx.lineTo(-3,-16); ctx.stroke();
   ctx.restore();
 }
 function hPose(name, x, yCenter, w, h, flip, rotWhole, parts){
@@ -7987,11 +8081,10 @@ function drawHop(){
       const sq=hSquash(LH.player);
       const hopU=LH.player.hop?LH.player.hop.t:0;
       if (LH.bike>0){
-        ctx.save(); if (LH.player.face<0){ ctx.translate(p.x*2,0); ctx.scale(-1,1); }
-        hDrawBike(p.x, p.y+H_TH*0.28+2, 1.15, LH.t*(LH.player.hop?22:4));
-        ctx.restore();
+        hDrawRider(p.x, p.y+H_TH*0.42, LH.player.face<0, H_CHAR!=="nic", LH.t*(LH.player.hop?16:6));
+      } else {
+        hDrawKidArt(p.x, p.y+H_TH*0.28, LH.player.face<0, sq.sx, sq.sy, H_CHAR!=="nic", hopU);
       }
-      hDrawKidArt(p.x, p.y+H_TH*0.28-(LH.bike>0?10:0), LH.player.face<0, sq.sx, sq.sy, H_CHAR!=="nic", hopU);
     }
   }
 
