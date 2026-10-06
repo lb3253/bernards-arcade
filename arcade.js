@@ -275,7 +275,7 @@ function chunky(c,txt,x,y,size,fill,stroke,weight){
 
 // ---------------------------------------------------------------- audio
 let audioOn=true, glare=true, ac=null;
-const ARCADE_FLASH = {flap:false, hop:false, air:false, ballies:false, memo:false, catch:false};
+const ARCADE_FLASH = {flap:false, hop:false, air:false, ballies:false, memo:false, catch:false, bba:false};
 function beep(f,dur,type,vol){
   if (!audioOn) return;
   try{
@@ -510,7 +510,7 @@ let pointer={down:false,x:0,y:0};
 const GP = { idx:null, id:"", prev:{}, focus:0, lastScreen:"", navHold:0, lastBtn:"" };
 
 const GP_ITEMS = {
-  home:     ["pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickCatch"],
+  home:     ["pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickCatch","pickBba"],
   memomenu: ["memoStartBtn","memoBack"],
   catchmenu: ["catchStartBtn","catchBack"],
   menu:     ["startBtn","menuBack"],
@@ -614,9 +614,9 @@ function uiBack(){ const sc=gpScreen(); if (sc==="pause") quitToArcade(); else i
 
 // ---------------------------------------------------------------- lobby carousel
 const CAR = {
-  items:["pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickCatch"],
-  flashKey:{pickFlap:"flap", pickHop:"hop", pickAir:"air", pickBallies:"ballies", pickMemo:"memo", pickCatch:"catch"},
-  spill:{pickFlap:"rgba(80,190,255,.32)", pickHop:"rgba(110,220,90,.30)", pickAir:"rgba(255,90,160,.32)", pickBallies:"rgba(255,207,58,.30)", pickMemo:"rgba(170,110,255,.32)", pickCatch:"rgba(255,140,60,.34)"},
+  items:["pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickCatch","pickBba"],
+  flashKey:{pickFlap:"flap", pickHop:"hop", pickAir:"air", pickBallies:"ballies", pickMemo:"memo", pickCatch:"catch", pickBba:"bba"},
+  spill:{pickFlap:"rgba(80,190,255,.32)", pickHop:"rgba(110,220,90,.30)", pickAir:"rgba(255,90,160,.32)", pickBallies:"rgba(255,207,58,.30)", pickMemo:"rgba(170,110,255,.32)", pickCatch:"rgba(255,140,60,.34)", pickBba:"rgba(90,190,255,.34)"},
   index:0, pos:0, vel:0, target:0, bounce:0,
   tiltX:0, tiltY:0, wantTiltX:0, wantTiltY:0,
   drag:null, lastIdx:-1, chaseT:0, ready:false
@@ -661,6 +661,7 @@ function carouselLaunch(){
   else if (id==="pickBallies") openBallies();
   else if (id==="pickMemo") openMemo();
   else if (id==="pickCatch") openCatch();
+  else if (id==="pickBba") bbaOpen();
 }
 function carouselOnClick(id){
   const i=CAR.items.indexOf(id);
@@ -1120,6 +1121,13 @@ function pollGamepad(){
   }
 
   // ================================================ gameplay
+  if (MODE==="bba"){
+    // Bernard's Big Adventure reads the pad itself (jump, run, bark, L, R).
+    gpEdge("pausePlay", startB);
+    gpEdge("selPlay", selB);
+    gpEdge("face", face);
+    return;
+  }
   gpApplyFocus();   // clears the ring once a round is running
   // only touch an arrow when the pad changes it, so keyboard/remote arrows keep working
   const padDir=(name,on,key)=>{
@@ -1192,7 +1200,14 @@ addEventListener("keydown",e=>{
     if (c==="Escape"||c==="Backspace"){ uiBack(); e.preventDefault(); return; }
     return;
   }
-  if (code==="Escape"||code==="KeyP"||code==="Backspace"){ togglePause(); e.preventDefault(); return; }
+  if (code==="Escape"||code==="KeyP"||code==="Backspace"){
+    if (MODE==="bba"){
+      if (code==="KeyP") bbaTogglePause();
+      else bbaSelect();
+      e.preventDefault(); return;
+    }
+    togglePause(); e.preventDefault(); return;
+  }
   if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","KeyX","KeyZ","KeyA","KeyB","KeyY","ShiftLeft","ShiftRight"].includes(code)) e.preventDefault();
   if (MODE==="memo" && !e.repeat) memoKey(code);
   if ((code==="Space"||code==="KeyX") && !keys.has("Space") && !keys.has("KeyX")) actionDown();
@@ -1288,6 +1303,7 @@ function actionDown(){
   else if (MODE==="jeep"){ if (J) J.touchGas=true; }
   else if (MODE==="memo"){ /* Bernard Says reads its buttons itself */ }
   else if (MODE==="catch") catchJump();
+  else if (MODE==="bba") return;
   else startCharge();
 }
 function actionUp(){
@@ -8785,6 +8801,7 @@ function frame(now){
       else if (MODE==="jeep"){ if (J){ if(!PAUSED) updateJeep(d); drawJeep(); } }
       else if (MODE==="memo"){ if (M){ if(!PAUSED) updateMemo(d); drawMemo(); } }
       else if (MODE==="catch"){ if (C){ if(!PAUSED) updateCatch(d); drawCatch(); } }
+      else if (MODE==="bba"){ /* Bernard's Big Adventure draws on its own canvas */ }
       else { if (G){ if(!PAUSED) update(d); draw(); } }
     }
   }catch(err){
@@ -9143,6 +9160,7 @@ const MARKS={
   air:   ["Flying with","BERNARD"],
   hop:   ["Lane Hoppers","BERNARD"],
   catch: ["Catch with","BERNARD"],
+  bba:   ["Bernard's","ADVENTURE"],
   memo:  ["Bernard","SAYS"],
   jeep:  ["Bernard Goes","OFF ROAD"]
 };
@@ -9172,8 +9190,10 @@ function refreshBests(){
   set("bestPaddle",get("paddle_best")); set("bestAir",get("air_best")); set("bestHop",get("hop_best")); set("bestJeep",get("jeep_best"));
   set("bestMemo",get("memo_best"));
   set("bestCatch",get("catch_best"));
+  set("bestBba",get("bba_best"));
 }
 function goHome(){
+  if (typeof bbaShutdown==="function") bbaShutdown();
   refreshBests();
   hideAll(); homeEl.classList.add("on"); setMark("home");
   MODE="ballies";
@@ -9285,14 +9305,14 @@ function updateStar(){
   const id=(GP_ITEMS.home||[])[GP.focus]||"pickFlap";
   const air=id==="pickAir";
   const hop=id==="pickHop";
-  const yard=id==="pickBallies", memo=id==="pickMemo", cat=id==="pickCatch";
-  const which=cat?"catch":memo?"memo":yard?"yard":hop?"hop":air?(A_PLANE==="jet"?"jet":"air"):"flap";
+  const yard=id==="pickBallies", memo=id==="pickMemo", cat=id==="pickCatch", bbaCard=id==="pickBba";
+  const which=bbaCard?"bba":cat?"catch":memo?"memo":yard?"yard":hop?"hop":air?(A_PLANE==="jet"?"jet":"air"):"flap";
   if (img.getAttribute("data-which")===which){ img.style.opacity="1"; return; }
   img.style.opacity="0";
   setTimeout(()=>{
     img.src=hop?"/art/bernard-portrait.jpg":air?(which==="jet"?"/art/bernard-jet-portrait.jpg":"/art/bernard-pilot-portrait.jpg"):"/art/bernard-portrait.jpg";
     img.setAttribute("data-which",which);
-    if (cap) cap.textContent=cat?"Catch!":memo?"Simon says":yard?"Ball thief":hop?"The hoppers":air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
+    if (cap) cap.textContent=bbaCard?"Big adventure":cat?"Catch!":memo?"Simon says":yard?"Ball thief":hop?"The hoppers":air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
     img.style.opacity="1";
   },90);
 }
@@ -9306,12 +9326,14 @@ function startAir(opts){
 }
 // ---- pause / quit, reachable from every game
 function gameRunning(){
+  if (MODE==="bba" && bba && bba.phase==="play") return true;
   return (MODE==="tita"&&T&&T.running)||(MODE==="flap"&&F&&F.running)||
          (MODE==="paddle"&&P&&P.running)||(MODE==="air"&&A&&A.running)||
          (MODE==="hop"&&LH&&LH.running)||(MODE==="jeep"&&J&&J.running)||(MODE==="ballies"&&G&&G.running)||
          (MODE==="memo"&&M&&M.running)||(MODE==="catch"&&C&&C.running);
 }
 function togglePause(){
+  if (MODE==="bba"){ bbaTogglePause(); return; }
   if (!gameRunning()) return;
   PAUSED=!PAUSED;
   pauseEl.classList.toggle("on",PAUSED);
@@ -9597,6 +9619,1238 @@ window.__BA={
   hopGo(n){ if(LH){ LH.player.r=n; LH.started=true; LH.running=true; } },
   hopRide(){ hFerry(); }
 };
+// =============================================================================
+// Bernard's Big Adventure
+// A self-contained 2.5D stage. Nothing above this line belongs to this game.
+// Edit the three blocks marked LEVEL, COLORS, and SPEEDS.
+// Three.js is loaded from cdnjs only while this game is open, then removed.
+// =============================================================================
+
+// ----- LEVEL ---------------------------------------------------------------
+// One character is one tile. The top string is the sky, the bottom is the ground.
+//   . empty     = grass ground     # brick (Big Bernard smashes these)
+//   ? treat box (pops out a ball)  B treat box (pops out a bone)
+//   o green ball   R red ball      Q golden squeaky toy
+//   S squirrel     C cat           W crow        H fire hydrant
+//   - still platform   M moving platform
+//   P water-bowl checkpoint        D doghouse (the goal)
+const BBA_MAP = [
+  "............................................................................................................................................................................................................................",
+  "............................................................................................................................................................................................................................",
+  "............................................................................................................................................................................................................................",
+  "........................................................................................................................................................................W...............................W...................",
+  ".....................................................................................................................................---.Q..................................................................................",
+  "..................?......R....................B.........................................?...R...................................---.............R...B.........####..........?.......R.......................................",
+  "............o.....................----..........o.....................----......o...............--............M...........----........................----...o..................o...........M...............................",
+  "........o..o..o..o..o..R...H..S..........o..o..o..C...H...o...S.###.........o..o..o..R....C...H...o...S.P..o.........o....o....o....o....o..o..R..H.........o..o..o...C...S...H...o...R.............o..o..o..o..C...H..o.D..",
+  "==================================....================================....==================================........==================================....================================........=========================="
+];
+
+// ----- COLORS --------------------------------------------------------------
+// Bernard's coat. Change these and the next launch uses the new colors.
+const BBA_COLORS = {
+  fur:    0xc4783a,  // rust / tan body, legs, cheeks
+  saddle: 0x1a120e,  // black saddle and face mask
+  chest:  0xf4efe6,  // white chest patch
+  nose:   0x140e0c,
+  grass:  0x67b83a,
+  dirt:   0x8d5a32,
+  brick:  0xc4563a,
+  wood:   0xd39a52,
+  gold:   0xf0c14d,
+  hydrant:0xe23b32,
+  ball:   0xc6f25a,  // neon yellow-green
+  ballRed:0xf0472f,
+  house:  0xf4e2c4,
+  roof:   0xc4563a,
+  sky:    0x8ecff5
+};
+
+// ----- SPEEDS --------------------------------------------------------------
+const BBA_SPEED = {
+  walk: 5.3,     // tiles per second
+  run:  8.4,
+  jump: 9.8,     // takeoff speed. Hold the button for the full arc.
+  gravity: 36,
+  squirrel: 1.65,
+  cat: 1.25,
+  crow: 1.35,    // how fast a crow finishes one swoop
+  kick: 8,       // curled-up cat
+  plat: 4.2      // how far an M platform slides, left and right
+};
+
+const BBA_THREE = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
+
+let bba = null;
+
+function bbaPadDefault(){
+  // Standard SNES-style mapping: B jump, Y run, A bark, X also jump.
+  return { jump:0, jump2:3, run:2, bark:1, start:9, select:8, l:4, r:5 };
+}
+function bbaLoadPad(){
+  const d = bbaPadDefault();
+  try{
+    const s = JSON.parse(localStorage.getItem("bba_pad") || "null");
+    if (s && typeof s.jump === "number") return Object.assign(d, s);
+  }catch(e){}
+  return d;
+}
+function bbaSavePad(map){
+  try{ localStorage.setItem("bba_pad", JSON.stringify(map)); }catch(e){}
+}
+function bbaSaveBest(v){
+  try{
+    const o = +localStorage.getItem("bba_best") || 0;
+    if (v > o){ ARCADE_FLASH.bba = true; localStorage.setItem("bba_best", String(v)); }
+  }catch(e){}
+}
+
+function bbaSfxJump(){ beep(200,.08,"sawtooth",.055); setTimeout(()=>beep(130,.1,"sawtooth",.04), 60); }
+function bbaSfxBall(){ beep(980,.07,"sine",.05); }
+function bbaSfxBone(){ beep(150,.12,"square",.06); setTimeout(()=>beep(90,.14,"triangle",.05), 80); }
+function bbaSfxBark(){ beep(240,.09,"sawtooth",.07); setTimeout(()=>beep(160,.12,"sawtooth",.055), 80); }
+function bbaSfxHurt(){ beep(100,.22,"sawtooth",.07); }
+function bbaSfxPower(){ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,.1,"square",.045), i*65)); }
+function bbaSfxWin(){ [392,523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,.16,"square",.05), i*130)); }
+function bbaSfxStomp(){ beep(180,.08,"square",.05); }
+
+function bbaLoadThree(){
+  if (window.THREE && window.THREE.WebGLRenderer) return Promise.resolve();
+  return new Promise((resolve, reject)=>{
+    const s = document.createElement("script");
+    s.src = BBA_THREE;
+    s.id = "bba-three";
+    s.onload = ()=> resolve();
+    s.onerror = ()=> reject(new Error("three"));
+    document.head.appendChild(s);
+  });
+}
+
+function bbaOpen(){
+  hideAll();
+  setMark("bba");
+  MODE = "bba";
+  if (bba) bbaShutdown();
+  bbaMount();
+}
+function bbaShutdown(){
+  if (!bba) return;
+  const st = bba;
+  bba = null;
+  if (st.raf) cancelAnimationFrame(st.raf);
+  if (st.onResize) removeEventListener("resize", st.onResize);
+  if (st.renderer){
+    try{ st.renderer.dispose(); st.renderer.forceContextLoss(); }catch(e){}
+  }
+  if (st.world) bbaDispose(st.world);
+  if (st.root && st.root.parentNode) st.root.parentNode.removeChild(st.root);
+  const tag = document.getElementById("bba-three");
+  if (tag && tag.parentNode) tag.parentNode.removeChild(tag);
+  try{ delete window.THREE; }catch(e){}
+}
+function bbaDispose(obj){
+  if (!obj) return;
+  obj.traverse(o=>{
+    if (o.geometry) o.geometry.dispose();
+    if (o.material){
+      const list = Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of list){ if (m.map) m.map.dispose(); m.dispose(); }
+    }
+  });
+}
+
+function bbaMount(){
+  const stage = document.getElementById("stage");
+  const root = document.createElement("div");
+  root.id = "bba-root";
+  root.innerHTML =
+    '<style>'+
+    '#bba-root{position:absolute;inset:0;z-index:5;background:#8ecff5;overflow:hidden;font-family:Fredoka,system-ui,sans-serif;color:#fff6c9}'+
+    '#bba-root canvas{display:block;width:100%;height:100%}'+
+    '#bba-hud{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;gap:8px;padding:10px 12px;pointer-events:none}'+
+    '#bba-hud .bba-pill{background:linear-gradient(#fff6c9,#f0c14d);color:#4a2408;border:3px solid #a86a12;border-radius:14px;padding:6px 12px;font-weight:700;min-width:84px;text-align:center;box-shadow:0 3px 0 #6a3a08}'+
+    '#bba-hud small{display:block;font-size:10px;letter-spacing:.14em}'+
+    '#bba-menu{position:absolute;left:50%;top:50%;transform:translate(-50%,-46%);width:min(440px,88%);background:rgba(18,12,8,.78);border:3px solid #f0c14d;border-radius:22px;padding:22px 20px 16px;text-align:center;box-shadow:0 16px 40px rgba(0,0,0,.35)}'+
+    '#bba-menu h2{margin:0 0 6px;font-size:28px;color:#ffe07a;-webkit-text-stroke:3px #4a1f08;paint-order:stroke fill}'+
+    '#bba-menu p{margin:0 0 12px;color:#fff6c9;font-size:14px;line-height:1.35}'+
+    '#bba-menu button{display:block;width:100%;margin:6px 0;font:700 16px Fredoka,system-ui,sans-serif;padding:10px;border-radius:999px;border:2px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff6c9;cursor:pointer}'+
+    '#bba-menu button.on{background:linear-gradient(#c9f24d,#8fd11f);color:#17300a;border-color:#fff}'+
+    '#bba-toast{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);background:rgba(6,16,10,.8);border:2px solid #c9f24d;color:#eaffc4;border-radius:999px;padding:6px 14px;font-weight:700;font-size:13px}'+
+    '#bba-touch{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;padding:10px;gap:8px}'+
+    '#bba-touch button{min-width:64px;min-height:54px;border-radius:16px;border:2px solid rgba(255,255,255,.4);background:rgba(8,16,12,.55);color:#fff;font:700 13px Fredoka,system-ui,sans-serif}'+
+    '</style>'+
+    '<div id="bba-hud"></div><div id="bba-menu"></div><div id="bba-toast" hidden></div>'+
+    '<div id="bba-touch"><button data-k="left">LEFT</button><button data-k="down">DUCK</button><button data-k="bark">BARK</button><button data-k="run">RUN</button><button data-k="jump">JUMP</button><button data-k="right">RIGHT</button></div>';
+  stage.appendChild(root);
+  bba = {
+    root, phase:"loading", raf:0, padMap:bbaLoadPad(), touch:{},
+    keyPrev:{}, btnPrev:{}, menuI:0, look:0, time:0, clock:0, score:0, displayScore:0,
+    ballN:0, lives:3, best:0, toastT:0, setupI:0, setupWait:false
+  };
+  try{ bba.best = +localStorage.getItem("bba_best") || 0; }catch(e){}
+  const touch = root.querySelector("#bba-touch");
+  if (typeof IS_TOUCH !== "undefined" && !IS_TOUCH) touch.style.display = "none";
+  touch.querySelectorAll("button").forEach(btn=>{
+    const k = btn.getAttribute("data-k");
+    const down = ev=>{ ev.preventDefault(); bba.touch[k] = true; };
+    const up = ev=>{ ev.preventDefault(); bba.touch[k] = false; };
+    btn.addEventListener("pointerdown", down);
+    btn.addEventListener("pointerup", up);
+    btn.addEventListener("pointercancel", up);
+    btn.addEventListener("pointerleave", up);
+  });
+  bba.onResize = ()=> bbaResize();
+  addEventListener("resize", bba.onResize);
+  bbaPaintMenu();
+  bbaLoadThree().then(()=>{
+    if (!bba || bba.root !== root) return;
+    bbaBoot3d();
+  }).catch(()=>{
+    if (!bba) return;
+    const m = root.querySelector("#bba-menu");
+    m.hidden = false;
+    m.innerHTML = "<h2>Couldn't start</h2><p>The 3D piece didn't load. Check the connection and try the cabinet again.</p>";
+  });
+}
+
+function bbaBoot3d(){
+  const THREE = window.THREE;
+  const root = bba.root;
+  const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.08;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  root.insertBefore(renderer.domElement, root.firstChild);
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(BBA_COLORS.sky);
+  scene.fog = new THREE.Fog(BBA_COLORS.sky, 18, 46);
+  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 80);
+  const hemi = new THREE.HemisphereLight(0xfff4d2, 0x5a8a32, 0.65);
+  scene.add(hemi);
+  const amb = new THREE.AmbientLight(0xffffff, 0.28);
+  scene.add(amb);
+  const sun = new THREE.DirectionalLight(0xfff1c9, 1.15);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.camera.near = 0.5;
+  sun.shadow.camera.far = 40;
+  sun.shadow.bias = -0.0008;
+  scene.add(sun);
+  scene.add(sun.target);
+  const world = new THREE.Group();
+  scene.add(world);
+  bba.renderer = renderer;
+  bba.scene = scene;
+  bba.camera = camera;
+  bba.world = world;
+  bba.sun = sun;
+  bba.THREE = THREE;
+  bbaMakeBackdrop();
+  bbaRebuild();
+  bba.phase = "title";
+  bba.menuI = 0;
+  bbaPaintMenu();
+  bbaResize();
+  bba.last = performance.now();
+  const loop = now=>{
+    if (!bba || bba.renderer !== renderer) return;
+    bba.raf = requestAnimationFrame(loop);
+    const dt = Math.min(0.033, (now - bba.last) / 1000);
+    bba.last = now;
+    bbaFrame(dt);
+  };
+  bba.raf = requestAnimationFrame(loop);
+}
+
+function bbaMat(color, opt){
+  return new bba.THREE.MeshStandardMaterial(Object.assign({
+    color, roughness:0.58, metalness:0.06
+  }, opt || {}));
+}
+function bbaBox(w,h,d, mat, x,y,z){
+  const m = new bba.THREE.Mesh(new bba.THREE.BoxGeometry(w,h,d), mat);
+  m.position.set(x,y,z);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  return m;
+}
+
+function bbaMakeBackdrop(){
+  const THREE = bba.THREE;
+  const mid = new THREE.Group();
+  const far = new THREE.Group();
+  bba.world.add(mid);
+  bba.world.add(far);
+  bba.mid = mid;
+  bba.far = far;
+  // Houses sit deep behind the fence so the side camera reads as a neighborhood.
+  for (let i=0;i<20;i++){
+    const x = i * 12 - 6;
+    const tall = 2.2 + ((i * 3) % 5) * 0.35;
+    const body = bbaBox(3.4, tall, 2.4, bbaMat(i%2?0xf6e6c8:0xf3d7b0), x, tall/2, -8);
+    body.castShadow = false;
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(2.6, 1.35, 4), bbaMat(i%3?BBA_COLORS.roof:0x4a6ea8));
+    roof.position.set(x, tall + 0.55, -8);
+    roof.rotation.y = Math.PI/4;
+    roof.castShadow = false;
+    const win = bbaBox(0.55, 0.7, 0.1, bbaMat(0x9fd8f2, {emissive:0x224455, emissiveIntensity:0.3}), x+0.7, tall*0.55, -6.7);
+    win.castShadow = false;
+    mid.add(body, roof, win);
+  }
+  const fenceMat = bbaMat(BBA_COLORS.wood);
+  for (let i=0;i<78;i++){
+    const post = bbaBox(0.12, 0.9, 0.12, fenceMat, i*3.1, 1.35, -1.8);
+    post.castShadow = false;
+    mid.add(post);
+    if (i<77){
+      const rail = bbaBox(3.1, 0.08, 0.08, fenceMat, i*3.1+1.55, 1.62, -1.8);
+      rail.castShadow = false;
+      mid.add(rail);
+    }
+  }
+  bba.clouds = [];
+  for (let i=0;i<10;i++){
+    const c = new THREE.Group();
+    const mat = bbaMat(0xffffff, {roughness:0.9, metalness:0});
+    c.add(new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 8), mat));
+    const a = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 8), mat);
+    a.position.set(0.9, 0.2, 0);
+    const d = new THREE.Mesh(new THREE.SphereGeometry(0.6, 10, 8), mat);
+    d.position.set(-0.8, 0.1, 0);
+    c.add(a, d);
+    c.userData.baseX = i * 18;
+    c.position.set(c.userData.baseX, 6.6 + (i%3)*0.45, -14);
+    far.add(c);
+    bba.clouds.push(c);
+  }
+  const sunBall = new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 12), bbaMat(0xfff3b0, {emissive:0xffe08a, emissiveIntensity:0.7}));
+  sunBall.position.set(18, 9.2, -18);
+  far.add(sunBall);
+}
+
+function bbaPawMat(){
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const g = c.getContext("2d");
+  g.fillStyle = "#f2c14a";
+  g.fillRect(0,0,64,64);
+  g.fillStyle = "#8a4e16";
+  g.beginPath(); g.arc(32,40,10,0,Math.PI*2); g.fill();
+  [[18,22],[32,16],[46,22]].forEach(([x,y])=>{ g.beginPath(); g.arc(x,y,5,0,Math.PI*2); g.fill(); });
+  const tex = new bba.THREE.CanvasTexture(c);
+  return bbaMat(0xffffff, {map:tex, roughness:0.45, metalness:0.12});
+}
+
+function bbaMakeDog(){
+  const THREE = bba.THREE;
+  const g = new THREE.Group();
+  const fur = bbaMat(BBA_COLORS.fur);
+  const black = bbaMat(BBA_COLORS.saddle, {roughness:0.5});
+  const white = bbaMat(BBA_COLORS.chest, {roughness:0.5});
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.28, 18, 14), fur);
+  body.scale.set(1.25, 0.82, 0.78);
+  body.position.set(0, 0.42, 0);
+  body.castShadow = true;
+  const saddle = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 10), black);
+  saddle.scale.set(1.05, 0.42, 0.72);
+  saddle.position.set(-0.02, 0.58, 0);
+  const chest = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 10), white);
+  chest.position.set(0.16, 0.36, 0);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), fur);
+  head.position.set(0.34, 0.62, 0);
+  const mask = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), black);
+  mask.scale.set(1.15, 0.62, 0.9);
+  mask.position.set(0.44, 0.64, 0);
+  const snout = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), fur);
+  snout.position.set(0.52, 0.55, 0);
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), bbaMat(BBA_COLORS.nose));
+  nose.position.set(0.59, 0.57, 0);
+  const eyeGeo = new THREE.SphereGeometry(0.028, 8, 8);
+  const eyeMat = bbaMat(0x1a120c);
+  const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(0.48, 0.68, 0.08);
+  const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set(0.48, 0.68, -0.08);
+  g.add(body, saddle, chest, head, mask, snout, nose, eyeL, eyeR);
+  const ears = [];
+  const earGeo = new THREE.ConeGeometry(0.055, 0.22, 8);
+  [-0.09, 0.09].forEach(z=>{
+    const pivot = new THREE.Group();
+    pivot.position.set(0.28, 0.78, z);
+    const ear = new THREE.Mesh(earGeo, black);
+    ear.position.y = 0.1;
+    pivot.add(ear);
+    g.add(pivot);
+    ears.push(pivot);
+  });
+  const legs = [];
+  [[0.16,0.12],[0.16,-0.12],[-0.16,0.1],[-0.16,-0.1]].forEach(([x,z])=>{
+    const pivot = new THREE.Group();
+    pivot.position.set(x, 0.36, z);
+    const upper = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), fur);
+    upper.scale.set(0.8, 1.3, 0.8);
+    upper.position.y = -0.08;
+    const paw = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), fur);
+    paw.position.y = -0.2;
+    pivot.add(upper, paw);
+    g.add(pivot);
+    legs.push(pivot);
+  });
+  const tail = new THREE.Group();
+  tail.position.set(-0.32, 0.48, 0);
+  const t1 = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), fur);
+  t1.position.set(-0.08, 0.06, 0);
+  const t2 = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), white);
+  t2.position.set(-0.18, 0.14, 0);
+  tail.add(t1, t2);
+  g.add(tail);
+  bba.world.add(g);
+  bba.dog = { group:g, legs, tail, ears, fur, black, body:body };
+}
+
+function bbaRebuild(){
+  const THREE = bba.THREE;
+  if (bba.level){
+    bba.world.remove(bba.level);
+    bbaDispose(bba.level);
+  }
+  const level = new THREE.Group();
+  bba.world.add(level);
+  bba.level = level;
+  if (!bba.dog) bbaMakeDog();
+  const solids = [];
+  const plats = [];
+  const balls = [];
+  const enemies = [];
+  const rows = BBA_MAP;
+  const n = rows.length;
+  const grass = bbaMat(BBA_COLORS.grass);
+  const dirt = bbaMat(BBA_COLORS.dirt);
+  const brickM = bbaMat(BBA_COLORS.brick, {roughness:0.72});
+  const wood = bbaMat(BBA_COLORS.wood);
+  const paw = bbaPawMat();
+  const ballM = bbaMat(BBA_COLORS.ball, {emissive:0x6a8a20, emissiveIntensity:0.25, roughness:0.35});
+  const redM = bbaMat(BBA_COLORS.ballRed, {emissive:0x6a140c, emissiveIntensity:0.2, roughness:0.35});
+  const goldM = bbaMat(0xffe27a, {emissive:0xaa7700, emissiveIntensity:0.45, roughness:0.3, metalness:0.2});
+  bba.goal = null;
+  bba.check = null;
+  for (let r=0;r<n;r++){
+    const y = n - 1 - r;
+    const line = rows[r];
+    for (let x=0;x<line.length;x++){
+      const ch = line[x];
+      if (ch === "="){
+        const mesh = bbaBox(1, 1, 1, grass, x+0.5, y+0.5, 0);
+        const side = bbaBox(1.02, 0.28, 1.02, dirt, x+0.5, y+0.14, 0);
+        level.add(mesh, side);
+        solids.push({x, y, w:1, h:1, kind:"ground"});
+      } else if (ch === "#"){
+        const mesh = bbaBox(0.96, 0.96, 0.96, brickM, x+0.5, y+0.5, 0);
+        level.add(mesh);
+        solids.push({x, y, w:1, h:1, kind:"brick", mesh});
+      } else if (ch === "?" || ch === "B"){
+        const mesh = bbaBox(0.86, 0.86, 0.86, paw, x+0.5, y+0.5, 0);
+        level.add(mesh);
+        solids.push({x, y, w:1, h:1, kind: ch==="B"?"bonebox":"box", mesh, used:false, baseY:y+0.5});
+      } else if (ch === "-" || ch === "M"){
+        const mesh = bbaBox(0.96, 0.22, 0.7, wood, x+0.5, y+0.12, 0);
+        level.add(mesh);
+        plats.push({x, y, w:1, h:0.22, origin:x, range: ch==="M"?BBA_SPEED.plat:0, moving:ch==="M", phase:x*0.4, mesh});
+      } else if (ch === "H"){
+        const hyd = new THREE.Group();
+        const red = bbaMat(BBA_COLORS.hydrant, {roughness:0.4, metalness:0.15});
+        const cap = bbaMat(0xf4f4f4, {metalness:0.3, roughness:0.35});
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.18, 0.92, 12), red);
+        pole.position.y = 0.5;
+        pole.castShadow = true;
+        const top = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), red);
+        top.position.y = 0.98;
+        const side = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.32, 8), cap);
+        side.rotation.z = Math.PI/2;
+        side.position.set(0.2, 0.7, 0);
+        hyd.add(pole, top, side);
+        hyd.position.set(x+0.5, y, 0);
+        level.add(hyd);
+        // Short enough that a held jump clears it. A tap does not.
+        solids.push({x:x+0.2, y, w:0.6, h:1.26, kind:"hydrant"});
+      } else if (ch === "o" || ch === "R" || ch === "Q"){
+        const mat = ch==="R" ? redM : ch==="Q" ? goldM : ballM;
+        const mesh = new THREE.Mesh(new THREE.SphereGeometry(ch==="Q"?0.28:0.22, 14, 12), mat);
+        mesh.castShadow = true;
+        mesh.position.set(x+0.5, y+0.45, 0);
+        level.add(mesh);
+        balls.push({x:x+0.5, y:y+0.45, kind:ch, mesh, got:false, ph:x});
+      } else if (ch === "S" || ch === "C" || ch === "W"){
+        enemies.push(bbaMakeEnemy(ch, x+0.5, y, level));
+      } else if (ch === "P"){
+        const bowl = new THREE.Group();
+        const bowlM = bbaMat(0x3aa0d8, {roughness:0.25, metalness:0.1, transparent:true, opacity:0.9});
+        const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.2, 0.22, 14), bbaMat(0xd8d2c8));
+        const water = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.18, 0.08, 14), bowlM);
+        water.position.y = 0.1;
+        bowl.add(cup, water);
+        bowl.position.set(x+0.5, y, 0);
+        level.add(bowl);
+        bba.check = {x:x+0.5, y, mesh:bowl, got:false};
+      } else if (ch === "D"){
+        const house = bbaMakeDoghouse();
+        house.position.set(x+0.5, y, 0);
+        level.add(house);
+        bba.goal = {x:x+0.2, w:1.3, y, mesh:house};
+      }
+    }
+  }
+  bba.solids = solids;
+  bba.plats = plats;
+  bba.balls = balls;
+  bba.enemies = enemies;
+  bba.drops = [];
+  bba.bits = [];
+  bba.p = {
+    x:3.2, y:1, vx:0, vy:0, hw:0.28, h:0.86, face:1, big:false, inv:0,
+    coyote:0, jumpBuf:0, onGround:false, crouch:false, barkCd:0, iframes:0,
+    runPhase:0, ride:null, wasGround:false
+  };
+  bba.respawn = {x:3.2, y:1};
+  bba.score = 0;
+  bba.displayScore = 0;
+  bba.ballN = 0;
+  bba.lives = 3;
+  bba.time = 0;
+  bba.winPlayed = false;
+  bba.spin = 0;
+  bbaSyncDog();
+}
+
+function bbaMakeEnemy(ch, x, y, level){
+  const THREE = bba.THREE;
+  const g = new THREE.Group();
+  if (ch === "S"){
+    const fur = bbaMat(0xb86a3a);
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), fur);
+    body.scale.set(1.2, 0.8, 0.7);
+    body.position.y = 0.28;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), fur);
+    head.position.set(0.18, 0.42, 0);
+    const tail = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), bbaMat(0x8d4e28));
+    tail.position.set(-0.22, 0.48, 0);
+    g.add(body, head, tail);
+  } else if (ch === "C"){
+    const fur = bbaMat(0x6a6e78);
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10), fur);
+    body.scale.set(1.3, 0.75, 0.7);
+    body.position.y = 0.3;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), fur);
+    head.position.set(0.22, 0.46, 0);
+    g.add(body, head);
+  } else {
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8), bbaMat(0x1c1a22));
+    body.scale.set(1.4, 0.7, 0.6);
+    body.position.y = 0.2;
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.28, 0.5), bbaMat(0x2a2830));
+    wing.position.set(0, 0.28, 0);
+    g.add(body, wing);
+    g.userData.wing = wing;
+  }
+  g.position.set(x, y, 0);
+  g.traverse(o=>{ if (o.isMesh) o.castShadow = true; });
+  level.add(g);
+  return {
+    kind: ch==="S"?"squirrel":ch==="C"?"cat":"crow",
+    x, y, baseX:x, baseY:y, dir: x%2?1:-1, vx:0, vy:0,
+    speed: ch==="S"?BBA_SPEED.squirrel:BBA_SPEED.cat,
+    w:0.7, h: ch==="W"?0.4:0.55,
+    mesh:g, dead:false, stun:0, curl:false, t:x*0.2
+  };
+}
+
+function bbaMakeDoghouse(){
+  const g = new bba.THREE.Group();
+  const wood = bbaMat(0xc4884a);
+  const dark = bbaMat(0x5c3a22);
+  const body = bbaBox(1.3, 1.05, 1.1, wood, 0, 0.52, 0);
+  const hole = bbaBox(0.48, 0.55, 0.2, dark, 0.15, 0.38, 0.5);
+  const roof = new bba.THREE.Mesh(new bba.THREE.ConeGeometry(1.05, 0.7, 4), bbaMat(BBA_COLORS.roof));
+  roof.position.y = 1.3;
+  roof.rotation.y = Math.PI/4;
+  const pole = new bba.THREE.Mesh(new bba.THREE.CylinderGeometry(0.03, 0.03, 0.9, 6), bbaMat(0xeeeeee));
+  pole.position.set(-0.45, 1.7, 0);
+  const flag = bbaBox(0.38, 0.22, 0.04, bbaMat(0xf0472f), -0.22, 2.05, 0);
+  g.add(body, hole, roof, pole, flag);
+  g.userData.flag = flag;
+  return g;
+}
+
+function bbaHasFloor(x, feet){
+  for (const s of bba.solids){
+    if (s.kind === "brick" && s.gone) continue;
+    const top = s.y + s.h;
+    if (Math.abs(top - feet) < 0.2 && x > s.x && x < s.x + s.w) return true;
+  }
+  for (const p of bba.plats){
+    const top = p.y + p.h;
+    if (Math.abs(top - feet) < 0.25 && x > p.x && x < p.x + p.w) return true;
+  }
+  return false;
+}
+function bbaWallAt(x, feet, h){
+  for (const s of bba.solids){
+    if (s.gone) continue;
+    if (x > s.x && x < s.x+s.w && feet + 0.05 < s.y+s.h && feet + h > s.y + 0.05) return true;
+  }
+  return false;
+}
+function bbaHits(px, py, hw, h){
+  const out = [];
+  for (const s of bba.solids){
+    if (s.gone) continue;
+    if (px+hw > s.x && px-hw < s.x+s.w && py < s.y+s.h - 0.001 && py+h > s.y + 0.001) out.push(s);
+  }
+  return out;
+}
+
+function bbaBreak(s){
+  if (!s || s.gone || s.kind !== "brick") return;
+  s.gone = true;
+  if (s.mesh) s.mesh.visible = false;
+  bbaSfxStomp();
+  bba.score += 20;
+  bbaBurst(s.x+0.5, s.y+0.5, BBA_COLORS.brick);
+}
+function bbaBump(s){
+  if (!s || s.used) return;
+  if (s.kind !== "box" && s.kind !== "bonebox") return;
+  s.used = true;
+  if (s.mesh && s.mesh.material && s.mesh.material.color) s.mesh.material.color.set(0x9a7a48);
+  bba.score += 20;
+  const bone = s.kind === "bonebox";
+  bba.drops.push({
+    kind: bone ? "bone" : "ball",
+    ball: Math.random()<0.3 ? "R" : "o",
+    x: s.x+0.5, y: s.y+1.15, vx: bone ? 2.1 : 1.1, vy: bone ? 2.2 : 4.2
+  });
+  if (bone) bbaSfxBone(); else bbaSfxBall();
+}
+
+function bbaBurst(x, y, color){
+  for (let i=0;i<6;i++){
+    const m = new bba.THREE.Mesh(new bba.THREE.SphereGeometry(0.06, 6, 6), bbaMat(color));
+    m.position.set(x, y, 0);
+    bba.level.add(m);
+    bba.bits.push({mesh:m, x, y, vx:(Math.random()-0.5)*3, vy:1+Math.random()*2, life:0.45});
+  }
+}
+
+function bbaHurt(kind){
+  const p = bba.p;
+  if (!p || bba.phase !== "play") return;
+  const fall = kind === "fall";
+  // A pit always costs a life. A hit while big only shrinks him.
+  if (!fall && (p.iframes > 0 || p.inv > 0)) return;
+  if (!fall && p.big){
+    p.big = false;
+    p.iframes = 1.4;
+    bbaSfxHurt();
+    return;
+  }
+  bbaSfxHurt();
+  bba.lives -= 1;
+  if (bba.lives <= 0){
+    bba.phase = "over";
+    bba.menuI = 0;
+    p.vx = 0; p.vy = 0;
+    bbaSaveBest(bba.score);
+    bbaPaintMenu();
+    return;
+  }
+  p.iframes = 1.5;
+  p.x = bba.respawn.x;
+  p.y = bba.respawn.y;
+  p.vx = 0; p.vy = 0;
+}
+
+function bbaCollect(kind){
+  if (kind === "Q"){
+    bba.p.inv = 8;
+    bba.score += 200;
+    bbaSfxPower();
+    return;
+  }
+  if (kind === "bone"){
+    bba.p.big = true;
+    bba.score += 100;
+    bbaSfxBone();
+    return;
+  }
+  bba.ballN += 1;
+  bba.score += kind === "R" ? 25 : 10;
+  if (bba.ballN > 0 && bba.ballN % 100 === 0) bba.lives += 1;
+  bbaSfxBall();
+  bbaBurst(bba.p.x, bba.p.y+0.6, kind==="R"?BBA_COLORS.ballRed:BBA_COLORS.ball);
+}
+
+function bbaStepPlayer(dt){
+  const p = bba.p;
+  const inp = bba.inp;
+  p.iframes = Math.max(0, p.iframes - dt);
+  p.inv = Math.max(0, p.inv - dt);
+  p.barkCd = Math.max(0, p.barkCd - dt);
+  p.crouch = !!(inp.down && p.onGround);
+  p.h = (p.big ? 1.32 : 0.86) * (p.crouch ? 0.6 : 1);
+  p.hw = p.big ? 0.38 : 0.28;
+  const speed = ((inp.run || p.inv > 0) ? BBA_SPEED.run : BBA_SPEED.walk) * (p.crouch ? 0.45 : 1) * (p.big ? 0.92 : 1);
+  let dir = (inp.right?1:0) - (inp.left?1:0);
+  if (dir) p.face = dir;
+  const accel = 42 * dt;
+  if (dir) p.vx = bbaApproach(p.vx, dir * speed, accel);
+  else p.vx = bbaApproach(p.vx, 0, accel * 1.4);
+  if (inp.jumpEdge) p.jumpBuf = 0.12;
+  else p.jumpBuf = Math.max(0, p.jumpBuf - dt);
+  if (p.jumpBuf > 0 && (p.onGround || p.coyote > 0) && !p.crouch){
+    p.vy = BBA_SPEED.jump * (p.big ? 1.04 : 1);
+    p.jumpBuf = 0;
+    p.coyote = 0;
+    p.onGround = false;
+    bbaSfxJump();
+  }
+  // Letting go early cuts the hop. Holding it carries him higher, with a little hang at the top.
+  if (inp.jumpRelease && p.vy > 0) p.vy *= 0.5;
+  let grav = BBA_SPEED.gravity;
+  if (Math.abs(p.vy) < 1.6) grav *= 0.46;
+  if (inp.jump && p.vy > 0) grav *= 0.66;
+  p.vy = Math.max(-16, p.vy - grav * dt);
+
+  p.x += p.vx * dt;
+  let broke = [];
+  for (const s of bbaHits(p.x, p.y, p.hw, p.h)){
+    if (s.kind === "brick" && p.big){ broke.push(s); continue; }
+    if (p.x < s.x + s.w/2) p.x = s.x - p.hw - 0.001;
+    else p.x = s.x + s.w + p.hw + 0.001;
+    p.vx = 0;
+  }
+  broke.forEach(bbaBreak);
+
+  const oldY = p.y;
+  p.y += p.vy * dt;
+  let grounded = false;
+  let hardLand = false;
+  p.ride = null;
+  broke = [];
+  for (const s of bbaHits(p.x, p.y, p.hw, p.h)){
+    if (p.vy > 0){
+      p.y = s.y - p.h - 0.001;
+      p.vy = 0;
+      if (s.kind === "box" || s.kind === "bonebox") bbaBump(s);
+      if (s.kind === "brick" && p.big) broke.push(s);
+    } else {
+      if (p.vy < -4) hardLand = true;
+      p.y = s.y + s.h;
+      p.vy = 0;
+      grounded = true;
+    }
+  }
+  broke.forEach(bbaBreak);
+  for (const plat of bba.plats){
+    const top = plat.y + plat.h;
+    const over = p.x+p.hw > plat.x+0.05 && p.x-p.hw < plat.x+plat.w-0.05;
+    if (p.vy <= 0 && over && oldY >= top - 0.08 && p.y <= top + 0.02){
+      if (p.vy < -4) hardLand = true;
+      p.y = top;
+      p.vy = 0;
+      grounded = true;
+      p.ride = plat;
+    }
+  }
+  if (grounded){ p.onGround = true; p.coyote = 0.14; }
+  else { p.onGround = false; p.coyote = Math.max(0, p.coyote - dt); }
+  if (!p.wasGround && p.onGround && hardLand) bbaBurst(p.x, p.y, 0xd8c39a);
+  p.wasGround = p.onGround;
+  if (Math.abs(p.vx) > 0.4 && p.onGround) p.runPhase += dt * Math.abs(p.vx) * 1.4;
+  if (p.y < -2.2) bbaHurt("fall");
+}
+
+function bbaApproach(v, to, dv){
+  if (v < to) return Math.min(to, v + dv);
+  return Math.max(to, v - dv);
+}
+
+function bbaStepWorld(dt){
+  if (!bba || bba.phase !== "play") return;
+  for (const plat of bba.plats){
+    if (!plat.moving) continue;
+    const prev = plat.x;
+    plat.x = plat.origin + Math.sin((bba.clock||0) * 1.15 + plat.phase) * plat.range;
+    if (bba.p.ride === plat) bba.p.x += plat.x - prev;
+    plat.mesh.position.x = plat.x + plat.w/2;
+  }
+  for (const e of bba.enemies){
+    if (e.dead) continue;
+    e.t += dt;
+    if (e.stun > 0){ e.stun -= dt; e.mesh.position.set(e.x, e.y, 0); continue; }
+    if (e.kind === "crow"){
+      const cycle = e.t * BBA_SPEED.crow;
+      const dip = Math.pow(Math.max(0, Math.sin(cycle)), 1.35);
+      e.x = e.baseX + Math.sin(cycle * 0.5) * 2.6;
+      e.y = e.baseY - dip * (e.baseY - 1.18);
+      if (e.mesh.userData.wing) e.mesh.userData.wing.rotation.z = Math.sin(e.t*18)*0.7;
+    } else if (e.kind === "cat" && e.curl){
+      e.x += e.vx * dt;
+      e.vy -= 30 * dt;
+      e.y += e.vy * dt;
+      if (bbaHasFloor(e.x, e.y) || bbaHasFloor(e.x, e.y+0.05)){
+        // settle onto the floor height we already use
+        if (e.vy < 0 && e.y <= e.baseY + 0.05){ e.y = e.baseY; e.vy = 0; }
+      }
+      if (bbaWallAt(e.x + Math.sign(e.vx||1)*0.3, e.y, 0.3)) e.vx = 0;
+      if (!bbaHasFloor(e.x, e.y) && e.vy === 0) e.vy = -1;
+      if (Math.abs(e.vx) > 2){
+        for (const o of bba.enemies){
+          if (o === e || o.dead) continue;
+          if (Math.abs(o.x-e.x) < 0.5 && Math.abs(o.y-e.y) < 0.6){
+            o.dead = true; o.mesh.visible = false; bba.score += 50; bbaSfxStomp();
+          }
+        }
+      }
+    } else {
+      const ahead = e.x + e.dir * 0.4;
+      if (!bbaHasFloor(ahead, e.y) || bbaWallAt(ahead, e.y, e.h*0.6)) e.dir *= -1;
+      e.x += e.dir * e.speed * dt;
+    }
+    if (e.y < -2.5){ e.dead = true; e.mesh.visible = false; continue; }
+    e.mesh.position.set(e.x, e.y, 0);
+    if (e.kind !== "crow") e.mesh.scale.x = e.dir;
+    if (e.kind === "cat") e.mesh.scale.y = e.curl ? 0.55 : 1;
+  }
+  for (const d of bba.drops){
+    d.vy -= 28*dt;
+    d.x += d.vx*dt;
+    d.y += d.vy*dt;
+    if (d.vy < 0 && bbaHasFloor(d.x, d.y)){
+      d.vy = 0;
+      let top = d.y;
+      for (const s of bba.solids){
+        if (s.gone) continue;
+        const t = s.y + s.h;
+        if (Math.abs(t - d.y) < 0.35 && d.x > s.x && d.x < s.x + s.w) top = t;
+      }
+      d.y = top;
+    }
+  }
+  // drops become pickups once they've landed
+  for (let i=bba.drops.length-1;i>=0;i--){
+    const d = bba.drops[i];
+    if (d.vy === 0){
+      const kind = d.kind === "bone" ? "bone" : d.ball;
+      const mat = kind==="bone" ? bbaMat(0xf4efe6) : kind==="R" ? bbaMat(BBA_COLORS.ballRed) : bbaMat(BBA_COLORS.ball);
+      const mesh = kind==="bone"
+        ? bbaBox(0.34, 0.12, 0.12, mat, d.x, d.y+0.2, 0)
+        : new bba.THREE.Mesh(new bba.THREE.SphereGeometry(0.2, 12, 10), mat);
+      if (kind !== "bone") mesh.position.set(d.x, d.y+0.35, 0);
+      bba.level.add(mesh);
+      bba.balls.push({x:d.x, y:d.y+0.35, kind, mesh, got:false, ph:d.x, bone:kind==="bone"});
+      bba.drops.splice(i,1);
+    }
+  }
+  const p = bba.p;
+  for (const b of bba.balls){
+    if (b.got) continue;
+    const bob = Math.sin(bba.time*3 + b.ph)*0.08;
+    b.mesh.position.y = b.y + bob;
+    b.mesh.rotation.y += dt*3;
+    const dx = p.x - b.x, dy = (p.y+p.h*0.5) - b.y;
+    if (dx*dx + dy*dy < 0.55){
+      b.got = true;
+      b.mesh.visible = false;
+      bbaCollect(b.bone ? "bone" : b.kind);
+    }
+  }
+  if (bba.check && !bba.check.got && p.onGround && Math.abs(p.x - bba.check.x) < 0.7 && Math.abs(p.y - bba.check.y) < 0.4){
+    bba.check.got = true;
+    bba.respawn.x = bba.check.x;
+    bba.respawn.y = p.y;
+    beep(660,.12,"triangle",.05);
+  }
+  for (const e of bba.enemies){
+    if (e.dead) continue;
+    const overlap = Math.abs(p.x - e.x) < (p.hw + e.w*0.45) && p.y < e.y + e.h && p.y + p.h > e.y + 0.05;
+    if (!overlap) continue;
+    const stomp = p.vy < 0 && p.y > e.y + e.h * 0.45;
+    if (p.inv > 0){
+      e.dead = true; e.mesh.visible = false; bba.score += 50;
+      continue;
+    }
+    if (stomp){
+      p.vy = 8.2;
+      bba.score += 50;
+      bbaSfxStomp();
+      if (e.kind === "cat"){ e.curl = true; e.vx = 0; e.h = 0.35; }
+      else { e.dead = true; e.mesh.visible = false; }
+    } else if (e.kind === "cat" && e.curl && Math.abs(p.vx) > 0.4){
+      e.vx = Math.sign(p.face) * BBA_SPEED.kick;
+    } else if (!(e.kind === "cat" && e.curl && Math.abs(e.vx) < 0.2)){
+      bbaHurt();
+    }
+  }
+  if (inpBark()){
+    bbaSfxBark();
+    p.barkCd = 1.15;
+    bbaBurst(p.x + p.face * 0.45, p.y + 0.55, 0xffe7a0);
+    for (const e of bba.enemies){
+      if (e.dead) continue;
+      if (Math.abs(e.x-p.x) < 2.6 && Math.abs(e.y-p.y) < 1.6) e.stun = 1;
+    }
+  }
+  if (bba.goal && p.x > bba.goal.x && p.x < bba.goal.x + bba.goal.w && Math.abs(p.y - bba.goal.y) < 1.2){
+    const bonus = Math.max(0, Math.round((150 - bba.time) * 8));
+    bba.score += bonus;
+    bba.timeBonus = bonus;
+    bba.phase = "clear";
+    bba.menuI = 0;
+    bba.displayScore = 0;
+    bbaSaveBest(bba.score);
+    bbaPaintMenu();
+  }
+  for (const bit of bba.bits){
+    bit.life -= dt;
+    bit.vy -= 10*dt;
+    bit.x += bit.vx*dt;
+    bit.y += bit.vy*dt;
+    bit.mesh.position.set(bit.x, bit.y, 0);
+    if (bit.life <= 0){ bit.mesh.visible = false; }
+  }
+  bba.bits = bba.bits.filter(b=>{
+    if (b.life > 0) return true;
+    if (b.mesh && b.mesh.parent) b.mesh.parent.remove(b.mesh);
+    if (b.mesh && b.mesh.geometry) b.mesh.geometry.dispose();
+    if (b.mesh && b.mesh.material) b.mesh.material.dispose();
+    return false;
+  });
+}
+function inpBark(){
+  return bba.inp.barkEdge && bba.p.barkCd <= 0;
+}
+
+function bbaSyncDog(){
+  const p = bba.p;
+  const d = bba.dog;
+  if (!d || !p) return;
+  const s = p.big ? 1.55 : 1;
+  const crouch = p.crouch ? 0.72 : 1;
+  const stretch = p.onGround ? 1 : 1 + Math.max(-0.14, Math.min(0.16, p.vy * 0.012));
+  d.group.position.set(p.x, p.y, 0);
+  d.group.scale.set((p.face || 1) * s / Math.pow(stretch, 0.4), s * crouch * stretch, s);
+  if (bba.phase === "clear") d.group.rotation.y = bba.spin || 0;
+  else d.group.rotation.y = 0;
+  const moving = Math.abs(p.vx) > 0.35 && p.onGround;
+  const swing = moving ? Math.sin(p.runPhase) * 0.75 : 0;
+  d.legs[0].rotation.z = swing;
+  d.legs[1].rotation.z = swing;
+  d.legs[2].rotation.z = -swing;
+  d.legs[3].rotation.z = -swing;
+  const wagT = bba.clock || bba.time || 0;
+  if (!moving) d.tail.rotation.z = Math.sin(wagT * 8) * 0.6;
+  else d.tail.rotation.z = 0.28 + Math.sin(p.runPhase) * 0.18;
+  if (d.body){
+    const breathe = (!moving && p.onGround) ? 1 + Math.sin(wagT * 2.5) * 0.045 : 1;
+    d.body.scale.set(1.25, 0.82 * breathe, 0.78);
+  }
+  const ear = p.onGround ? 0 : -0.5 + Math.sin(wagT * 16) * 0.18;
+  d.ears[0].rotation.z = ear;
+  d.ears[1].rotation.z = -ear;
+  const blink = p.iframes > 0 && Math.sin(wagT * 30) > 0;
+  d.group.visible = !blink;
+  if (p.inv > 0){
+    d.fur.emissive = d.fur.emissive || new bba.THREE.Color();
+    d.fur.emissive.set(0xffe08a);
+    d.fur.emissiveIntensity = 0.4 + Math.sin(wagT * 22) * 0.28;
+  } else if (d.fur.emissive){
+    d.fur.emissiveIntensity = 0;
+  }
+}
+
+function bbaReadInput(){
+  const pad = bbaReadPad();
+  const left = !!(pad.left || keys.has("ArrowLeft") || bba.touch.left);
+  const right = !!(pad.right || keys.has("ArrowRight") || bba.touch.right);
+  const down = !!(pad.down || keys.has("ArrowDown") || bba.touch.down);
+  const jump = !!(pad.jump || keys.has("Space") || keys.has("KeyX") || bba.touch.jump);
+  const run = !!(pad.run || keys.has("ShiftLeft") || keys.has("ShiftRight") || bba.touch.run);
+  const bark = !!(pad.bark || keys.has("KeyZ") || bba.touch.bark);
+  const lookL = !!(pad.l || keys.has("KeyQ"));
+  const lookR = !!(pad.r || keys.has("KeyE"));
+  const prev = bba._prev || {};
+  bba.inp = {
+    left, right, down, jump, run, bark, lookL, lookR,
+    jumpEdge: jump && !prev.jump,
+    jumpRelease: !jump && prev.jump,
+    barkEdge: bark && !prev.bark,
+    upEdge: (keys.has("ArrowUp") || pad.up) && !prev.up,
+    downEdge: (keys.has("ArrowDown") || pad.down) && !prev.down,
+    startEdge: pad.startEdge || bbaKeyEdge("Enter"),
+    selectEdge: pad.selectEdge
+  };
+  bba._prev = { jump, bark, up: keys.has("ArrowUp") || pad.up, down: keys.has("ArrowDown") || pad.down };
+}
+function bbaKeyEdge(code){
+  const down = keys.has(code);
+  const prev = !!bba.keyPrev[code];
+  bba.keyPrev[code] = down;
+  return down && !prev;
+}
+function bbaReadPad(){
+  const out = { left:false, right:false, up:false, down:false, jump:false, run:false, bark:false, l:false, r:false, startEdge:false, selectEdge:false };
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  let gp = null;
+  for (let i=0;i<(pads?pads.length:0);i++) if (pads[i] && pads[i].connected){ gp = pads[i]; break; }
+  const was = bba.padOn;
+  bba.padOn = !!gp;
+  if (gp && !was){ bba.toastT = 2.4; bba.toast = "Controller connected"; }
+  if (!gp) return out;
+  const b = gp.buttons;
+  const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
+  const dead = 0.42;
+  const pressed = i => !!(b[i] && (b[i].pressed || b[i].value > 0.5));
+  out.left = pressed(14) || ax < -dead;
+  out.right = pressed(15) || ax > dead;
+  out.up = pressed(12) || ay < -dead;
+  out.down = pressed(13) || ay > dead;
+  const map = bba.padMap;
+  if (bba.phase === "setup"){
+    // Wait for a clean press, then store that button and move on.
+    let hit = -1;
+    for (let i=0;i<b.length;i++) if (pressed(i)){ hit = i; break; }
+    if (hit < 0) bba.setupWait = false;
+    else if (!bba.setupWait){
+      const order = ["jump","run","bark","start","select","l","r"];
+      const key = order[bba.setupI];
+      bba.padMap[key] = hit;
+      if (key === "jump") bba.padMap.jump2 = hit;
+      bba.setupI += 1;
+      bba.setupWait = true;
+      if (bba.setupI >= order.length){
+        bbaSavePad(bba.padMap);
+        bba.phase = "title";
+        bba.menuI = 0;
+        bba.toast = "Controller saved";
+        bba.toastT = 2;
+      }
+      bbaPaintMenu();
+    }
+    return out;
+  }
+  out.jump = pressed(map.jump) || pressed(map.jump2);
+  out.run = pressed(map.run);
+  out.bark = pressed(map.bark);
+  out.l = pressed(map.l);
+  out.r = pressed(map.r);
+  const st = pressed(map.start), sel = pressed(map.select);
+  out.startEdge = st && !bba.btnPrev.start;
+  out.selectEdge = sel && !bba.btnPrev.select;
+  bba.btnPrev.start = st;
+  bba.btnPrev.select = sel;
+  return out;
+}
+
+function bbaMenuItems(){
+  if (bba.phase === "title") return [["start","Start"], ["setup","Controller Setup"]];
+  if (bba.phase === "pause") return [["resume","Resume"], ["setup","Controller Setup"], ["quit","Quit to arcade"]];
+  if (bba.phase === "quit") return [["no","Keep playing"], ["yes","Quit to arcade"]];
+  if (bba.phase === "over") return [["again","Try again"], ["arcade","Back to the arcade"]];
+  if (bba.phase === "clear") return [["again","Play the stage again"], ["arcade","Back to the arcade"]];
+  return [];
+}
+function bbaPaintMenu(){
+  if (!bba || !bba.root) return;
+  const menu = bba.root.querySelector("#bba-menu");
+  if (!menu) return;
+  if (bba.phase === "play" || bba.phase === "loading"){ menu.hidden = true; return; }
+  menu.hidden = false;
+  if (bba.phase === "setup"){
+    const names = ["Jump (B)","Run (Y)","Bark (A)","Start","Select","L","R"];
+    menu.innerHTML = "<h2>Controller Setup</h2><p>Press "+names[Math.min(bba.setupI, names.length-1)]+" on the pad.</p><p>Escape cancels.</p>";
+    return;
+  }
+  const items = bbaMenuItems();
+  if (bba.menuI >= items.length) bba.menuI = 0;
+  let title = "Bernard's Big Adventure";
+  let sub = "Press Start. Run the yard, jump the hydrants, bark. A bone makes him big.";
+  if (bba.phase === "pause"){ title = "Paused"; sub = "The neighborhood can wait."; }
+  if (bba.phase === "quit"){ title = "Quit to arcade?"; sub = "This run will end."; }
+  if (bba.phase === "over"){ title = "Oh no"; sub = "Out of lives. Score "+bba.score+"."; }
+  if (bba.phase === "clear"){ title = "Stage Clear!"; sub = "He made it home."+(bba.timeBonus?" Time bonus "+bba.timeBonus+".":""); }
+  const buttons = items.map((it,i)=>'<button type="button" class="'+(i===bba.menuI?"on":"")+'" data-i="'+i+'">'+it[1]+"</button>").join("");
+  const hint = bba.phase==="title" ? "<p>D-pad moves. B or Start chooses. Arrows and Enter work too.</p>" : "";
+  menu.innerHTML = "<h2>"+title+"</h2><p>"+sub+"</p>"+buttons+hint;
+  menu.querySelectorAll("button").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      bba.menuI = +btn.getAttribute("data-i");
+      bbaConfirm();
+    });
+  });
+}
+function bbaConfirm(){
+  const items = bbaMenuItems();
+  const id = (items[bba.menuI] || items[0] || ["noop"])[0];
+  if (id === "start" || id === "again"){
+    bbaRebuild();
+    bba.phase = "play";
+    bba.lives = 3;
+  } else if (id === "setup"){
+    bba.phase = "setup";
+    bba.setupI = 0;
+    bba.setupWait = true;
+  } else if (id === "resume"){
+    bba.phase = "play";
+  } else if (id === "no"){
+    bba.phase = bba._quitFrom || "title";
+  } else if (id === "quit"){
+    bba._quitFrom = "pause";
+    bba.phase = "quit";
+    bba.menuI = 0;
+  } else if (id === "yes" || id === "arcade"){
+    bbaQuit();
+    return;
+  }
+  bbaPaintMenu();
+}
+function bbaQuit(){
+  bbaShutdown();
+  goHome();
+}
+function bbaSelect(){
+  if (!bba) return;
+  if (bba.phase === "setup"){ bba.phase = "title"; bba.menuI = 0; bbaPaintMenu(); return; }
+  if (bba.phase === "quit"){ bba.phase = bba._quitFrom || "title"; bbaPaintMenu(); return; }
+  if (bba.phase === "loading") return;
+  bba._quitFrom = bba.phase;
+  bba.phase = "quit";
+  bba.menuI = 0;
+  bbaPaintMenu();
+}
+function bbaTogglePause(){
+  if (!bba) return;
+  if (bba.phase === "play"){ bba.phase = "pause"; bba.menuI = 0; bbaPaintMenu(); }
+  else if (bba.phase === "pause"){ bba.phase = "play"; bbaPaintMenu(); }
+  else bbaConfirm();
+}
+
+function bbaHud(){
+  const hud = bba.root.querySelector("#bba-hud");
+  if (!hud) return;
+  const show = bba.phase==="clear" ? Math.round(bba.displayScore) : bba.score;
+  const t = Math.max(0, Math.floor(bba.time));
+  const mm = String(Math.floor(t/60)).padStart(1,"0");
+  const ss = String(t%60).padStart(2,"0");
+  const big = bba.p && bba.p.big ? "BIG" : "small";
+  const inv = bba.p && bba.p.inv>0 ? " · glow "+bba.p.inv.toFixed(0)+"s" : "";
+  hud.innerHTML =
+    '<div class="bba-pill"><small>BALLS</small>'+bba.ballN+'</div>'+
+    '<div class="bba-pill"><small>SCORE</small>'+show+'</div>'+
+    '<div class="bba-pill"><small>LIVES</small>'+bba.lives+'</div>'+
+    '<div class="bba-pill"><small>TIME</small>'+mm+':'+ss+'</div>'+
+    '<div class="bba-pill"><small>BERNARD</small>'+big+inv+'</div>';
+  const toast = bba.root.querySelector("#bba-toast");
+  if (toast){
+    toast.hidden = bba.toastT <= 0;
+    if (bba.toastT > 0) toast.textContent = bba.toast || "";
+  }
+}
+
+function bbaFrame(dt){
+  if (!bba || !bba.renderer) return;
+  bba.clock = (bba.clock || 0) + dt;
+  if (bba.phase === "play") bba.time += dt;
+  if (bba.toastT > 0) bba.toastT -= dt;
+  bbaReadInput();
+  if (bba.inp.selectEdge) bbaSelect();
+  if (!bba) return;
+
+  if (bba.phase === "play"){
+    if (bba.inp.startEdge) bbaTogglePause();
+    else {
+      bbaStepPlayer(dt);
+      if (bba && bba.phase === "play") bbaStepWorld(dt);
+    }
+  } else if (bba.phase !== "setup" && bba.phase !== "loading"){
+    const items = bbaMenuItems();
+    if (items.length){
+      if (bba.inp.upEdge){
+        bba.menuI = (bba.menuI - 1 + items.length) % items.length;
+        bbaPaintMenu();
+      }
+      if (bba.inp.downEdge){
+        bba.menuI = (bba.menuI + 1) % items.length;
+        bbaPaintMenu();
+      }
+      // D-pad moves the highlight. B chooses. Start confirms.
+      if ((bba.inp.startEdge || bba.inp.jumpEdge) && bba) bbaConfirm();
+    }
+    if (bba && bba.phase === "clear"){
+      bba.spin += dt * 7;
+      bba.displayScore = Math.min(bba.score, bba.displayScore + dt * Math.max(80, bba.score * 0.65));
+      if (!bba.winPlayed){ bba.winPlayed = true; bbaSfxWin(); bbaSfxBark(); }
+    }
+  }
+  if (!bba || !bba.renderer) return;
+
+  for (const c of bba.clouds || []){
+    const span = 180;
+    const base = c.userData.baseX || 0;
+    c.position.x = ((base + bba.clock * 1.4) % span) - 12;
+  }
+  const px = bba.p ? bba.p.x : 0;
+  if (bba.mid) bba.mid.position.x = px * 0.4;
+  if (bba.far) bba.far.position.x = px * 0.72;
+  if (bba.goal && bba.goal.mesh && bba.goal.mesh.userData.flag){
+    bba.goal.mesh.userData.flag.rotation.z = Math.sin(bba.clock * 3) * 0.28;
+  }
+  for (const plat of bba.plats || []){
+    if (bba.phase !== "play" && plat.moving){
+      plat.x = plat.origin + Math.sin(bba.clock * 1.15 + plat.phase) * plat.range;
+      plat.mesh.position.x = plat.x + plat.w / 2;
+    }
+  }
+  for (const b of bba.balls || []){
+    if (b.got || !b.mesh) continue;
+    b.mesh.position.y = b.y + Math.sin(bba.clock * 3 + (b.ph || 0)) * 0.08;
+    b.mesh.rotation.y += dt * 3;
+  }
+  bbaSyncDog();
+  const p = bba.p;
+  if (!p) return;
+  const wantLook = (bba.inp.lookR ? 3.2 : 0) - (bba.inp.lookL ? 3.2 : 0);
+  bba.look += (wantLook - bba.look) * Math.min(1, dt * 6);
+  const cam = bba.camera;
+  cam.position.set(p.x + bba.look, p.y + 2.35, 12.6);
+  cam.lookAt(p.x + bba.look * 0.35, p.y + 1.05, 0);
+  const sun = bba.sun;
+  sun.position.set(p.x - 7, p.y + 12, 8);
+  sun.target.position.set(p.x, p.y, 0);
+  sun.target.updateMatrixWorld();
+  const s = 9;
+  sun.shadow.camera.left = -s;
+  sun.shadow.camera.right = s;
+  sun.shadow.camera.top = s;
+  sun.shadow.camera.bottom = -s;
+  sun.shadow.camera.updateProjectionMatrix();
+  bbaHud();
+  bba.renderer.render(bba.scene, cam);
+}
+
+function bbaResize(){
+  if (!bba || !bba.renderer) return;
+  const stage = document.getElementById("stage");
+  const w = stage.clientWidth || 900;
+  const h = stage.clientHeight || 680;
+  bba.renderer.setSize(w, h, false);
+  bba.camera.aspect = w / h;
+  bba.camera.updateProjectionMatrix();
+}
+
+window.bbaOpen = bbaOpen;
+window.bbaShutdown = bbaShutdown;
+
 window.__controlsTest={
   getYaw(){ return (MODE==="hop"&&LH) ? LH.player.c : (MODE==="jeep"&&J) ? J.jeep.x : (MODE==="air"&&A&&A.ship) ? A.ship.x : 0; },
   getSpeed(){ return (MODE==="hop"&&LH) ? LH.player.r : (MODE==="jeep"&&J) ? J.speed : (MODE==="air"&&A&&A.started) ? 1 : 0; },
