@@ -9649,21 +9649,23 @@ const BBA_MAP = [
 // ----- COLORS --------------------------------------------------------------
 // Bernard's coat. Change these and the next launch uses the new colors.
 const BBA_COLORS = {
-  fur:    0xc4783a,  // rust / tan body, legs, cheeks
-  saddle: 0x1a120e,  // black saddle and face mask
-  chest:  0xf4efe6,  // white chest patch
-  nose:   0x140e0c,
-  grass:  0x67b83a,
-  dirt:   0x8d5a32,
-  brick:  0xc4563a,
-  wood:   0xd39a52,
-  gold:   0xf0c14d,
-  hydrant:0xe23b32,
-  ball:   0xc6f25a,  // neon yellow-green
-  ballRed:0xf0472f,
-  house:  0xf4e2c4,
-  roof:   0xc4563a,
-  sky:    0x8ecff5
+  fur:     "#e0853a",  // rust / tan legs, chest, cheeks
+  saddle:  "#161310",  // black saddle and face mask
+  chest:   "#fff8ee",  // white chest patch
+  nose:    "#120e0c",
+  grass:   "#22e03a",
+  grassTop:"#c6ff4a",
+  dirt:    "#c16a32",
+  brick:   "#e24b32",
+  wood:    "#e0a45a",
+  gold:    "#ffc83d",
+  hydrant: "#ff2d2d",
+  ball:    "#C6FF00",  // neon yellow-green
+  ballRed: "#FF2A2A",
+  house:   "#fff0d2",
+  roof:    "#e23b32",
+  skyTop:  "#1d5fd6",
+  sky:     "#c5eaff"
 };
 
 // ----- SPEEDS --------------------------------------------------------------
@@ -9679,7 +9681,7 @@ const BBA_SPEED = {
   plat: 4.2      // how far an M platform slides, left and right
 };
 
-const BBA_THREE = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
+const BBA_THREE = "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js";
 
 let bba = null;
 
@@ -9765,7 +9767,7 @@ function bbaMount(){
   root.id = "bba-root";
   root.innerHTML =
     '<style>'+
-    '#bba-root{position:absolute;inset:0;z-index:5;background:#8ecff5;overflow:hidden;font-family:Fredoka,system-ui,sans-serif;color:#fff6c9}'+
+    '#bba-root{position:absolute;inset:0;z-index:5;background:#1d5fd6;overflow:hidden;font-family:Fredoka,system-ui,sans-serif;color:#fff6c9}'+
     '#bba-root canvas{display:block;width:100%;height:100%}'+
     '#bba-hud{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;gap:8px;padding:10px 12px;pointer-events:none}'+
     '#bba-hud .bba-pill{background:linear-gradient(#fff6c9,#f0c14d);color:#4a2408;border:3px solid #a86a12;border-radius:14px;padding:6px 12px;font-weight:700;min-width:84px;text-align:center;box-shadow:0 3px 0 #6a3a08}'+
@@ -9815,29 +9817,33 @@ function bbaMount(){
 
 function bbaBoot3d(){
   const THREE = window.THREE;
+  if (THREE.ColorManagement) THREE.ColorManagement.enabled = true;
+  bba.THREE = THREE;
   const root = bba.root;
   const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.08;
-  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMappingExposure = 1.05;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
   root.insertBefore(renderer.domElement, root.firstChild);
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(BBA_COLORS.sky);
-  scene.fog = new THREE.Fog(BBA_COLORS.sky, 18, 46);
-  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 80);
-  const hemi = new THREE.HemisphereLight(0xfff4d2, 0x5a8a32, 0.65);
+  scene.background = bbaSkyTex();
+  scene.fog = new THREE.Fog(new THREE.Color("#c5eaff"), 42, 96);
+  const camera = new THREE.PerspectiveCamera(34, 1, 0.08, 140);
+  const hemi = new THREE.HemisphereLight("#9ad4ff", "#5ec24a", 1.15);
   scene.add(hemi);
-  const amb = new THREE.AmbientLight(0xffffff, 0.28);
+  const amb = new THREE.AmbientLight("#fff8ee", 0.38);
   scene.add(amb);
-  const sun = new THREE.DirectionalLight(0xfff1c9, 1.15);
+  const sun = new THREE.DirectionalLight("#ffe2a8", 2.7);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.near = 0.5;
-  sun.shadow.camera.far = 40;
-  sun.shadow.bias = -0.0008;
+  sun.shadow.camera.far = 48;
+  sun.shadow.bias = -0.00015;
+  sun.shadow.normalBias = 0.045;
+  if ("radius" in sun.shadow) sun.shadow.radius = 3.5;
   scene.add(sun);
   scene.add(sun.target);
   const world = new THREE.Group();
@@ -9865,146 +9871,376 @@ function bbaBoot3d(){
   bba.raf = requestAnimationFrame(loop);
 }
 
-function bbaMat(color, opt){
-  return new bba.THREE.MeshStandardMaterial(Object.assign({
-    color, roughness:0.58, metalness:0.06
-  }, opt || {}));
+function bbaHex(c){
+  if (c && c.isColor) return null;
+  if (typeof c === "string") return c.charAt(0) === "#" ? c : "#" + c;
+  const n = (Number(c) >>> 0) & 0xffffff;
+  return "#" + n.toString(16).padStart(6, "0");
 }
-function bbaBox(w,h,d, mat, x,y,z){
-  const m = new bba.THREE.Mesh(new bba.THREE.BoxGeometry(w,h,d), mat);
-  m.position.set(x,y,z);
+function bbaColor(c){
+  if (c && c.isColor) return c;
+  return new bba.THREE.Color(bbaHex(c));
+}
+function bbaMat(color, opt){
+  const o = Object.assign({ roughness:0.48, metalness:0.04 }, opt || {});
+  o.color = bbaColor(color);
+  if (o.emissive != null) o.emissive = bbaColor(o.emissive);
+  return new bba.THREE.MeshStandardMaterial(o);
+}
+function bbaRoundGeo(w, h, d, rad){
+  const THREE = bba.THREE;
+  const r = Math.max(0.012, Math.min(rad || 0.08, w * 0.45, h * 0.45, d * 0.45));
+  try{
+    const s = new THREE.Shape();
+    const x = -w / 2, y = -h / 2;
+    s.moveTo(x + r, y);
+    s.lineTo(x + w - r, y);
+    s.absarc(x + w - r, y + r, r, -Math.PI / 2, 0, false);
+    s.lineTo(x + w, y + h - r);
+    s.absarc(x + w - r, y + h - r, r, 0, Math.PI / 2, false);
+    s.lineTo(x + r, y + h);
+    s.absarc(x + r, y + h - r, r, Math.PI / 2, Math.PI, false);
+    s.lineTo(x, y + r);
+    s.absarc(x + r, y + r, r, Math.PI, Math.PI * 1.5, false);
+    const bevelT = Math.min(r * 0.55, d * 0.22);
+    const geo = new THREE.ExtrudeGeometry(s, {
+      depth: Math.max(0.04, d - bevelT * 2),
+      bevelEnabled: true,
+      bevelThickness: bevelT,
+      bevelSize: Math.min(r * 0.5, h * 0.2),
+      bevelSegments: 2,
+      curveSegments: 3
+    });
+    geo.translate(0, 0, -d / 2);
+    geo.computeVertexNormals();
+    return geo;
+  }catch(e){
+    return new THREE.BoxGeometry(w, h, d);
+  }
+}
+function bbaGableGeo(w, h, d){
+  const THREE = bba.THREE;
+  const s = new THREE.Shape();
+  s.moveTo(-w / 2, 0);
+  s.lineTo(w / 2, 0);
+  s.lineTo(0, h);
+  const geo = new THREE.ExtrudeGeometry(s, {
+    depth: d, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.05, bevelSegments: 1
+  });
+  geo.translate(0, 0, -d / 2);
+  return geo;
+}
+function bbaBox(w, h, d, mat, x, y, z, rad){
+  const geo = bbaRoundGeo(w, h, d, rad == null ? Math.min(0.09, w, h, d) * 0.28 : rad);
+  const m = new bba.THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
   m.castShadow = true;
   m.receiveShadow = true;
   return m;
 }
+function bbaSkyTex(){
+  const THREE = bba.THREE;
+  const c = document.createElement("canvas");
+  c.width = 4;
+  c.height = 512;
+  const g = c.getContext("2d");
+  const grd = g.createLinearGradient(0, 0, 0, 512);
+  grd.addColorStop(0, BBA_COLORS.skyTop);
+  grd.addColorStop(0.45, "#4aa4ef");
+  grd.addColorStop(0.78, "#9fd8fb");
+  grd.addColorStop(1, BBA_COLORS.sky);
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 4, 512);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  return tex;
+}
+function bbaShade(obj){
+  if (!obj) return;
+  obj.traverse(o=>{
+    if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; }
+  });
+}
 
 function bbaMakeBackdrop(){
   const THREE = bba.THREE;
+  const near = new THREE.Group();
   const mid = new THREE.Group();
   const far = new THREE.Group();
-  bba.world.add(mid);
   bba.world.add(far);
+  bba.world.add(mid);
+  bba.world.add(near);
+  bba.near = near;
   bba.mid = mid;
   bba.far = far;
-  // Houses sit deep behind the fence so the side camera reads as a neighborhood.
-  for (let i=0;i<20;i++){
-    const x = i * 12 - 6;
-    const tall = 2.2 + ((i * 3) % 5) * 0.35;
-    const body = bbaBox(3.4, tall, 2.4, bbaMat(i%2?0xf6e6c8:0xf3d7b0), x, tall/2, -8);
-    body.castShadow = false;
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(2.6, 1.35, 4), bbaMat(i%3?BBA_COLORS.roof:0x4a6ea8));
-    roof.position.set(x, tall + 0.55, -8);
-    roof.rotation.y = Math.PI/4;
-    roof.castShadow = false;
-    const win = bbaBox(0.55, 0.7, 0.1, bbaMat(0x9fd8f2, {emissive:0x224455, emissiveIntensity:0.3}), x+0.7, tall*0.55, -6.7);
-    win.castShadow = false;
-    mid.add(body, roof, win);
-  }
-  const fenceMat = bbaMat(BBA_COLORS.wood);
-  for (let i=0;i<78;i++){
-    const post = bbaBox(0.12, 0.9, 0.12, fenceMat, i*3.1, 1.35, -1.8);
-    post.castShadow = false;
-    mid.add(post);
-    if (i<77){
-      const rail = bbaBox(3.1, 0.08, 0.08, fenceMat, i*3.1+1.55, 1.62, -1.8);
-      rail.castShadow = false;
-      mid.add(rail);
-    }
+
+  // Far hills sit on the visual horizon. Bases are dropped so perspective
+  // lines them up with the playfield ground instead of floating.
+  const hillCols = ["#3eae45", "#2f9a55", "#57c44e"];
+  for (let i=0;i<16;i++){
+    const rad = 5.2 + (i % 3) * 1.1;
+    const hill = new THREE.Mesh(new THREE.SphereGeometry(rad, 20, 12), bbaMat(hillCols[i % 3], {roughness:0.92}));
+    hill.scale.set(1.15, 0.42, 1);
+    hill.position.set(i * 16 - 12, -1.15, -20);
+    hill.castShadow = false;
+    hill.receiveShadow = true;
+    far.add(hill);
   }
   bba.clouds = [];
-  for (let i=0;i<10;i++){
+  for (let i=0;i<9;i++){
     const c = new THREE.Group();
-    const mat = bbaMat(0xffffff, {roughness:0.9, metalness:0});
-    c.add(new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 8), mat));
-    const a = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 8), mat);
-    a.position.set(0.9, 0.2, 0);
-    const d = new THREE.Mesh(new THREE.SphereGeometry(0.6, 10, 8), mat);
-    d.position.set(-0.8, 0.1, 0);
-    c.add(a, d);
-    c.userData.baseX = i * 18;
-    c.position.set(c.userData.baseX, 6.6 + (i%3)*0.45, -14);
+    const mat = bbaMat("#ffffff", {roughness:0.85, metalness:0});
+    const puff = (rx, ry, rz, px, py)=>{
+      const m = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), mat);
+      m.scale.set(rx, ry, rz);
+      m.position.set(px, py, 0);
+      m.castShadow = false;
+      c.add(m);
+    };
+    puff(1.3, 0.85, 0.9, 0, 0);
+    puff(0.85, 0.7, 0.75, 1.05, 0.15);
+    puff(0.7, 0.55, 0.6, -0.95, 0.05);
+    c.userData.baseX = i * 22;
+    c.position.set(c.userData.baseX, 7.4 + (i % 3) * 0.55, -26);
     far.add(c);
     bba.clouds.push(c);
   }
-  const sunBall = new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 12), bbaMat(0xfff3b0, {emissive:0xffe08a, emissiveIntensity:0.7}));
-  sunBall.position.set(18, 9.2, -18);
+  const sunBall = new THREE.Mesh(
+    new THREE.SphereGeometry(1.35, 20, 14),
+    bbaMat("#fff4b0", {emissive:new THREE.Color("#ffe28a"), emissiveIntensity:0.85, roughness:0.4})
+  );
+  sunBall.position.set(-6, 8.6, -28);
   far.add(sunBall);
+
+  // Middle: colorful houses, walls vertical, gable roofs level, bases on the ground line.
+  const wallCols = ["#fff6dc", "#ffe3c4", "#fff1b8", "#f3ffe4"];
+  const roofCols = ["#e23b32", "#2f7fe0", "#2f9d4a", "#e23b32", "#3a6fd4"];
+  for (let i=0;i<18;i++){
+    const x = i * 13 - 8;
+    const tall = 1.85 + (i % 3) * 0.38;
+    const walls = bbaMat(wallCols[i % wallCols.length], {roughness:0.72});
+    const body = bbaBox(3.3, tall, 2.35, walls, 0, tall / 2, 0, 0.08);
+    const roof = new THREE.Mesh(bbaGableGeo(3.7, 1.15, 2.6), bbaMat(roofCols[i % roofCols.length], {roughness:0.5}));
+    roof.position.y = tall;
+    const door = bbaBox(0.58, 0.95, 0.12, bbaMat("#7a3e22", {roughness:0.6}), -0.35, 0.48, 1.2, 0.05);
+    const glass = bbaMat("#c9f4ff", {emissive:new THREE.Color("#9ad8f0"), emissiveIntensity:0.35, roughness:0.15, metalness:0.05});
+    const win = bbaBox(0.52, 0.52, 0.1, glass, 0.85, tall * 0.62, 1.22, 0.06);
+    const chim = bbaBox(0.32, 0.55, 0.32, bbaMat("#c4563a", {roughness:0.7}), 0.9, tall + 0.7, -0.2, 0.04);
+    const house = new THREE.Group();
+    house.add(body, roof, door, win, chim);
+    house.position.set(x, 0.05, -9);
+    bbaShade(house);
+    mid.add(house);
+  }
+
+  // Close: fence and bushes planted on the ground, just behind the play plane.
+  const fenceMat = bbaMat(BBA_COLORS.wood, {roughness:0.62});
+  const bushMat = bbaMat("#2f9a3a", {roughness:0.8});
+  const bushMat2 = bbaMat("#46c44a", {roughness:0.75});
+  for (let i=0;i<80;i++){
+    const x = i * 3.05 - 4;
+    const post = bbaBox(0.14, 1.15, 0.14, fenceMat, x, 0.58, 0, 0.03);
+    near.add(post);
+    if (i < 79){
+      near.add(bbaBox(3.05, 0.09, 0.09, fenceMat, x + 1.52, 0.95, 0, 0.03));
+      near.add(bbaBox(3.05, 0.08, 0.08, fenceMat, x + 1.52, 0.48, 0, 0.03));
+    }
+    if (i % 2 === 0){
+      const bush = new THREE.Mesh(new THREE.SphereGeometry(0.38, 12, 10), i % 4 ? bushMat : bushMat2);
+      bush.scale.set(1.2, 0.75, 0.9);
+      bush.position.set(x + 1.2, 0.28, 0.35);
+      bush.castShadow = true;
+      bush.receiveShadow = true;
+      near.add(bush);
+    }
+  }
+  near.position.z = -2.15;
 }
 
 function bbaPawMat(){
+  const THREE = bba.THREE;
   const c = document.createElement("canvas");
-  c.width = c.height = 64;
+  c.width = c.height = 128;
   const g = c.getContext("2d");
-  g.fillStyle = "#f2c14a";
-  g.fillRect(0,0,64,64);
-  g.fillStyle = "#8a4e16";
-  g.beginPath(); g.arc(32,40,10,0,Math.PI*2); g.fill();
-  [[18,22],[32,16],[46,22]].forEach(([x,y])=>{ g.beginPath(); g.arc(x,y,5,0,Math.PI*2); g.fill(); });
-  const tex = new bba.THREE.CanvasTexture(c);
-  return bbaMat(0xffffff, {map:tex, roughness:0.45, metalness:0.12});
+  const grd = g.createLinearGradient(0, 0, 128, 128);
+  grd.addColorStop(0, "#ffe98a");
+  grd.addColorStop(0.55, "#ffc83d");
+  grd.addColorStop(1, "#f0a020");
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 128, 128);
+  g.fillStyle = "#a85a12";
+  g.beginPath(); g.arc(64, 80, 18, 0, Math.PI * 2); g.fill();
+  [[36, 46], [64, 34], [92, 46]].forEach(([x, y])=>{
+    g.beginPath(); g.arc(x, y, 9, 0, Math.PI * 2); g.fill();
+  });
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return bbaMat("#ffffff", {
+    map: tex, roughness: 0.2, metalness: 0.62,
+    emissive: new THREE.Color("#c47a12"), emissiveIntensity: 0.16
+  });
+}
+
+function bbaMakeOrb(kind){
+  const THREE = bba.THREE;
+  const neon = kind === "R" ? BBA_COLORS.ballRed : kind === "Q" ? BBA_COLORS.gold : BBA_COLORS.ball;
+  const mat = bbaMat(neon, {
+    emissive: new THREE.Color(neon),
+    emissiveIntensity: kind === "Q" ? 0.42 : 0.72,
+    roughness: 0.2,
+    metalness: 0.04
+  });
+  const r = kind === "Q" ? 0.28 : 0.23;
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, 22, 16), mat);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  if (kind !== "Q"){
+    const seamMat = bbaMat("#ffffff", {roughness:0.28, metalness:0.02});
+    const a = new THREE.Mesh(new THREE.TorusGeometry(r * 0.8, 0.013, 8, 28, Math.PI * 1.28), seamMat);
+    a.rotation.set(1.15, 0.45, 0.15);
+    const b = new THREE.Mesh(new THREE.TorusGeometry(r * 0.8, 0.013, 8, 28, Math.PI * 1.28), seamMat);
+    b.rotation.set(-0.35, -0.95, 0.55);
+    mesh.add(a, b);
+  }
+  return mesh;
+}
+
+function bbaTuft(x, y, z, flower){
+  const g = new bba.THREE.Group();
+  const blade = bbaMat("#2fbf3a", {roughness:0.7});
+  for (let i=0;i<3;i++){
+    const m = new bba.THREE.Mesh(new bba.THREE.ConeGeometry(0.05, 0.36, 5), blade);
+    m.position.set((i - 1) * 0.045, 0.1, 0);
+    m.rotation.z = (i - 1) * 0.28;
+    m.castShadow = true;
+    g.add(m);
+  }
+  if (flower){
+    const cols = ["#ff4d6a", "#ffe14a", "#ffffff", "#5ad0ff"];
+    const head = new bba.THREE.Mesh(
+      new bba.THREE.SphereGeometry(0.075, 8, 6),
+      bbaMat(cols[Math.abs(Math.floor(x * 3)) % cols.length], {roughness:0.4})
+    );
+    head.position.set(0.02, 0.24, 0);
+    g.add(head);
+  }
+  g.position.set(x, y, z);
+  return g;
+}
+
+function bbaDressGround(level){
+  const cells = bba.solids.filter(s=>s.kind==="ground").slice().sort((a,b)=>a.y-b.y || a.x-b.x);
+  const runs = [];
+  for (const s of cells){
+    const last = runs[runs.length - 1];
+    if (last && last.y === s.y && s.x === last.x1 + 1) last.x1 = s.x;
+    else runs.push({y:s.y, x0:s.x, x1:s.x});
+  }
+  const grass = bbaMat(BBA_COLORS.grass, {roughness:0.7});
+  const top = bbaMat(BBA_COLORS.grassTop, {roughness:0.45});
+  const dirt = bbaMat(BBA_COLORS.dirt, {roughness:0.94});
+  const soil = bbaMat("#5a3018", {roughness:0.9});
+  for (const run of runs){
+    const w = run.x1 - run.x0 + 1;
+    const cx = run.x0 + w / 2;
+    const topY = run.y + 1;
+    const grassH = 0.88;
+    const dirtH = 22;
+    level.add(bbaBox(w, dirtH, 1.7, dirt, cx, topY - grassH - dirtH / 2 + 0.02, -0.02, 0.06));
+    level.add(bbaBox(w + 0.04, grassH, 1.86, grass, cx, topY - grassH / 2, 0.06, 0.12));
+    level.add(bbaBox(w + 0.08, 0.16, 1.94, top, cx, topY - 0.1, 0.12, 0.06));
+    level.add(bbaBox(w + 0.02, 0.07, 1.7, soil, cx, topY - grassH + 0.02, 0.02, 0.02));
+    for (let x = run.x0 + 0.8; x < run.x1 + 0.2; x += 2.7){
+      level.add(bbaTuft(x, topY, 0.72, true));
+      if (Math.floor(x) % 2 === 0) level.add(bbaTuft(x + 0.7, topY, -0.55, false));
+    }
+  }
 }
 
 function bbaMakeDog(){
   const THREE = bba.THREE;
   const g = new THREE.Group();
-  const fur = bbaMat(BBA_COLORS.fur);
-  const black = bbaMat(BBA_COLORS.saddle, {roughness:0.5});
-  const white = bbaMat(BBA_COLORS.chest, {roughness:0.5});
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.28, 18, 14), fur);
-  body.scale.set(1.25, 0.82, 0.78);
-  body.position.set(0, 0.42, 0);
+  const fur = bbaMat(BBA_COLORS.fur, {roughness:0.58});
+  const black = bbaMat(BBA_COLORS.saddle, {roughness:0.42});
+  const white = bbaMat(BBA_COLORS.chest, {roughness:0.48});
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.32, 22, 16), fur);
+  body.scale.set(1.55, 0.8, 0.86);
+  body.position.set(0.02, 0.5, 0);
+  body.userData.base = [1.55, 0.8, 0.86];
   body.castShadow = true;
-  const saddle = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 10), black);
-  saddle.scale.set(1.05, 0.42, 0.72);
-  saddle.position.set(-0.02, 0.58, 0);
-  const chest = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 10), white);
-  chest.position.set(0.16, 0.36, 0);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), fur);
-  head.position.set(0.34, 0.62, 0);
-  const mask = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), black);
-  mask.scale.set(1.15, 0.62, 0.9);
-  mask.position.set(0.44, 0.64, 0);
-  const snout = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), fur);
-  snout.position.set(0.52, 0.55, 0);
-  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), bbaMat(BBA_COLORS.nose));
-  nose.position.set(0.59, 0.57, 0);
-  const eyeGeo = new THREE.SphereGeometry(0.028, 8, 8);
-  const eyeMat = bbaMat(0x1a120c);
-  const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(0.48, 0.68, 0.08);
-  const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set(0.48, 0.68, -0.08);
-  g.add(body, saddle, chest, head, mask, snout, nose, eyeL, eyeR);
+  // Black saddle blankets the whole back so he doesn't read as a tan blob.
+  const saddle = new THREE.Mesh(new THREE.SphereGeometry(0.28, 18, 14), black);
+  saddle.scale.set(1.25, 0.46, 0.82);
+  saddle.position.set(-0.02, 0.7, 0);
+  saddle.castShadow = true;
+  const chest = new THREE.Mesh(new THREE.SphereGeometry(0.15, 14, 12), white);
+  chest.scale.set(0.9, 1.2, 0.72);
+  chest.position.set(0.24, 0.44, 0.02);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 20, 16), fur);
+  head.position.set(0.48, 0.74, 0);
+  head.castShadow = true;
+  const mask = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), black);
+  mask.scale.set(1.28, 0.7, 1.02);
+  mask.position.set(0.58, 0.78, 0);
+  const muzzleMask = new THREE.Mesh(new THREE.SphereGeometry(0.095, 12, 10), black);
+  muzzleMask.scale.set(1.45, 0.72, 0.9);
+  muzzleMask.position.set(0.72, 0.66, 0);
+  const snout = new THREE.Mesh(new THREE.SphereGeometry(0.085, 12, 10), fur);
+  snout.position.set(0.74, 0.62, 0);
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.042, 10, 8), bbaMat(BBA_COLORS.nose, {roughness:0.32}));
+  nose.position.set(0.82, 0.64, 0);
+  function bbaEye(z, sc){
+    const eg = new THREE.Group();
+    const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.052 * sc, 12, 10), bbaMat("#fffef8", {roughness:0.22}));
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.03 * sc, 10, 8), bbaMat("#1a120c", {roughness:0.3}));
+    pupil.position.set(0.028, 0.004, 0);
+    const glint = new THREE.Mesh(
+      new THREE.SphereGeometry(0.014 * sc, 8, 6),
+      bbaMat("#ffffff", {emissive:new THREE.Color("#ffffff"), emissiveIntensity:0.55, roughness:0.2})
+    );
+    glint.position.set(0.04, 0.022, 0.012 * (z < 0 ? -1 : 1));
+    eg.add(sclera, pupil, glint);
+    eg.position.set(0.66, 0.82, z);
+    return eg;
+  }
+  g.add(body, saddle, chest, head, mask, muzzleMask, snout, nose, bbaEye(0.11, 1.2), bbaEye(-0.11, 1));
   const ears = [];
-  const earGeo = new THREE.ConeGeometry(0.055, 0.22, 8);
-  [-0.09, 0.09].forEach(z=>{
+  [-0.12, 0.12].forEach(z=>{
     const pivot = new THREE.Group();
-    pivot.position.set(0.28, 0.78, z);
-    const ear = new THREE.Mesh(earGeo, black);
-    ear.position.y = 0.1;
-    pivot.add(ear);
+    pivot.position.set(0.4, 0.96, z);
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.38, 8), black);
+    ear.position.y = 0.18;
+    ear.castShadow = true;
+    const inner = new THREE.Mesh(new THREE.ConeGeometry(0.036, 0.2, 6), fur);
+    inner.position.set(0.02, 0.15, 0);
+    pivot.add(ear, inner);
     g.add(pivot);
     ears.push(pivot);
   });
   const legs = [];
-  [[0.16,0.12],[0.16,-0.12],[-0.16,0.1],[-0.16,-0.1]].forEach(([x,z])=>{
+  [[0.22, 0.15], [0.22, -0.15], [-0.2, 0.13], [-0.2, -0.13]].forEach(([x, z])=>{
     const pivot = new THREE.Group();
-    pivot.position.set(x, 0.36, z);
-    const upper = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), fur);
-    upper.scale.set(0.8, 1.3, 0.8);
-    upper.position.y = -0.08;
-    const paw = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), fur);
-    paw.position.y = -0.2;
+    pivot.position.set(x, 0.42, z);
+    const upper = new THREE.Mesh(new THREE.SphereGeometry(0.072, 10, 8), fur);
+    upper.scale.set(0.85, 1.5, 0.85);
+    upper.position.y = -0.1;
+    const paw = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), fur);
+    paw.position.y = -0.36;
     pivot.add(upper, paw);
     g.add(pivot);
     legs.push(pivot);
   });
   const tail = new THREE.Group();
-  tail.position.set(-0.32, 0.48, 0);
-  const t1 = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), fur);
-  t1.position.set(-0.08, 0.06, 0);
+  tail.position.set(-0.44, 0.56, 0);
+  const t1 = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), fur);
+  t1.position.set(-0.08, 0.05, 0);
   const t2 = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), white);
   t2.position.set(-0.18, 0.14, 0);
   tail.add(t1, t2);
   g.add(tail);
+  bbaShade(g);
   bba.world.add(g);
   bba.dog = { group:g, legs, tail, ears, fur, black, body:body };
 }
@@ -10025,14 +10261,9 @@ function bbaRebuild(){
   const enemies = [];
   const rows = BBA_MAP;
   const n = rows.length;
-  const grass = bbaMat(BBA_COLORS.grass);
-  const dirt = bbaMat(BBA_COLORS.dirt);
-  const brickM = bbaMat(BBA_COLORS.brick, {roughness:0.72});
-  const wood = bbaMat(BBA_COLORS.wood);
+  const brickM = bbaMat(BBA_COLORS.brick, {roughness:0.62});
+  const wood = bbaMat(BBA_COLORS.wood, {roughness:0.55});
   const paw = bbaPawMat();
-  const ballM = bbaMat(BBA_COLORS.ball, {emissive:0x6a8a20, emissiveIntensity:0.25, roughness:0.35});
-  const redM = bbaMat(BBA_COLORS.ballRed, {emissive:0x6a140c, emissiveIntensity:0.2, roughness:0.35});
-  const goldM = bbaMat(0xffe27a, {emissive:0xaa7700, emissiveIntensity:0.45, roughness:0.3, metalness:0.2});
   bba.goal = null;
   bba.check = null;
   for (let r=0;r<n;r++){
@@ -10041,20 +10272,18 @@ function bbaRebuild(){
     for (let x=0;x<line.length;x++){
       const ch = line[x];
       if (ch === "="){
-        const mesh = bbaBox(1, 1, 1, grass, x+0.5, y+0.5, 0);
-        const side = bbaBox(1.02, 0.28, 1.02, dirt, x+0.5, y+0.14, 0);
-        level.add(mesh, side);
+        // Collision only. The thick grass/dirt shell is built afterwards.
         solids.push({x, y, w:1, h:1, kind:"ground"});
       } else if (ch === "#"){
-        const mesh = bbaBox(0.96, 0.96, 0.96, brickM, x+0.5, y+0.5, 0);
+        const mesh = bbaBox(0.9, 0.9, 0.9, brickM, x+0.5, y+0.5, 0, 0.12);
         level.add(mesh);
         solids.push({x, y, w:1, h:1, kind:"brick", mesh});
       } else if (ch === "?" || ch === "B"){
-        const mesh = bbaBox(0.86, 0.86, 0.86, paw, x+0.5, y+0.5, 0);
+        const mesh = bbaBox(0.84, 0.84, 0.84, paw, x+0.5, y+0.5, 0, 0.12);
         level.add(mesh);
         solids.push({x, y, w:1, h:1, kind: ch==="B"?"bonebox":"box", mesh, used:false, baseY:y+0.5});
       } else if (ch === "-" || ch === "M"){
-        const mesh = bbaBox(0.96, 0.22, 0.7, wood, x+0.5, y+0.12, 0);
+        const mesh = bbaBox(0.96, 0.22, 0.72, wood, x+0.5, y+0.12, 0, 0.05);
         level.add(mesh);
         plats.push({x, y, w:1, h:0.22, origin:x, range: ch==="M"?BBA_SPEED.plat:0, moving:ch==="M", phase:x*0.4, mesh});
       } else if (ch === "H"){
@@ -10071,13 +10300,12 @@ function bbaRebuild(){
         side.position.set(0.2, 0.7, 0);
         hyd.add(pole, top, side);
         hyd.position.set(x+0.5, y, 0);
+        bbaShade(hyd);
         level.add(hyd);
         // Short enough that a held jump clears it. A tap does not.
         solids.push({x:x+0.2, y, w:0.6, h:1.26, kind:"hydrant"});
       } else if (ch === "o" || ch === "R" || ch === "Q"){
-        const mat = ch==="R" ? redM : ch==="Q" ? goldM : ballM;
-        const mesh = new THREE.Mesh(new THREE.SphereGeometry(ch==="Q"?0.28:0.22, 14, 12), mat);
-        mesh.castShadow = true;
+        const mesh = bbaMakeOrb(ch);
         mesh.position.set(x+0.5, y+0.45, 0);
         level.add(mesh);
         balls.push({x:x+0.5, y:y+0.45, kind:ch, mesh, got:false, ph:x});
@@ -10091,6 +10319,7 @@ function bbaRebuild(){
         water.position.y = 0.1;
         bowl.add(cup, water);
         bowl.position.set(x+0.5, y, 0);
+        bbaShade(bowl);
         level.add(bowl);
         bba.check = {x:x+0.5, y, mesh:bowl, got:false};
       } else if (ch === "D"){
@@ -10107,6 +10336,7 @@ function bbaRebuild(){
   bba.enemies = enemies;
   bba.drops = [];
   bba.bits = [];
+  bbaDressGround(level);
   bba.p = {
     x:3.2, y:1, vx:0, vy:0, hw:0.28, h:0.86, face:1, big:false, inv:0,
     coyote:0, jumpBuf:0, onGround:false, crouch:false, barkCd:0, iframes:0,
@@ -10127,17 +10357,17 @@ function bbaMakeEnemy(ch, x, y, level){
   const THREE = bba.THREE;
   const g = new THREE.Group();
   if (ch === "S"){
-    const fur = bbaMat(0xb86a3a);
+    const fur = bbaMat("#e09040", {roughness:0.55});
     const body = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), fur);
     body.scale.set(1.2, 0.8, 0.7);
     body.position.y = 0.28;
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), fur);
     head.position.set(0.18, 0.42, 0);
-    const tail = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), bbaMat(0x8d4e28));
+    const tail = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), bbaMat("#b86a32"));
     tail.position.set(-0.22, 0.48, 0);
     g.add(body, head, tail);
   } else if (ch === "C"){
-    const fur = bbaMat(0x6a6e78);
+    const fur = bbaMat("#9aa2b0", {roughness:0.5});
     const body = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10), fur);
     body.scale.set(1.3, 0.75, 0.7);
     body.position.y = 0.3;
@@ -10145,10 +10375,10 @@ function bbaMakeEnemy(ch, x, y, level){
     head.position.set(0.22, 0.46, 0);
     g.add(body, head);
   } else {
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8), bbaMat(0x1c1a22));
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8), bbaMat("#241f2c", {roughness:0.45}));
     body.scale.set(1.4, 0.7, 0.6);
     body.position.y = 0.2;
-    const wing = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.28, 0.5), bbaMat(0x2a2830));
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.28, 0.5), bbaMat("#3a3544"));
     wing.position.set(0, 0.28, 0);
     g.add(body, wing);
     g.userData.wing = wing;
@@ -10167,18 +10397,18 @@ function bbaMakeEnemy(ch, x, y, level){
 
 function bbaMakeDoghouse(){
   const g = new bba.THREE.Group();
-  const wood = bbaMat(0xc4884a);
-  const dark = bbaMat(0x5c3a22);
-  const body = bbaBox(1.3, 1.05, 1.1, wood, 0, 0.52, 0);
-  const hole = bbaBox(0.48, 0.55, 0.2, dark, 0.15, 0.38, 0.5);
-  const roof = new bba.THREE.Mesh(new bba.THREE.ConeGeometry(1.05, 0.7, 4), bbaMat(BBA_COLORS.roof));
-  roof.position.y = 1.3;
-  roof.rotation.y = Math.PI/4;
-  const pole = new bba.THREE.Mesh(new bba.THREE.CylinderGeometry(0.03, 0.03, 0.9, 6), bbaMat(0xeeeeee));
-  pole.position.set(-0.45, 1.7, 0);
-  const flag = bbaBox(0.38, 0.22, 0.04, bbaMat(0xf0472f), -0.22, 2.05, 0);
+  const wood = bbaMat("#e09a48", {roughness:0.58});
+  const dark = bbaMat("#4a2c18", {roughness:0.7});
+  const body = bbaBox(1.35, 1.02, 1.15, wood, 0, 0.51, 0, 0.08);
+  const hole = bbaBox(0.46, 0.52, 0.16, dark, 0.12, 0.36, 0.52, 0.08);
+  const roof = new bba.THREE.Mesh(bbaGableGeo(1.7, 0.72, 1.4), bbaMat(BBA_COLORS.roof, {roughness:0.48}));
+  roof.position.y = 1.02;
+  const pole = new bba.THREE.Mesh(new bba.THREE.CylinderGeometry(0.03, 0.03, 0.85, 6), bbaMat("#f7f7f7"));
+  pole.position.set(-0.48, 1.62, 0);
+  const flag = bbaBox(0.4, 0.24, 0.04, bbaMat("#ff3b30"), -0.24, 1.98, 0, 0.02);
   g.add(body, hole, roof, pole, flag);
   g.userData.flag = flag;
+  bbaShade(g);
   return g;
 }
 
@@ -10442,10 +10672,9 @@ function bbaStepWorld(dt){
     const d = bba.drops[i];
     if (d.vy === 0){
       const kind = d.kind === "bone" ? "bone" : d.ball;
-      const mat = kind==="bone" ? bbaMat(0xf4efe6) : kind==="R" ? bbaMat(BBA_COLORS.ballRed) : bbaMat(BBA_COLORS.ball);
-      const mesh = kind==="bone"
-        ? bbaBox(0.34, 0.12, 0.12, mat, d.x, d.y+0.2, 0)
-        : new bba.THREE.Mesh(new bba.THREE.SphereGeometry(0.2, 12, 10), mat);
+      const mesh = kind === "bone"
+        ? bbaBox(0.36, 0.12, 0.12, bbaMat("#fff4e4", {roughness:0.45}), d.x, d.y+0.2, 0, 0.04)
+        : bbaMakeOrb(kind === "R" ? "R" : "o");
       if (kind !== "bone") mesh.position.set(d.x, d.y+0.35, 0);
       bba.level.add(mesh);
       bba.balls.push({x:d.x, y:d.y+0.35, kind, mesh, got:false, ph:d.x, bone:kind==="bone"});
@@ -10538,8 +10767,9 @@ function bbaSyncDog(){
   const s = p.big ? 1.55 : 1;
   const crouch = p.crouch ? 0.72 : 1;
   const stretch = p.onGround ? 1 : 1 + Math.max(-0.14, Math.min(0.16, p.vy * 0.012));
+  const vis = 1.18;
   d.group.position.set(p.x, p.y, 0);
-  d.group.scale.set((p.face || 1) * s / Math.pow(stretch, 0.4), s * crouch * stretch, s);
+  d.group.scale.set((p.face || 1) * s * vis / Math.pow(stretch, 0.4), s * crouch * stretch * vis, s * vis);
   if (bba.phase === "clear") d.group.rotation.y = bba.spin || 0;
   else d.group.rotation.y = 0;
   const moving = Math.abs(p.vx) > 0.35 && p.onGround;
@@ -10551,9 +10781,10 @@ function bbaSyncDog(){
   const wagT = bba.clock || bba.time || 0;
   if (!moving) d.tail.rotation.z = Math.sin(wagT * 8) * 0.6;
   else d.tail.rotation.z = 0.28 + Math.sin(p.runPhase) * 0.18;
-  if (d.body){
+  if (d.body && d.body.userData.base){
+    const b = d.body.userData.base;
     const breathe = (!moving && p.onGround) ? 1 + Math.sin(wagT * 2.5) * 0.045 : 1;
-    d.body.scale.set(1.25, 0.82 * breathe, 0.78);
+    d.body.scale.set(b[0], b[1] * breathe, b[2]);
   }
   const ear = p.onGround ? 0 : -0.5 + Math.sin(wagT * 16) * 0.18;
   d.ears[0].rotation.z = ear;
@@ -10562,7 +10793,7 @@ function bbaSyncDog(){
   d.group.visible = !blink;
   if (p.inv > 0){
     d.fur.emissive = d.fur.emissive || new bba.THREE.Color();
-    d.fur.emissive.set(0xffe08a);
+    d.fur.emissive.set("#ffe08a");
     d.fur.emissiveIntensity = 0.4 + Math.sin(wagT * 22) * 0.28;
   } else if (d.fur.emissive){
     d.fur.emissiveIntensity = 0;
@@ -10800,8 +11031,9 @@ function bbaFrame(dt){
     c.position.x = ((base + bba.clock * 1.4) % span) - 12;
   }
   const px = bba.p ? bba.p.x : 0;
-  if (bba.mid) bba.mid.position.x = px * 0.4;
-  if (bba.far) bba.far.position.x = px * 0.72;
+  if (bba.near) bba.near.position.x = px * 0.14;
+  if (bba.mid) bba.mid.position.x = px * 0.36;
+  if (bba.far) bba.far.position.x = px * 0.62;
   if (bba.goal && bba.goal.mesh && bba.goal.mesh.userData.flag){
     bba.goal.mesh.userData.flag.rotation.z = Math.sin(bba.clock * 3) * 0.28;
   }
@@ -10816,16 +11048,23 @@ function bbaFrame(dt){
     b.mesh.position.y = b.y + Math.sin(bba.clock * 3 + (b.ph || 0)) * 0.08;
     b.mesh.rotation.y += dt * 3;
   }
+  for (const s of bba.solids || []){
+    if (!s.mesh || s.gone || s.used) continue;
+    if (s.kind === "box" || s.kind === "bonebox"){
+      s.mesh.position.y = s.baseY + Math.sin(bba.clock * 3.1 + s.x) * 0.07;
+      s.mesh.rotation.y = Math.sin(bba.clock * 1.2 + s.x * 0.5) * 0.15;
+    }
+  }
   bbaSyncDog();
   const p = bba.p;
   if (!p) return;
   const wantLook = (bba.inp.lookR ? 3.2 : 0) - (bba.inp.lookL ? 3.2 : 0);
   bba.look += (wantLook - bba.look) * Math.min(1, dt * 6);
   const cam = bba.camera;
-  cam.position.set(p.x + bba.look, p.y + 2.35, 12.6);
-  cam.lookAt(p.x + bba.look * 0.35, p.y + 1.05, 0);
+  cam.position.set(p.x + bba.look, p.y + 1.4, 12.15);
+  cam.lookAt(p.x + bba.look * 0.35, p.y + 1.4, 0);
   const sun = bba.sun;
-  sun.position.set(p.x - 7, p.y + 12, 8);
+  sun.position.set(p.x - 11, p.y + 15, 9);
   sun.target.position.set(p.x, p.y, 0);
   sun.target.updateMatrixWorld();
   const s = 9;
