@@ -1202,11 +1202,21 @@ addEventListener("keydown",e=>{
   }
   if (code==="Escape"||code==="KeyP"||code==="Backspace"){
     if (MODE==="bba"){
+      if (e.repeat){ e.preventDefault(); return; }
       if (code==="KeyP") bbaTogglePause();
       else bbaSelect();
       e.preventDefault(); return;
     }
     togglePause(); e.preventDefault(); return;
+  }
+  if (MODE==="bba" && bba && bba.phase!=="play" && bba.phase!=="win" && bba.phase!=="setup"){
+    if (code==="ArrowDown"||code==="ArrowRight"||code==="ArrowUp"||code==="ArrowLeft"){
+      if (!e.repeat){
+        if (code==="ArrowDown"||code==="ArrowRight") bba.nav = (bba.nav||0)+1;
+        else bba.nav = (bba.nav||0)-1;
+      }
+      e.preventDefault(); return;
+    }
   }
   if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","KeyX","KeyZ","KeyA","KeyB","KeyY","ShiftLeft","ShiftRight"].includes(code)) e.preventDefault();
   if (MODE==="memo" && !e.repeat) memoKey(code);
@@ -9621,72 +9631,64 @@ window.__BA={
 };
 // =============================================================================
 // Bernard's Big Adventure
-// A self-contained 2.5D stage. Nothing above this line belongs to this game.
+// A self-contained 2D stage. Nothing above this line belongs to this game.
 // Edit the three blocks marked LEVEL, COLORS, and SPEEDS.
-// Three.js is loaded from cdnjs only while this game is open, then removed.
+// Everything is drawn on a canvas. No images, no audio files, no Three.js.
 // =============================================================================
 
 // ----- LEVEL ---------------------------------------------------------------
 // One character is one tile. The top string is the sky, the bottom is the ground.
-//   . empty     = grass ground     # brick (Big Bernard smashes these)
-//   ? treat box (pops out a ball)  B treat box (pops out a bone)
-//   o green ball   R red ball      Q golden squeaky toy
-//   S squirrel     C cat           W crow        H fire hydrant
-//   - still platform   M moving platform
-//   P water-bowl checkpoint        D doghouse (the goal)
+//   . empty          = grass ground
+//   B brick          ? treat box (pops a ball)     N treat box (pops a bone)
+//   o green ball     R red ball                    Q golden squeaky toy
+//   S squirrel       C cat                         W crow
+//   H fire hydrant   - still platform              M moving platform
+//   P water bowl     D doghouse (the goal)
+// Bricks belong on row 5 (two tiles above Bernard's head) so Big Bernard
+// can still walk underneath them. Do not move them down a row.
 const BBA_MAP = [
-  "............................................................................................................................................................................................................................",
-  "............................................................................................................................................................................................................................",
-  "............................................................................................................................................................................................................................",
-  "........................................................................................................................................................................W...............................W...................",
-  ".....................................................................................................................................---.Q..................................................................................",
-  "..................?......R....................B.........................................?...R...................................---.............R...B.........####..........?.......R.......................................",
-  "............o.....................----..........o.....................----......o...............--............M...........----........................----...o..................o...........M...............................",
-  "........o..o..o..o..o..R...H..S..........o..o..o..C...H...o...S.###.........o..o..o..R....C...H...o...S.P..o.........o....o....o....o....o..o..R..H.........o..o..o...C...S...H...o...R.............o..o..o..o..C...H..o.D..",
-  "==================================....================================....==================================........==================================....================================........=========================="
+"............................................................................................................................................................................................................................................................................................................",
+"............................................................................................................................................................................................................................................................................................................",
+"............................................................................................................................................................................................................................................................................................................",
+"............................................................................................................................................................................................................W.....................W.................W.................W.....................................",
+"...................................................................................................................................................................Q........................................................................................................................................",
+"..................................R.?.......BB............N.......?.................B.B...............?...................N...............?.........BB.............-......................?.......B.B.............N.................?..........BB...............?.........N.................................",
+"....................o.............-.............................o....................R..............o...................................o....................o..-.........o........................R........................o....................R............o.............................................",
+"....o.o.o.o.R.o.o.o.o.H.o.o.S.o.R.o.o.o.o.o.o..-..o.R.o.o.o.C.o.o.o.o.H.o.R.o...--..o.o.o.S.o.R.H.o.o.o.o.o.S.o....M....o.o.o.R.C.o.o.H.o.o.S.o.R.P.o.o.o.H.o-o.o.o.o.o.....o.R.C.o.S.o.o.o.o.H.o.o.o.o.R.o.o....M....o.o.o.o.S.o.o.o.H.o.R.C.o.o.o.o.o..-.-..o.o.R.S.o.H.o.C.o.H.o.....o.o.o.R.o.o.D.o.o...",
+"==============================================...=============================.....=============================........================================================....==================================........==================================.....=======================....===================="
 ];
 
 // ----- COLORS --------------------------------------------------------------
-// Bernard's coat. Change these and the next launch uses the new colors.
 const BBA_COLORS = {
-  fur:     "#e0853a",  // rust / tan legs, chest, cheeks
-  saddle:  "#161310",  // black saddle and face mask
-  chest:   "#fff8ee",  // white chest patch
-  nose:    "#120e0c",
-  grass:   "#22e03a",
-  grassTop:"#c6ff4a",
-  dirt:    "#c16a32",
-  brick:   "#e24b32",
-  wood:    "#e0a45a",
-  gold:    "#ffc83d",
-  hydrant: "#ff2d2d",
-  ball:    "#C6FF00",  // neon yellow-green
-  ballRed: "#FF2A2A",
-  house:   "#fff0d2",
-  roof:    "#e23b32",
-  skyTop:  "#1d5fd6",
-  sky:     "#c5eaff"
+  fur:"#e0853a", furDeep:"#c86a2e", cheek:"#f2a45e",
+  saddle:"#161310", mask:"#1a1614", chest:"#fff8ee", nose:"#14110f",
+  ear:"#161310", earIn:"#e0a05a", outline:"#1c140f",
+  eye:"#fffdf8", pupil:"#24180f",
+  ball:"#C6FF00", ballRed:"#FF2A2A",
+  grass:"#22e03a", grassTop:"#c6ff4a", dirt:"#c16a32", dirtDeep:"#8a3e16",
+  brick:"#ef5b45", brickDark:"#b9342c", mortar:"#ffb39a",
+  gold:"#ffd24a", goldDeep:"#e08a12",
+  skyTop:"#1d5fd6", skyHorizon:"#bfe9ff",
+  wood:"#d0893c", roofRed:"#e23b3b", roofBlue:"#3a7bff", roofGreen:"#2fbf55",
+  wall:"#fff3d6", ink:"#1c140f", cream:"#fff6c9", leaf:"#1ea84a"
 };
 
 // ----- SPEEDS --------------------------------------------------------------
+// walk / run / enemies are in tiles per second. Jump physics is in pixels.
 const BBA_SPEED = {
-  walk: 5.3,     // tiles per second
-  run:  8.4,
-  jump: 9.8,     // takeoff speed. Hold the button for the full arc.
-  gravity: 36,
-  squirrel: 1.65,
-  cat: 1.25,
-  crow: 1.35,    // how fast a crow finishes one swoop
-  kick: 8,       // curled-up cat
-  plat: 4.2      // how far an M platform slides, left and right
+  walk:5.3, run:8.4,
+  jump:490, gravity:1900,
+  squirrel:1.65, cat:1.25, crow:1.35,
+  kick:8, plat:3.5
 };
-
-const BBA_THREE = "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js";
+const BBA_T = 48;
+const BBA_VW = 960;
+const BBA_VH = 540;
+const BBA_PAR = 150;
 
 let bba = null;
 
 function bbaPadDefault(){
-  // Standard SNES-style mapping: B jump, Y run, A bark, X also jump.
   return { jump:0, jump2:3, run:2, bark:1, start:9, select:8, l:4, r:5 };
 }
 function bbaLoadPad(){
@@ -9703,31 +9705,1833 @@ function bbaSavePad(map){
 function bbaSaveBest(v){
   try{
     const o = +localStorage.getItem("bba_best") || 0;
-    if (v > o){ ARCADE_FLASH.bba = true; localStorage.setItem("bba_best", String(v)); }
+    if (v > o){ ARCADE_FLASH.bba = true; localStorage.setItem("bba_best", String(v)); if (bba) bba.best = v; }
   }catch(e){}
 }
-
-function bbaSfxJump(){ beep(200,.08,"sawtooth",.055); setTimeout(()=>beep(130,.1,"sawtooth",.04), 60); }
+function bbaSfxJump(){ beep(200,.08,"sawtooth",.055); setTimeout(function(){ beep(130,.1,"sawtooth",.04); }, 60); }
 function bbaSfxBall(){ beep(980,.07,"sine",.05); }
-function bbaSfxBone(){ beep(150,.12,"square",.06); setTimeout(()=>beep(90,.14,"triangle",.05), 80); }
-function bbaSfxBark(){ beep(240,.09,"sawtooth",.07); setTimeout(()=>beep(160,.12,"sawtooth",.055), 80); }
+function bbaSfxBone(){ beep(150,.12,"square",.06); setTimeout(function(){ beep(90,.14,"triangle",.05); }, 80); }
+function bbaSfxBark(){ beep(240,.09,"sawtooth",.07); setTimeout(function(){ beep(160,.12,"sawtooth",.055); }, 80); }
 function bbaSfxHurt(){ beep(100,.22,"sawtooth",.07); }
-function bbaSfxPower(){ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,.1,"square",.045), i*65)); }
-function bbaSfxWin(){ [392,523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,.16,"square",.05), i*130)); }
+function bbaSfxPower(){ [523,659,784,1046].forEach(function(f,i){ setTimeout(function(){ beep(f,.1,"square",.045); }, i*65); }); }
+function bbaSfxWin(){ [392,523,659,784,1046].forEach(function(f,i){ setTimeout(function(){ beep(f,.16,"square",.05); }, i*130); }); }
 function bbaSfxStomp(){ beep(180,.08,"square",.05); }
+function bbaSfxOne(){ beep(660,.08,"square",.05); setTimeout(function(){ beep(880,.12,"square",.05); }, 90); }
 
-function bbaLoadThree(){
-  if (window.THREE && window.THREE.WebGLRenderer) return Promise.resolve();
-  return new Promise((resolve, reject)=>{
-    const s = document.createElement("script");
-    s.src = BBA_THREE;
-    s.id = "bba-three";
-    s.onload = ()=> resolve();
-    s.onerror = ()=> reject(new Error("three"));
-    document.head.appendChild(s);
-  });
+function bbaMake(w, h, draw){
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const g = c.getContext("2d");
+  g.lineJoin = "round";
+  g.lineCap = "round";
+  draw(g);
+  return c;
+}
+function bbaPathRound(g, x, y, w, h, r){
+  r = Math.max(0, Math.min(r, w/2, h/2));
+  g.beginPath();
+  g.moveTo(x+r, y);
+  g.arcTo(x+w, y, x+w, y+h, r);
+  g.arcTo(x+w, y+h, x, y+h, r);
+  g.arcTo(x, y+h, x, y, r);
+  g.arcTo(x, y, x+w, y, r);
+  g.closePath();
+}
+function bbaRR(g, x, y, w, h, r, fill, strokeW){
+  bbaPathRound(g, x, y, w, h, r);
+  g.fillStyle = fill;
+  g.fill();
+  g.save();
+  g.clip();
+  const gr = g.createLinearGradient(x, y, x, y+h);
+  gr.addColorStop(0, "rgba(255,255,255,.45)");
+  gr.addColorStop(0.42, "rgba(255,255,255,0)");
+  gr.addColorStop(1, "rgba(0,0,0,.14)");
+  g.fillStyle = gr;
+  g.fillRect(x, y-1, w, h+2);
+  g.restore();
+  if (strokeW){
+    bbaPathRound(g, x, y, w, h, r);
+    g.lineWidth = strokeW;
+    g.strokeStyle = BBA_COLORS.outline;
+    g.stroke();
+  }
+}
+function bbaOval(g, x, y, rx, ry, fill, strokeW){
+  g.beginPath();
+  g.ellipse(x, y, Math.abs(rx), Math.abs(ry), 0, 0, Math.PI*2);
+  if (fill){
+    g.fillStyle = fill;
+    g.fill();
+    g.save();
+    g.clip();
+    g.fillStyle = "rgba(255,255,255,.32)";
+    g.beginPath();
+    g.ellipse(x-rx*0.28, y-ry*0.42, Math.max(1,rx*0.5), Math.max(1,ry*0.36), -0.5, 0, 7);
+    g.fill();
+    g.restore();
+  }
+  if (strokeW){
+    g.beginPath();
+    g.ellipse(x, y, Math.abs(rx), Math.abs(ry), 0, 0, Math.PI*2);
+    g.lineWidth = strokeW;
+    g.strokeStyle = BBA_COLORS.outline;
+    g.stroke();
+  }
+}
+function bbaLimb(g, x1, y1, x2, y2, far){
+  const C = BBA_COLORS;
+  g.lineCap = "round";
+  g.strokeStyle = C.outline;
+  g.lineWidth = far ? 18 : 22;
+  g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+  g.strokeStyle = far ? C.furDeep : C.fur;
+  g.lineWidth = far ? 11 : 14;
+  g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+  bbaOval(g, x2, y2+1, far?7:8, far?5.5:6.5, far?C.furDeep:C.fur, 6);
+}
+function bbaEar(g, x, y, rot, sc){
+  const C = BBA_COLORS;
+  g.save();
+  g.translate(x, y);
+  g.rotate(rot);
+  g.scale(sc, sc);
+  g.beginPath();
+  g.moveTo(-8, 10);
+  g.quadraticCurveTo(-14, -16, 0, -40);
+  g.quadraticCurveTo(14, -16, 10, 10);
+  g.closePath();
+  g.fillStyle = C.ear;
+  g.fill();
+  g.lineWidth = 8;
+  g.strokeStyle = C.outline;
+  g.stroke();
+  g.beginPath();
+  g.moveTo(-3, 6);
+  g.quadraticCurveTo(-6, -10, 1, -26);
+  g.quadraticCurveTo(8, -10, 5, 6);
+  g.closePath();
+  g.fillStyle = C.earIn;
+  g.fill();
+  g.restore();
+}
+function bbaPaintDog(g, pose){
+  const C = BBA_COLORS;
+  const wag = pose==="idle0"?-0.75:pose==="idle1"?0:pose==="idle2"?0.6:pose==="idle3"?0.2:pose==="win"?1.1:pose==="jump"?0.15:-0.2;
+  const blink = pose==="idle3" || pose==="hurt";
+  const drop = pose==="crouch" ? 28 : 0;
+  const earUp = pose==="jump" ? -0.65 : pose==="fall" ? 0.3 : pose==="win" ? -0.15 : 0;
+  const legs = {
+    run0:{b:46,bl:0,f:-44,fl:2},
+    run1:{b:8,bl:-40,f:-4,fl:-32},
+    run2:{b:-44,bl:2,f:46,fl:0},
+    run3:{b:-8,bl:-34,f:10,fl:-40},
+    jump:{b:-30,bl:-36,f:-36,fl:-32},
+    fall:{b:18,bl:10,f:24,fl:14},
+    crouch:{b:16,bl:-6,f:-12,fl:-4},
+    hurt:{b:-8,bl:6,f:14,fl:6}
+  }[pose] || {b:0,bl:0,f:0,fl:0};
+  g.save();
+  if (pose==="hurt") g.translate(12, 6);
+  g.save();
+  g.translate(86, 150+drop*0.25);
+  g.rotate(wag);
+  bbaOval(g, -42, 6, 44, 20, C.fur, 8);
+  bbaOval(g, -44, -10, 34, 14, C.saddle, 7);
+  g.restore();
+  bbaLimb(g, 110, 168+drop, 110+legs.b*0.4, 236, true);
+  bbaLimb(g, 168, 172+drop, 168+legs.f*0.4, 236, true);
+  bbaOval(g, 150, 164+drop, 64, 40, C.fur, 8);
+  bbaOval(g, 136, 146+drop, 46, 20, C.saddle, 8);
+  bbaOval(g, 190, 176+drop, 24, 20, C.chest, 7);
+  bbaLimb(g, 124, 176+drop, 124+legs.b, 248+Math.min(0, legs.bl), false);
+  bbaLimb(g, 186, 180+drop, 186+legs.f, 248+Math.min(0, legs.fl), false);
+  const hx = 222, hy = 112+drop*0.7;
+  bbaOval(g, hx, hy, 40, 36, C.fur, 8);
+  bbaOval(g, hx+16, hy+18, 18, 14, C.cheek, 0);
+  g.beginPath();
+  g.moveTo(hx-8, hy-16);
+  g.quadraticCurveTo(hx+36, hy-30, hx+46, hy+6);
+  g.quadraticCurveTo(hx+42, hy+28, hx+12, hy+16);
+  g.quadraticCurveTo(hx-10, hy+2, hx-14, hy-8);
+  g.closePath();
+  g.fillStyle = C.mask;
+  g.fill();
+  g.lineWidth = 8;
+  g.strokeStyle = C.outline;
+  g.stroke();
+  bbaEar(g, hx-18, hy-8, -0.3+earUp, 1.05);
+  bbaEar(g, hx+6, hy-20, 0.08+earUp, 1.15);
+  if (blink){
+    g.strokeStyle = "#fff";
+    g.lineWidth = 7;
+    g.lineCap = "round";
+    g.beginPath();
+    g.moveTo(hx+8, hy-2);
+    g.quadraticCurveTo(hx+22, hy-14, hx+36, hy);
+    g.stroke();
+  } else {
+    bbaOval(g, hx+18, hy-6, 16, 17, C.eye, 7);
+    bbaOval(g, hx+22, hy-3, 7, 8, C.pupil, 0);
+    bbaOval(g, hx+26, hy-10, 4.5, 4.5, "#fff", 0);
+  }
+  bbaOval(g, hx+40, hy+12, 10, 8, C.nose, 7);
+  bbaOval(g, hx+36, hy+9, 3, 2, "rgba(255,255,255,.9)", 0);
+  g.lineCap = "round";
+  g.strokeStyle = C.outline;
+  g.lineWidth = 5;
+  if (pose==="win") bbaOval(g, hx+20, hy+26, 10, 12, "#ff5d6c", 6);
+  else if (pose==="hurt"){
+    g.beginPath(); g.moveTo(hx+12, hy+24); g.lineTo(hx+32, hy+20); g.stroke();
+  } else {
+    g.beginPath(); g.arc(hx+16, hy+22, 11, 0.1, 1.2); g.stroke();
+  }
+  g.restore();
 }
 
+const BBA_DOG = { w:300, h:270, ax:150, ay:248, body:172 };
+
+function bbaBakeBall(color){
+  const frames = [];
+  for (let i=0;i<8;i++){
+    frames.push(bbaMake(72, 72, function(g){
+      g.translate(36, 36);
+      bbaOval(g, 0, 0, 28, 28, color, 7);
+      g.save();
+      g.rotate(i * Math.PI/4);
+      g.strokeStyle = "#fff";
+      g.lineWidth = 5;
+      g.beginPath();
+      g.ellipse(0, 0, 12, 24, 0, 0.65, 2.5);
+      g.stroke();
+      g.restore();
+      g.fillStyle = "rgba(255,255,255,.7)";
+      g.beginPath();
+      g.ellipse(-8, -10, 7, 4.5, -0.5, 0, 7);
+      g.fill();
+    }));
+  }
+  return frames;
+}
+function bbaBakeSquirrel(){
+  function paint(g, step, flat){
+    const C = BBA_COLORS;
+    if (flat){
+      bbaOval(g, 48, 58, 36, 12, "#c47a3a", 7);
+      bbaOval(g, 78, 50, 16, 10, "#8a4e22", 6);
+      bbaOval(g, 30, 54, 6, 5, "#fff", 5);
+      return;
+    }
+    const lift = step ? -8 : 0;
+    g.save();
+    g.translate(18, 36);
+    g.rotate(step ? 0.4 : -0.2);
+    bbaOval(g, 0, 0, 18, 14, "#a86428", 7);
+    g.restore();
+    bbaOval(g, 52, 40+lift, 24, 16, "#d4843c", 7);
+    bbaOval(g, 56, 46+lift, 12, 8, "#ffe0b8", 0);
+    bbaLimb(g, 40, 48, 36, 64+(step?0:-6), true);
+    bbaLimb(g, 62, 50, 68, 66+(step?-6:0), false);
+    bbaOval(g, 70, 30+lift, 14, 12, "#e09048", 7);
+    bbaOval(g, 66, 22+lift, 5, 7, "#a86428", 5);
+    bbaOval(g, 76, 28+lift, 4.5, 4.5, "#fff", 4);
+    bbaOval(g, 77, 28+lift, 2, 2, "#24180f", 0);
+  }
+  return {
+    a:bbaMake(100, 80, function(g){ paint(g, 0, false); }),
+    b:bbaMake(100, 80, function(g){ paint(g, 1, false); }),
+    f:bbaMake(100, 80, function(g){ paint(g, 0, true); })
+  };
+}
+function bbaBakeCat(){
+  function walk(g, step){
+    const lift = step ? -6 : 0;
+    bbaOval(g, 28, 48, 16, 8, "#e07a32", 6);
+    bbaOval(g, 58, 46+lift, 28, 18, "#f0943e", 7);
+    bbaOval(g, 70, 52+lift, 12, 8, "#fff6ea", 0);
+    g.strokeStyle = "#c86420"; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(48, 40+lift); g.lineTo(62, 44+lift); g.stroke();
+    g.beginPath(); g.moveTo(50, 48+lift); g.lineTo(64, 50+lift); g.stroke();
+    bbaLimb(g, 46, 54, 42, 70+(step?0:-8), true);
+    bbaLimb(g, 70, 56, 76, 72+(step?-8:0), false);
+    bbaOval(g, 84, 36+lift, 16, 14, "#f0943e", 7);
+    bbaRR(g, 74, 16+lift, 8, 16, 4, "#f0943e", 6);
+    bbaRR(g, 90, 18+lift, 8, 14, 4, "#e07a32", 6);
+    bbaOval(g, 90, 34+lift, 5, 5, "#fff", 4);
+    bbaOval(g, 91, 34+lift, 2.2, 2.4, "#24180f", 0);
+    bbaOval(g, 98, 40+lift, 3.5, 2.6, "#ff8aa0", 4);
+  }
+  return {
+    a:bbaMake(120, 90, function(g){ walk(g, 0); }),
+    b:bbaMake(120, 90, function(g){ walk(g, 1); }),
+    c:bbaMake(90, 90, function(g){
+      bbaOval(g, 46, 48, 30, 26, "#f0943e", 8);
+      bbaOval(g, 46, 50, 16, 12, "#ffe0c2", 0);
+      g.strokeStyle = "#c86420"; g.lineWidth = 4;
+      g.beginPath(); g.arc(46, 48, 14, 0.4, 2.2); g.stroke();
+      bbaRR(g, 28, 22, 10, 16, 5, "#e07a32", 6);
+      bbaRR(g, 52, 18, 10, 18, 5, "#f0943e", 6);
+      bbaOval(g, 58, 42, 5, 5, "#fff", 4);
+      bbaOval(g, 59, 42, 2, 2, "#24180f", 0);
+    })
+  };
+}
+function bbaBakeCrow(){
+  function bird(g, up){
+    g.save();
+    g.translate(20, 46);
+    g.rotate(up ? -0.7 : 0.25);
+    bbaOval(g, 0, 0, 18, 10, "#2a2438", 6);
+    g.restore();
+    bbaOval(g, 58, 40, 26, 16, "#221c2e", 7);
+    bbaOval(g, 82, 36, 12, 10, "#221c2e", 6);
+    bbaRR(g, 90, 34, 16, 7, 3, "#ffcf3a", 5);
+    bbaOval(g, 80, 32, 5, 5, "#fff", 4);
+    bbaOval(g, 81, 32, 2.2, 2.2, "#24180f", 0);
+    bbaOval(g, 48, 36, 8, 5, "rgba(255,255,255,.18)", 0);
+  }
+  return {
+    a:bbaMake(120, 80, function(g){ bird(g, true); }),
+    b:bbaMake(120, 80, function(g){ bird(g, false); })
+  };
+}
+function bbaHouse(g, x, roof){
+  const C = BBA_COLORS;
+  bbaRR(g, x, 78, 108, 86, 8, C.wall, 7);
+  g.beginPath();
+  g.moveTo(x-12, 86);
+  g.lineTo(x+54, 28);
+  g.lineTo(x+120, 86);
+  g.closePath();
+  g.fillStyle = roof;
+  g.fill();
+  g.lineWidth = 7;
+  g.strokeStyle = C.outline;
+  g.stroke();
+  g.save();
+  g.clip();
+  g.fillStyle = "rgba(255,255,255,.28)";
+  g.beginPath();
+  g.moveTo(x-12, 86); g.lineTo(x+54, 28); g.lineTo(x+54, 86); g.closePath();
+  g.fill();
+  g.restore();
+  bbaRR(g, x+16, 98, 26, 26, 5, "#b9e6ff", 6);
+  g.fillStyle = "rgba(255,255,255,.7)";
+  g.fillRect(x+20, 102, 6, 16);
+  bbaRR(g, x+62, 112, 26, 52, 5, "#6a3a22", 6);
+  bbaOval(g, x+80, 140, 3, 3, "#ffd24a", 0);
+}
+function bbaBakeWorld(){
+  const C = BBA_COLORS;
+  const s = {};
+  s.sky = bbaMake(8, 540, function(g){
+    const gr = g.createLinearGradient(0, 0, 0, 540);
+    gr.addColorStop(0, C.skyTop);
+    gr.addColorStop(0.62, "#6eb6f2");
+    gr.addColorStop(1, C.skyHorizon);
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 8, 540);
+  });
+  s.sun = bbaMake(120, 120, function(g){
+    const gr = g.createRadialGradient(60, 60, 10, 60, 60, 58);
+    gr.addColorStop(0, "#fff6c4");
+    gr.addColorStop(0.55, "#ffe08a");
+    gr.addColorStop(1, "rgba(255,224,138,0)");
+    g.fillStyle = gr;
+    g.beginPath(); g.arc(60, 60, 58, 0, 7); g.fill();
+  });
+  s.hills = bbaMake(640, 220, function(g){
+    g.clearRect(0, 0, 640, 220);
+    function hill(y, col, h){
+      g.fillStyle = col;
+      g.beginPath();
+      g.moveTo(0, y+40);
+      for (let x=0;x<=640;x+=40){
+        const yy = y - Math.sin(x*0.02)*18 - Math.sin(x*0.008)*10;
+        g.lineTo(x, yy);
+      }
+      g.lineTo(640, 220); g.lineTo(0, 220); g.closePath();
+      g.fill();
+    }
+    hill(90, "#7dce63", 1);
+    hill(130, "#3dae45", 1);
+  });
+  s.clouds = bbaMake(720, 160, function(g){
+    function cloud(x, y, sc){
+      g.save(); g.translate(x, y); g.scale(sc, sc);
+      bbaOval(g, 0, 20, 28, 18, "#fff", 6);
+      bbaOval(g, 30, 14, 34, 24, "#fff", 6);
+      bbaOval(g, 62, 22, 26, 16, "#fff", 6);
+      g.restore();
+    }
+    cloud(80, 40, 1);
+    cloud(300, 70, 0.85);
+    cloud(500, 36, 1.15);
+  });
+  s.houses = bbaMake(860, 200, function(g){
+    bbaHouse(g, 20, C.roofRed);
+    bbaHouse(g, 230, C.roofBlue);
+    bbaHouse(g, 450, C.roofGreen);
+    bbaHouse(g, 660, C.roofRed);
+    // bushes between
+    bbaOval(g, 180, 150, 28, 18, C.leaf, 6);
+    bbaOval(g, 400, 154, 24, 16, "#187a38", 6);
+    bbaOval(g, 620, 150, 26, 16, C.leaf, 6);
+  });
+  s.fence = bbaMake(480, 120, function(g){
+    // rails
+    bbaRR(g, 0, 28, 480, 14, 6, C.wood, 6);
+    bbaRR(g, 0, 62, 480, 12, 6, "#b8742e", 6);
+    for (let x=16; x<480; x+=48){
+      bbaRR(g, x, 8, 16, 100, 5, "#e0a058", 6);
+      bbaOval(g, x+8, 10, 8, 6, "#f2c48a", 0);
+    }
+    bbaOval(g, 70, 86, 34, 22, C.leaf, 6);
+    bbaOval(g, 250, 90, 40, 24, "#187a38", 6);
+    bbaOval(g, 400, 84, 30, 20, C.leaf, 6);
+  });
+  s.dirt = bbaMake(96, 96, function(g){
+    g.fillStyle = C.dirt;
+    g.fillRect(0, 0, 96, 96);
+    g.fillStyle = "rgba(0,0,0,.08)";
+    g.beginPath(); g.ellipse(24, 40, 7, 4, 0.4, 0, 7); g.fill();
+    g.beginPath(); g.ellipse(68, 70, 9, 5, -0.3, 0, 7); g.fill();
+    g.fillStyle = "rgba(255,220,170,.12)";
+    g.beginPath(); g.ellipse(50, 24, 5, 3, 0.2, 0, 7); g.fill();
+  });
+  s.grass = bbaMake(96, 64, function(g){
+    bbaRR(g, 0, 22, 96, 42, 8, C.grass, 0);
+    g.fillStyle = C.grassTop;
+    bbaPathRound(g, 0, 18, 96, 22, 8);
+    g.fill();
+    g.fillStyle = "rgba(255,255,255,.35)";
+    g.fillRect(8, 22, 80, 6);
+    g.strokeStyle = C.outline;
+    g.lineWidth = 6;
+    g.beginPath();
+    g.moveTo(0, 28);
+    g.quadraticCurveTo(16, 8, 28, 26);
+    g.quadraticCurveTo(40, 4, 52, 26);
+    g.quadraticCurveTo(70, 10, 84, 24);
+    g.quadraticCurveTo(96, 12, 96, 28);
+    g.stroke();
+    // flower
+    bbaOval(g, 64, 16, 5, 5, "#ff5d8a", 4);
+    bbaOval(g, 64, 16, 2, 2, "#ffe14a", 0);
+  });
+  s.grassB = bbaMake(96, 64, function(g){
+    bbaRR(g, 0, 22, 96, 42, 8, C.grass, 0);
+    g.fillStyle = C.grassTop;
+    bbaPathRound(g, 0, 18, 96, 20, 8);
+    g.fill();
+    g.strokeStyle = C.outline; g.lineWidth = 6;
+    g.beginPath();
+    g.moveTo(0, 30);
+    g.quadraticCurveTo(20, 12, 36, 28);
+    g.quadraticCurveTo(58, 6, 78, 26);
+    g.lineTo(96, 24);
+    g.stroke();
+  });
+  s.brick = bbaMake(96, 96, function(g){
+    bbaRR(g, 2, 2, 92, 92, 10, C.brick, 8);
+    g.strokeStyle = "rgba(90,20,16,.45)";
+    g.lineWidth = 4;
+    g.beginPath();
+    g.moveTo(8, 34); g.lineTo(88, 34);
+    g.moveTo(8, 64); g.lineTo(88, 64);
+    g.moveTo(30, 8); g.lineTo(30, 34);
+    g.moveTo(62, 34); g.lineTo(62, 64);
+    g.moveTo(24, 64); g.lineTo(24, 90);
+    g.stroke();
+  });
+  s.box = bbaMake(96, 96, function(g){
+    bbaRR(g, 2, 2, 92, 92, 12, C.gold, 8);
+    bbaOval(g, 48, 50, 22, 22, C.goldDeep, 6);
+    // paw
+    g.fillStyle = "#fff6d8";
+    g.beginPath(); g.arc(48, 56, 8, 0, 7); g.fill();
+    g.beginPath(); g.arc(38, 42, 4.5, 0, 7); g.fill();
+    g.beginPath(); g.arc(48, 38, 4.5, 0, 7); g.fill();
+    g.beginPath(); g.arc(58, 42, 4.5, 0, 7); g.fill();
+  });
+  s.boxN = bbaMake(96, 96, function(g){
+    bbaRR(g, 2, 2, 92, 92, 12, "#ffe07a", 8);
+    bbaOval(g, 48, 52, 26, 12, "#fff8ee", 6);
+    bbaOval(g, 28, 46, 10, 10, "#fff8ee", 6);
+    bbaOval(g, 68, 46, 10, 10, "#fff8ee", 6);
+  });
+  s.used = bbaMake(96, 96, function(g){
+    bbaRR(g, 2, 2, 92, 92, 12, "#c9a04a", 8);
+    g.strokeStyle = "rgba(80,50,10,.35)";
+    g.lineWidth = 4;
+    g.beginPath(); g.arc(48, 52, 10, 0, 7); g.stroke();
+  });
+  s.plat = bbaMake(96, 36, function(g){
+    bbaRR(g, 2, 2, 92, 28, 10, "#8fd14e", 7);
+    g.fillStyle = C.grassTop;
+    g.fillRect(10, 6, 76, 6);
+  });
+  s.hydrant = bbaMake(80, 150, function(g){
+    bbaRR(g, 22, 28, 36, 100, 12, "#ef3b3b", 8);
+    bbaRR(g, 14, 18, 52, 28, 10, "#ff5a4e", 8);
+    bbaOval(g, 40, 22, 10, 8, "#f2f4f8", 6);
+    bbaRR(g, 52, 58, 22, 16, 8, "#ff5a4e", 7);
+    bbaOval(g, 74, 66, 8, 8, "#d9dde6", 6);
+    bbaRR(g, 16, 118, 48, 14, 5, "#c9ced8", 6);
+    g.fillStyle = "rgba(255,255,255,.35)";
+    g.fillRect(30, 40, 8, 70);
+  });
+  s.bone = bbaMake(84, 40, function(g){
+    bbaOval(g, 16, 12, 12, 10, "#fff6e4", 6);
+    bbaOval(g, 16, 28, 12, 10, "#fff6e4", 6);
+    bbaOval(g, 68, 12, 12, 10, "#fff6e4", 6);
+    bbaOval(g, 68, 28, 12, 10, "#fff6e4", 6);
+    bbaRR(g, 16, 10, 52, 20, 8, "#fff6e4", 6);
+  });
+  s.toy = bbaMake(80, 72, function(g){
+    bbaOval(g, 40, 40, 26, 18, C.gold, 7);
+    bbaOval(g, 62, 28, 14, 12, C.gold, 7);
+    bbaRR(g, 70, 24, 8, 8, 2, "#e23b3b", 4);
+    bbaOval(g, 58, 26, 3, 3, "#24180f", 0);
+    bbaOval(g, 28, 36, 8, 6, "rgba(255,255,255,.35)", 0);
+  });
+  s.bowl = bbaMake(120, 70, function(g){
+    bbaOval(g, 60, 40, 50, 18, "#d9dde6", 7);
+    bbaOval(g, 60, 36, 40, 12, "#3aa0e8", 6);
+    g.fillStyle = "rgba(255,255,255,.65)";
+    g.beginPath(); g.ellipse(48, 32, 10, 4, -0.4, 0, 7); g.fill();
+  });
+  s.house = bbaMake(180, 160, function(g){
+    bbaRR(g, 28, 70, 120, 78, 8, C.wood, 8);
+    g.beginPath();
+    g.moveTo(16, 78); g.lineTo(88, 22); g.lineTo(160, 78); g.closePath();
+    g.fillStyle = C.roofRed; g.fill();
+    g.lineWidth = 8; g.strokeStyle = C.outline; g.stroke();
+    g.fillStyle = "rgba(255,255,255,.25)";
+    g.beginPath(); g.moveTo(16, 78); g.lineTo(88, 22); g.lineTo(88, 78); g.closePath(); g.fill();
+    bbaRR(g, 62, 96, 46, 52, 8, "#24180f", 7);
+    bbaOval(g, 70, 88, 6, 8, C.roofRed, 0);
+  });
+  s.flag = bbaMake(70, 48, function(g){
+    g.fillStyle = "#ffcf3a";
+    g.strokeStyle = C.outline;
+    g.lineWidth = 5;
+    g.beginPath();
+    g.moveTo(4, 8); g.lineTo(58, 20); g.lineTo(4, 34); g.closePath();
+    g.fill(); g.stroke();
+  });
+  s.heart = bbaMake(40, 36, function(g){
+    g.fillStyle = "#ff3b4e";
+    g.strokeStyle = C.outline;
+    g.lineWidth = 4;
+    g.beginPath();
+    g.moveTo(20, 32);
+    g.bezierCurveTo(-6, 16, 8, 0, 20, 10);
+    g.bezierCurveTo(32, 0, 46, 16, 20, 32);
+    g.fill(); g.stroke();
+  });
+  const poses = ["idle0","idle1","idle2","idle3","run0","run1","run2","run3","jump","fall","crouch","hurt","win"];
+  s.dog = {};
+  for (let i=0;i<poses.length;i++){
+    const pose = poses[i];
+    s.dog[pose] = bbaMake(BBA_DOG.w, BBA_DOG.h, function(g){ bbaPaintDog(g, pose); });
+  }
+  s.ballG = bbaBakeBall(C.ball);
+  s.ballR = bbaBakeBall(C.ballRed);
+  s.sq = bbaBakeSquirrel();
+  s.cat = bbaBakeCat();
+  s.crow = bbaBakeCrow();
+  return s;
+}
+function bbaHit(a, b){
+  return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
+}
+function bbaNormalize(rows){
+  let n = 0;
+  for (let i=0;i<rows.length;i++) if (rows[i].length > n) n = rows[i].length;
+  const out = [];
+  for (let i=0;i<rows.length;i++){
+    const r = rows[i];
+    out.push(r.length < n ? r + ".".repeat(n - r.length) : r.slice(0, n));
+  }
+  return out;
+}
+function bbaParse(rows){
+  rows = bbaNormalize(rows);
+  const T = BBA_T;
+  const cols = rows[0].length;
+  const groundY = (rows.length-1) * T;
+  const gnd = [];
+  const solids = [];
+  let run = null;
+  for (let c=0;c<=cols;c++){
+    const on = c<cols && rows[rows.length-1][c] === "=";
+    gnd[c] = on;
+    if (on && !run) run = c;
+    if (!on && run !== null){
+      solids.push({ x:run*T, y:groundY, w:(c-run)*T, h:T*30, kind:"ground", alive:true });
+      run = null;
+    }
+  }
+  const plats = [];
+  const items = [];
+  const foes = [];
+  const marks = [];
+  for (let r=0;r<rows.length-1;r++){
+    for (let c=0;c<cols;c++){
+      const ch = rows[r][c];
+      if (ch === "." || ch === "=") continue;
+      const x = c*T, y = r*T;
+      if (ch === "B") solids.push({ x:x, y:y, w:T, h:T, kind:"brick", alive:true, bump:0 });
+      else if (ch === "?" || ch === "N") solids.push({ x:x, y:y, w:T, h:T, kind:ch==="?"?"q":"n", alive:true, used:false, bump:0 });
+      else if (ch === "-" || ch === "M") plats.push({ x:x, y:y, w:T, h:16, ox:x, range: ch==="M" ? BBA_SPEED.plat*T : 0, t:c*0.37, dx:0, mov:ch==="M" });
+      else if (ch === "o" || ch === "R" || ch === "Q") items.push({ x:x+T/2, y:y+T-18, kind:ch==="o"?"g":ch==="R"?"r":"q", bob:c*0.7, got:false });
+      else if (ch === "S") foes.push({ kind:"s", x:x+8, y:y+T-28, w:32, h:28, vx:(c%2?1:-1)*BBA_SPEED.squirrel*T, dir:c%2?1:-1, alive:true, flat:0, stun:0, vy:0 });
+      else if (ch === "C") foes.push({ kind:"c", x:x+4, y:y+T-34, w:40, h:34, vx:(c%2?-1:1)*BBA_SPEED.cat*T, dir:c%2?-1:1, alive:true, curl:0, roll:0, stun:0, safe:0, vy:0 });
+      else if (ch === "W") foes.push({ kind:"w", x:x, y:y+6, w:40, h:28, baseX:x, baseY:y+6, dir:1, t:c, alive:true, stun:0, vx:BBA_SPEED.crow*T });
+      else if (ch === "H") marks.push({ kind:"h", x:x+T/2, y:y+T });
+      else if (ch === "P") marks.push({ kind:"p", x:x+T/2, y:y+T, got:false });
+      else if (ch === "D") marks.push({ kind:"d", x:x+4, y:y+T });
+    }
+  }
+  for (let i=0;i<marks.length;i++){
+    const d = marks[i];
+    if (d.kind === "h"){
+      const w = 26, h = 64;
+      solids.push({ x:d.x-w/2, y:d.y-h, w:w, h:h, kind:"hydrant", alive:true, bump:0 });
+    }
+  }
+  return { rows:rows, cols:cols, groundY:groundY, gnd:gnd, solids:solids, plats:plats, items:items, foes:foes, marks:marks, worldW:cols*T };
+}
+function bbaMakePlayer(){
+  return {
+    x:64, y:0, w:26, h:46, vx:0, vy:0, dir:1,
+    big:false, grounded:false, coyote:0, buf:0, cut:false,
+    crouch:false, iframe:0, star:0, barkCd:0, ft:0,
+    anim:"idle", frame:0, squash:0, hurtT:0, spin:0, jumpLock:false
+  };
+}
+function bbaFeet(p){ return p.y + p.h; }
+function bbaSize(p, big){
+  const feet = bbaFeet(p);
+  p.big = big;
+  p.w = big ? 39 : 26;
+  p.h = p.crouch ? (big ? 46 : 32) : (big ? 69 : 46);
+  p.y = feet - p.h;
+}
+function bbaBlocked(box){
+  const list = bba.solids;
+  for (let i=0;i<list.length;i++){
+    const s = list[i];
+    if (!s.alive) continue;
+    if (s.kind === "ground") continue;
+    if (bbaHit(box, s)) return true;
+  }
+  return false;
+}
+function bbaReset(){
+  const lvl = bbaParse(BBA_MAP);
+  bba.cols = lvl.cols;
+  bba.groundY = lvl.groundY;
+  bba.gnd = lvl.gnd;
+  bba.solids = lvl.solids;
+  bba.plats = lvl.plats;
+  bba.items = lvl.items;
+  bba.foes = lvl.foes;
+  bba.marks = lvl.marks;
+  bba.worldW = lvl.worldW;
+  bba.player = bbaMakePlayer();
+  bba.player.y = bba.groundY - bba.player.h;
+  bba.player.grounded = true;
+  bba.cpX = bba.player.x;
+  bba.score = 0;
+  bba.show = 0;
+  bba.balls = 0;
+  bba.lives = 3;
+  bba.time = 0;
+  bba.parts = [];
+  bba.pops = [];
+  bba.bones = [];
+  bba.barks = [];
+  bba.camX = -20;
+  bba.camY = bba.groundY - BBA_VH * 0.62;
+  bba.look = 0;
+  bba.bonus = 0;
+  bba.bonusGiven = false;
+  bba.saved = false;
+  bba.shake = 0;
+  bba.winT = 0;
+  bba.tallyT = 0;
+}
+function bbaBtn(pad, i){
+  return !!(pad && pad.buttons[i] && pad.buttons[i].pressed);
+}
+function bbaPoll(){
+  const held = { left:false, right:false, up:false, down:false, jump:false, run:false, bark:false, start:false, select:false, lookL:false, lookR:false };
+  const keysOn = typeof keys !== "undefined" && keys;
+  if (keysOn){
+    held.left = keys.has("ArrowLeft");
+    held.right = keys.has("ArrowRight");
+    held.up = keys.has("ArrowUp");
+    held.down = keys.has("ArrowDown");
+    held.jump = keys.has("Space");
+    held.run = keys.has("ShiftLeft") || keys.has("ShiftRight");
+    held.bark = keys.has("KeyZ");
+    held.start = keys.has("Enter") || keys.has("NumpadEnter");
+  }
+  const t = bba.touch;
+  if (t.left) held.left = true;
+  if (t.right) held.right = true;
+  if (t.down) held.down = true;
+  if (t.jump) held.jump = true;
+  if (t.run) held.run = true;
+  if (t.bark) held.bark = true;
+  let pad = null;
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  if (pads){
+    for (let i=0;i<pads.length;i++){
+      if (pads[i] && pads[i].connected){ pad = pads[i]; break; }
+    }
+  }
+  if (pad && !bba.sawPad){
+    bba.sawPad = true;
+    bba.toast = "Controller connected";
+    bba.toastT = 2.6;
+  }
+  bba.pad = pad;
+  if (pad){
+    const b = pad.buttons;
+    const ax = pad.axes || [];
+    const dead = 0.5;
+    if ((b[14] && b[14].pressed) || (ax[0] < -dead)) held.left = true;
+    if ((b[15] && b[15].pressed) || (ax[0] > dead)) held.right = true;
+    if ((b[12] && b[12].pressed) || (ax[1] < -dead)) held.up = true;
+    if ((b[13] && b[13].pressed) || (ax[1] > dead)) held.down = true;
+    const m = bba.padMap;
+    if (bbaBtn(pad, m.jump) || bbaBtn(pad, m.jump2)) held.jump = true;
+    if (bbaBtn(pad, m.run)) held.run = true;
+    if (bbaBtn(pad, m.bark)) held.bark = true;
+    if (bbaBtn(pad, m.start)) held.start = true;
+    if (bbaBtn(pad, m.select)) held.select = true;
+    if (bbaBtn(pad, m.l)) held.lookL = true;
+    if (bbaBtn(pad, m.r)) held.lookR = true;
+  }
+  const prev = bba.prevHeld;
+  const edge = {};
+  for (const k in held) edge[k] = held[k] && !prev[k];
+  bba.held = held;
+  bba.edge = edge;
+  bba.prevHeld = held;
+}
+function bbaMenuItems(){
+  const ph = bba.phase;
+  if (ph === "title") return ["Start game", "Controller setup"];
+  if (ph === "pause") return ["Resume", "Controller setup", "Quit"];
+  if (ph === "quit") return ["Yes, quit", "Keep playing"];
+  if (ph === "over") return ["Try again", "Quit"];
+  if (ph === "tally") return ["Back to the arcade"];
+  return [];
+}
+function bbaMenuActivate(){
+  const ph = bba.phase;
+  const i = bba.menuI;
+  if (ph === "title"){
+    if (i === 0) bbaBegin();
+    else bbaOpenSetup("title");
+  } else if (ph === "pause"){
+    if (i === 0){ bba.phase = "play"; bba.player.jumpLock = true; }
+    else if (i === 1) bbaOpenSetup("pause");
+    else { bba.quitBack = "pause"; bba.phase = "quit"; bba.menuI = 1; }
+  } else if (ph === "quit"){
+    if (i === 0) bbaQuit();
+    else bba.phase = bba.quitBack || "play";
+  } else if (ph === "over"){
+    if (i === 0){ bbaReset(); bba.phase = "play"; bba.player.jumpLock = true; }
+    else { bba.quitBack = "over"; bba.phase = "quit"; bba.menuI = 1; }
+  } else if (ph === "tally"){
+    bbaQuit();
+  }
+}
+function bbaOpenSetup(back){
+  bba.setupReturn = back;
+  bba.phase = "setup";
+  bba.setupI = 0;
+  bba.padDraft = {};
+  bba.setupPrev = [];
+}
+function bbaSetupStep(){
+  const pad = bba.pad;
+  const order = ["jump","run","bark","start","select","l","r"];
+  const labels = ["Jump","Run","Bark","Start","Select","Look left","Look right"];
+  bba.setupLabel = labels[bba.setupI] || "";
+  if (!pad) return;
+  const startI = bba.padMap.start;
+  const prev = bba.setupPrev;
+  // Start cancels until the player is binding Start itself.
+  if (order[bba.setupI] !== "start" && bbaBtn(pad, startI) && !prev[startI]){
+    bba.phase = bba.setupReturn || "title";
+    bba.menuI = 0;
+    return;
+  }
+  const used = {};
+  for (const k in bba.padDraft) used[bba.padDraft[k]] = true;
+  for (let i=0;i<pad.buttons.length;i++){
+    if (i >= 12 && i <= 15) continue;
+    const pressed = !!(pad.buttons[i] && pad.buttons[i].pressed);
+    const was = !!prev[i];
+    prev[i] = pressed;
+    if (!pressed || was || used[i]) continue;
+    if (order[bba.setupI] !== "start" && i === startI) continue;
+    bba.padDraft[order[bba.setupI]] = i;
+    beep(720, .05, "square", .04);
+    bba.setupI++;
+    if (bba.setupI >= order.length){
+      const m = bbaPadDefault();
+      for (const k in bba.padDraft) m[k] = bba.padDraft[k];
+      const taken = {};
+      for (let k=0;k<order.length;k++) taken[m[order[k]]] = true;
+      if (taken[m.jump2] && m.jump2 !== m.jump) m.jump2 = m.jump;
+      bba.padMap = m;
+      bbaSavePad(m);
+      bba.phase = bba.setupReturn || "title";
+      bba.menuI = 0;
+      bba.toast = "Controller saved";
+      bba.toastT = 2.2;
+    }
+    return;
+  }
+}
+function bbaInputGame(){
+  const ph = bba.phase;
+  if (ph === "setup"){ bbaSetupStep(); return; }
+  const items = bbaMenuItems();
+  if (ph !== "play" && ph !== "win"){
+    let step = bba.nav || 0;
+    bba.nav = 0;
+    if (bba.edge.down || bba.edge.right) step++;
+    if (bba.edge.up || bba.edge.left) step--;
+    if (step > 0){ bba.menuI = (bba.menuI + 1) % Math.max(1, items.length); beep(520,.04,"square",.03); }
+    else if (step < 0){ bba.menuI = (bba.menuI - 1 + items.length) % Math.max(1, items.length); beep(520,.04,"square",.03); }
+    if (bba.edge.jump){ bbaMenuActivate(); if (!bba) return; }
+    if (bba.edge.start){ bbaTogglePause(); if (!bba) return; }
+    if (bba.edge.select) bbaSelect();
+    return;
+  }
+  if (bba.edge.start) bbaTogglePause();
+  if (!bba) return;
+  if (bba.edge.select) bbaSelect();
+}
+function bbaBegin(){
+  bba.phase = "play";
+  bba.player.jumpLock = true;
+  bba.player.buf = 0;
+}
+function bbaAdd(n, x, y){
+  bba.score += n;
+  bba.pops.push({ x:x, y:y, vy:-40, life:0.7, text:(n>0?"+":"")+n });
+}
+function bbaBurst(x, y, color){
+  for (let i=0;i<7;i++){
+    bba.parts.push({
+      x:x, y:y,
+      vx:(Math.random()-0.5)*220,
+      vy:-80-Math.random()*160,
+      life:0.45+Math.random()*0.25,
+      s:4+Math.random()*5,
+      c:color
+    });
+  }
+}
+function bbaSpawnBall(s){
+  const red = Math.random() < 0.18;
+  bba.items.push({ x:s.x+s.w/2, y:s.y-8, kind:red?"r":"g", bob:0, got:false });
+}
+function bbaSpawnBone(s){
+  const dir = bba.player.dir || 1;
+  bba.bones.push({ x:s.x+s.w/2-14, y:s.y+s.h-6, w:30, h:16, vx:160*dir, vy:-40 });
+}
+function bbaBonk(s){
+  if (!s || s.kind === "ground" || s.kind === "hydrant") return;
+  s.bump = 0.18;
+  if (s.kind === "brick"){
+    if (bba.player.big){
+      s.alive = false;
+      bbaAdd(20, s.x+20, s.y);
+      bbaBurst(s.x+24, s.y+24, BBA_COLORS.brick);
+      bbaSfxStomp();
+      bba.shake = Math.max(bba.shake, 0.12);
+    } else beep(160, .05, "square", .04);
+  } else if ((s.kind === "q" || s.kind === "n") && !s.used){
+    s.used = true;
+    if (s.kind === "n"){ bbaSpawnBone(s); bbaSfxBone(); }
+    else { bbaSpawnBall(s); bbaSfxBall(); }
+  }
+}
+function bbaResolveX(box, vx){
+  const list = bba.solids;
+  for (let i=0;i<list.length;i++){
+    const s = list[i];
+    if (!s.alive) continue;
+    if (!bbaHit(box, s)) continue;
+    if (vx > 0) box.x = s.x - box.w;
+    else if (vx < 0) box.x = s.x + s.w;
+    else {
+      const penL = (box.x+box.w) - s.x;
+      const penR = (s.x+s.w) - box.x;
+      if (penL < penR) box.x = s.x - box.w;
+      else box.x = s.x + s.w;
+    }
+    return true;
+  }
+  return false;
+}
+function bbaJump(){
+  const p = bba.player;
+  p.vy = -BBA_SPEED.jump;
+  p.grounded = false;
+  p.coyote = 0;
+  p.cut = false;
+  p.buf = 0;
+  p.crouch = false;
+  bbaSize(p, p.big);
+  bbaSfxJump();
+}
+function bbaLoseLife(){
+  bba.lives -= 1;
+  bba.shake = 0.2;
+  bbaSfxHurt();
+  const p = bba.player;
+  p.big = false;
+  p.crouch = false;
+  p.star = 0;
+  p.vx = 0;
+  p.vy = 0;
+  p.w = 26;
+  p.h = 46;
+  if (bba.lives <= 0){
+    bba.phase = "over";
+    bba.menuI = 0;
+    if (!bba.saved){ bba.saved = true; bbaSaveBest(bba.score); }
+    return;
+  }
+  p.x = bba.cpX;
+  p.y = bba.groundY - p.h;
+  p.iframe = 1.6;
+  p.hurtT = 0.35;
+  bba.camX = p.x - 180;
+}
+function bbaHurt(){
+  const p = bba.player;
+  if (p.iframe > 0 || p.star > 0) return;
+  if (p.big){
+    const feet = bbaFeet(p);
+    p.big = false;
+    p.w = 26;
+    p.h = p.crouch ? 32 : 46;
+    p.y = feet - p.h;
+    p.iframe = 1.4;
+    p.hurtT = 0.4;
+    p.vy = -180;
+    bba.shake = 0.16;
+    bbaSfxHurt();
+  } else {
+    p.hurtT = 0.3;
+    bbaLoseLife();
+  }
+}
+function bbaKillFoe(f){
+  if (!f.alive || f.flat) return;
+  if (f.kind === "s"){
+    f.flat = 0.85;
+    f.vx = 0;
+    f.h = 14;
+    f.y += 14;
+  } else if (f.kind === "c" && !f.curl){
+    f.curl = 1;
+    f.roll = 0;
+    f.vx = 0;
+    const feet = f.y+f.h;
+    f.w = 32; f.h = 32;
+    f.y = feet - f.h;
+  } else if (f.kind === "w"){
+    f.alive = false;
+  } else if (f.kind === "c" && f.curl && !f.roll){
+    return;
+  } else {
+    f.alive = false;
+  }
+  bbaAdd(50, f.x, f.y);
+  bbaBurst(f.x+f.w/2, f.y, "#ffe08a");
+  bbaSfxStomp();
+  bba.player.vy = -280;
+  bba.player.grounded = false;
+}
+function bbaSupportAt(px, footY){
+  const T = BBA_T;
+  const c = Math.floor(px / T);
+  if (c >= 0 && c < bba.cols && bba.gnd[c] && footY >= bba.groundY-2 && footY <= bba.groundY+36) return bba.groundY;
+  const plats = bba.plats;
+  for (let i=0;i<plats.length;i++){
+    const pl = plats[i];
+    if (px >= pl.x && px <= pl.x+pl.w && Math.abs(footY - pl.y) < 14) return pl.y;
+  }
+  return null;
+}
+function bbaFoeWall(f){
+  const list = bba.solids;
+  for (let i=0;i<list.length;i++){
+    const s = list[i];
+    if (!s.alive || s.kind === "ground") continue;
+    if (bbaHit(f, s)) return s;
+  }
+  return null;
+}
+function bbaStepFoes(dt){
+  const foes = bba.foes;
+  for (let i=0;i<foes.length;i++){
+    const f = foes[i];
+    if (!f.alive) continue;
+    if (f.flat){ f.flat -= dt; if (f.flat <= 0) f.alive = false; continue; }
+    if (f.stun > 0 && !(f.kind === "c" && f.roll)){ f.stun -= dt; continue; }
+    if (f.kind === "w"){
+      f.t += dt;
+      if (f.stun > 0){ f.stun -= dt; continue; }
+      f.x += f.dir * f.vx * dt;
+      if (f.x < f.baseX - 80 || f.x > f.baseX + 240) f.dir *= -1;
+      const wave = Math.sin(f.t * 0.9);
+      const dip = wave > 0.15 ? (wave-0.15) * 250 : 0;
+      f.y = Math.min(f.baseY + dip, bba.groundY - 48);
+      continue;
+    }
+    if (f.safe > 0) f.safe -= dt;
+    const dir = f.vx < 0 ? -1 : 1;
+    if (!(f.kind === "c" && f.roll)){
+      const ahead = f.x + f.w/2 + dir * (f.w*0.45 + 8);
+      if (!bbaSupportAt(ahead, f.y+f.h+2)) f.vx = -f.vx;
+    }
+    f.x += f.vx * dt;
+    const wall = bbaFoeWall(f);
+    if (wall){
+      if (f.vx > 0) f.x = wall.x - f.w;
+      else f.x = wall.x + wall.w;
+      f.vx = -f.vx;
+    }
+    f.dir = f.vx < 0 ? -1 : 1;
+    const surf = bbaSupportAt(f.x+f.w/2, f.y+f.h+1);
+    if (surf !== null && f.vy >= 0 && f.y+f.h >= surf-1 && f.y+f.h <= surf+22){
+      f.y = surf - f.h;
+      f.vy = 0;
+    } else {
+      f.vy += BBA_SPEED.gravity * dt;
+      if (f.vy > 800) f.vy = 800;
+      f.y += f.vy * dt;
+      if (f.y > bba.groundY + 80) f.alive = false;
+    }
+    if (f.kind === "c" && f.roll){
+      for (let j=0;j<foes.length;j++){
+        if (j === i) continue;
+        const o = foes[j];
+        if (!o.alive || o.flat) continue;
+        if (bbaHit(f, o)){
+          o.alive = false;
+          bbaAdd(50, o.x, o.y);
+          bbaBurst(o.x, o.y, "#ffe08a");
+          bbaSfxStomp();
+        }
+      }
+    }
+  }
+}
+function bbaStepBones(dt){
+  const arr = bba.bones;
+  for (let i=arr.length-1;i>=0;i--){
+    const b = arr[i];
+    b.vy += BBA_SPEED.gravity * dt;
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    const box = { x:b.x, y:b.y, w:b.w, h:b.h };
+    const prevBottom = b.y + b.h - b.vy*dt;
+    for (let s=0;s<bba.solids.length;s++){
+      const sol = bba.solids[s];
+      if (!sol.alive || !bbaHit(box, sol)) continue;
+      if (b.vy >= 0 && prevBottom <= sol.y+2){
+        b.y = sol.y - b.h;
+        b.vy = 0;
+      } else if (b.vx > 0){ b.x = sol.x - b.w; b.vx = 0; }
+      else if (b.vx < 0){ b.x = sol.x + sol.w; b.vx = 0; }
+    }
+    const c = Math.floor((b.x+b.w/2)/BBA_T);
+    if (!(c>=0 && c<bba.cols && bba.gnd[c]) && b.y+b.h > bba.groundY+8 && b.vy>=0){
+      // slide off an edge
+    }
+    if (b.y > bba.groundY + 120) arr.splice(i, 1);
+  }
+}
+function bbaCollect(it){
+  const p = bba.player;
+  if (it.kind === "q"){
+    p.star = 8;
+    bbaAdd(200, it.x, it.y);
+    bbaSfxPower();
+  } else if (it.kind === "bone"){
+    bbaAdd(100, it.x, it.y);
+    bbaSfxBone();
+    if (!p.big){
+      const feet = bbaFeet(p);
+      const trial = { x:p.x-(39-p.w)/2, y:feet-69, w:39, h:69 };
+      if (!bbaBlocked(trial)){
+        p.x = trial.x; p.y = trial.y; p.w = 39; p.h = 69; p.big = true;
+      }
+    }
+  } else {
+    const red = it.kind === "r";
+    bbaAdd(red ? 25 : 10, it.x, it.y);
+    bba.balls += 1;
+    bbaSfxBall();
+    if (bba.balls % 100 === 0){
+      bba.lives += 1;
+      bbaSfxOne();
+      bba.pops.push({ x:p.x, y:p.y-20, vy:-30, life:1, text:"1UP" });
+    }
+  }
+}
+function bbaPlay(dt){
+  const p = bba.player;
+  const held = bba.held;
+  p.ft += dt;
+  if (p.iframe > 0) p.iframe -= dt;
+  if (p.star > 0) p.star -= dt;
+  if (p.barkCd > 0) p.barkCd -= dt;
+  if (p.hurtT > 0) p.hurtT -= dt;
+  if (p.squash > 0) p.squash -= dt;
+  bba.time += dt;
+
+  if (p.jumpLock){
+    if (!held.jump) p.jumpLock = false;
+  } else if (bba.edge.jump) p.buf = 0.12;
+  if (p.buf > 0) p.buf -= dt;
+
+  const spd = (held.run || p.star > 0 ? BBA_SPEED.run : BBA_SPEED.walk) * BBA_T * (p.star > 0 ? 1.28 : 1);
+  let target = 0;
+  if (held.left){ target = -spd; p.dir = -1; }
+  if (held.right){ target = spd; p.dir = 1; }
+  const wantCrouch = held.down && p.grounded && !held.jump;
+  if (wantCrouch && !p.crouch){
+    p.crouch = true;
+    bbaSize(p, p.big);
+  } else if (!wantCrouch && p.crouch){
+    const feet = bbaFeet(p);
+    const h = p.big ? 69 : 46;
+    const trial = { x:p.x, y:feet-h, w:p.w, h:h };
+    if (!bbaBlocked(trial)){ p.crouch = false; bbaSize(p, p.big); }
+  }
+  if (p.crouch && p.grounded) target *= 0.45;
+  const accel = 2400;
+  if (p.vx < target) p.vx = Math.min(target, p.vx + accel*dt);
+  else if (p.vx > target) p.vx = Math.max(target, p.vx - accel*dt);
+
+  if ((p.grounded || p.coyote > 0) && p.buf > 0 && !p.jumpLock) bbaJump();
+
+  let grav = BBA_SPEED.gravity;
+  if (p.vy < 0 && held.jump && !p.cut) grav *= 0.6;
+  if (Math.abs(p.vy) < 80) grav *= 0.45;
+  if (!held.jump && !p.cut && p.vy < 0){ p.vy *= 0.48; p.cut = true; }
+  if (!p.grounded){
+    p.vy += grav * dt;
+    if (p.vy > 860) p.vy = 860;
+  }
+
+  p.x += p.vx * dt;
+  if (p.x < 0){ p.x = 0; p.vx = 0; }
+  if (p.x + p.w > bba.worldW){ p.x = bba.worldW - p.w; p.vx = 0; }
+  if (bbaResolveX(p, p.vx)) p.vx = 0;
+
+  const prevBottom = p.y + p.h;
+  const prevTop = p.y;
+  p.y += p.vy * dt;
+  let landed = false;
+  const sols = bba.solids;
+  for (let i=0;i<sols.length;i++){
+    const s = sols[i];
+    if (!s.alive || !bbaHit(p, s)) continue;
+    if (p.vy >= 0 && prevBottom <= s.y + 2){
+      p.y = s.y - p.h;
+      if (p.vy > 420) p.squash = 0.18;
+      p.vy = 0;
+      landed = true;
+    } else if (p.vy < 0 && prevTop >= s.y + s.h - 3){
+      p.y = s.y + s.h;
+      p.vy = 20;
+      bbaBonk(s);
+    } else if (p.x + p.w/2 < s.x + s.w/2){
+      p.x = s.x - p.w;
+    } else p.x = s.x + s.w;
+  }
+  let ride = null;
+  if (p.vy >= 0){
+    const plats = bba.plats;
+    for (let i=0;i<plats.length;i++){
+      const pl = plats[i];
+      if (p.x+p.w > pl.x+6 && p.x < pl.x+pl.w-6 && prevBottom <= pl.y+2 && p.y+p.h >= pl.y){
+        p.y = pl.y - p.h;
+        p.vy = 0;
+        landed = true;
+        ride = pl;
+      }
+    }
+  }
+  if (ride){
+    p.x += ride.dx;
+    if (bbaResolveX(p, ride.dx)) {}
+  }
+  if (!landed && p.vy >= 0){
+    const foot = p.y + p.h;
+    const mid = p.x + p.w * 0.5;
+    const surf = bbaSupportAt(mid, foot);
+    if (surf !== null && foot >= surf - 1 && foot <= surf + 4){
+      p.y = surf - p.h;
+      p.vy = 0;
+      landed = true;
+    }
+  }
+  const wasGround = p.grounded;
+  p.grounded = landed;
+  if (landed){ p.coyote = 0.14; p.cut = false; }
+  else p.coyote -= dt;
+  if (!wasGround && landed) p.squash = Math.max(p.squash, 0.1);
+
+  if (p.y > bba.groundY + 8){
+    p.big = false;
+    bbaLoseLife();
+    return;
+  }
+
+  if (bba.edge.bark && p.barkCd <= 0 && !p.crouch){
+    p.barkCd = 1.15;
+    bbaSfxBark();
+    const mx = p.x + p.w/2 + p.dir * 24;
+    const my = p.y + p.h*0.35;
+    bba.barks.push({ x:mx, y:my, life:0.28 });
+    const foes = bba.foes;
+    for (let i=0;i<foes.length;i++){
+      const f = foes[i];
+      if (!f.alive) continue;
+      const dx = (f.x+f.w/2) - mx;
+      const dy = (f.y+f.h/2) - my;
+      if (dx*dx + dy*dy < 120*120) f.stun = Math.max(f.stun, 1);
+    }
+  }
+
+  // items
+  const items = bba.items;
+  for (let i=0;i<items.length;i++){
+    const it = items[i];
+    if (it.got) continue;
+    const bob = Math.sin(bba.clock*3 + it.bob) * 4;
+    const box = { x:it.x-14, y:it.y-18+bob, w:28, h:28 };
+    if (bbaHit(p, box)){ it.got = true; bbaCollect(it); }
+  }
+  for (let i=bba.bones.length-1;i>=0;i--){
+    const b = bba.bones[i];
+    if (bbaHit(p, b)){ bba.bones.splice(i, 1); bbaCollect({ kind:"bone", x:b.x, y:b.y }); }
+  }
+
+  const foes = bba.foes;
+  for (let i=0;i<foes.length;i++){
+    const f = foes[i];
+    if (!f.alive || f.flat) continue;
+    if (!bbaHit(p, f)) continue;
+    const stomp = p.vy > 40 && prevBottom <= f.y + f.h*0.45;
+    if (p.star > 0){
+      f.alive = false;
+      bbaAdd(50, f.x, f.y);
+      bbaBurst(f.x, f.y, "#fff");
+      bbaSfxStomp();
+      p.vy = -240;
+      continue;
+    }
+    if (stomp){
+      if (f.kind === "c" && f.curl && !f.roll){
+        p.vy = -260;
+      } else bbaKillFoe(f);
+      continue;
+    }
+    if (f.kind === "c" && f.curl && !f.roll){
+      f.roll = 1;
+      f.vx = ((p.x+p.w/2) < (f.x+f.w/2) ? 1 : -1) * BBA_SPEED.kick * BBA_T;
+      f.safe = 0.18;
+      f.dir = f.vx < 0 ? -1 : 1;
+      bbaSfxStomp();
+      continue;
+    }
+    if (f.kind === "c" && f.roll && f.safe > 0) continue;
+    bbaHurt();
+    break;
+  }
+
+  // checkpoint + goal
+  const marks = bba.marks;
+  for (let i=0;i<marks.length;i++){
+    const d = marks[i];
+    if (d.kind === "p" && !d.got){
+      const box = { x:d.x-28, y:d.y-36, w:56, h:40 };
+      if (bbaHit(p, box)){
+        d.got = true;
+        bba.cpX = p.x;
+        beep(640,.08,"sine",.05);
+        bba.toast = "Water bowl saved";
+        bba.toastT = 1.6;
+      }
+    } else if (d.kind === "d"){
+      const box = { x:d.x+10, y:d.y-70, w:70, h:74 };
+      if (bbaHit(p, box)){ bbaWin(); return; }
+    }
+  }
+
+  if (held.lookL) bba.look = Math.max(-170, bba.look - 380*dt);
+  else if (held.lookR) bba.look = Math.min(200, bba.look + 380*dt);
+  else bba.look *= Math.max(0, 1 - dt*3);
+
+  // anim
+  if (p.hurtT > 0) p.anim = "hurt";
+  else if (!p.grounded && p.vy < 0) p.anim = "jump";
+  else if (!p.grounded) p.anim = "fall";
+  else if (p.crouch) p.anim = "crouch";
+  else if (Math.abs(p.vx) > 30) p.anim = "run";
+  else p.anim = "idle";
+
+  if (p.grounded && Math.abs(p.vx) > 220 && Math.random() < 0.35){
+    bba.parts.push({ x:p.x+p.w/2, y:bbaFeet(p), vx:-p.vx*0.05, vy:-20, life:0.22, s:4, c:"#ead7b0" });
+  }
+}
+function bbaWin(){
+  if (bba.phase !== "play") return;
+  bba.phase = "win";
+  bba.winT = 0;
+  bba.player.vx = 0;
+  bba.player.anim = "win";
+  bbaSfxWin();
+}
+function bbaWinTick(dt){
+  const p = bba.player;
+  bba.winT += dt;
+  p.ft += dt;
+  p.spin += dt * 7;
+  if (Math.floor(bba.winT * 2.1) !== Math.floor((bba.winT-dt) * 2.1)) bbaSfxBark();
+  if (bba.winT > 2.35){
+    if (!bba.bonusGiven){
+      bba.bonus = Math.max(0, Math.round((BBA_PAR - bba.time) * 8));
+      bba.score += bba.bonus;
+      bba.bonusGiven = true;
+      bba.saved = true;
+      bbaSaveBest(bba.score);
+    }
+    bba.phase = "tally";
+    bba.menuI = 0;
+    bba.tallyT = 0;
+  }
+}
+function bbaStepWorld(dt){
+  const plats = bba.plats;
+  for (let i=0;i<plats.length;i++){
+    const pl = plats[i];
+    if (!pl.mov){ pl.dx = 0; continue; }
+    const last = pl.x;
+    pl.t += dt;
+    pl.x = pl.ox + Math.sin(pl.t * 1.15) * pl.range;
+    pl.dx = pl.x - last;
+  }
+  const sols = bba.solids;
+  for (let i=0;i<sols.length;i++) if (sols[i].bump > 0) sols[i].bump -= dt;
+  bbaStepFoes(dt);
+  bbaStepBones(dt);
+  const parts = bba.parts;
+  for (let i=parts.length-1;i>=0;i--){
+    const q = parts[i];
+    q.life -= dt;
+    q.x += q.vx * dt;
+    q.y += q.vy * dt;
+    q.vy += 500 * dt;
+    if (q.life <= 0) parts.splice(i, 1);
+  }
+  if (parts.length > 48) parts.splice(0, parts.length-48);
+  const pops = bba.pops;
+  for (let i=pops.length-1;i>=0;i--){
+    pops[i].life -= dt;
+    pops[i].y += pops[i].vy * dt;
+    if (pops[i].life <= 0) pops.splice(i, 1);
+  }
+  const barks = bba.barks;
+  for (let i=barks.length-1;i>=0;i--){
+    barks[i].life -= dt;
+    if (barks[i].life <= 0) barks.splice(i, 1);
+  }
+}
+function bbaFollow(dt){
+  const p = bba.player;
+  const target = p.x + p.w/2 - BBA_VW * 0.36 + p.dir * 70 + bba.look;
+  bba.camX += (target - bba.camX) * Math.min(1, dt * 5);
+  const max = Math.max(-20, bba.worldW - BBA_VW + 20);
+  if (bba.camX < -20) bba.camX = -20;
+  if (bba.camX > max) bba.camX = max;
+  bba.camY = bba.groundY - BBA_VH * 0.62;
+}
+function bbaTick(dt){
+  bba.clock += dt;
+  if (bba.toastT > 0) bba.toastT -= dt;
+  bba.show += (bba.score - bba.show) * Math.min(1, dt * 8);
+  if (bba.phase === "play"){
+    bbaStepWorld(dt);
+    bbaPlay(dt);
+    bbaFollow(dt);
+  } else if (bba.phase === "win"){
+    bbaWinTick(dt);
+    bbaFollow(dt);
+  } else if (bba.phase === "tally"){
+    bba.tallyT += dt;
+  } else if (bba.phase === "title"){
+    bba.player.ft += dt;
+    bbaFollow(dt);
+  }
+  if (bba.shake > 0) bba.shake -= dt;
+}
+
+function bbaRoundScreen(x, y, w, h, r){
+  const ctx = bba.ctx;
+  bbaPathRound(ctx, x, y, w, h, r);
+}
+function bbaText(text, x, y, size, fill, stroke, align){
+  const ctx = bba.ctx;
+  ctx.font = "700 " + size + "px Fredoka, system-ui, sans-serif";
+  ctx.textAlign = align || "center";
+  ctx.textBaseline = "middle";
+  ctx.lineJoin = "round";
+  ctx.miterLimit = 2;
+  ctx.lineWidth = Math.max(3, size * 0.16);
+  ctx.strokeStyle = stroke || "#1c140f";
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = fill || "#fff6c9";
+  ctx.fillText(text, x, y);
+}
+function bbaDrawDog(p, name){
+  const ctx = bba.ctx;
+  const spr = bba.sprites.dog[name] || bba.sprites.dog.idle0;
+  const visualH = p.big ? 82 : 64;
+  const k = visualH / BBA_DOG.body;
+  const sq = p.squash > 0 ? p.squash : 0;
+  ctx.save();
+  ctx.translate(p.x + p.w/2, p.y + p.h);
+  ctx.scale(p.dir < 0 ? -1 : 1, 1);
+  if (p.anim === "win") ctx.rotate(Math.sin(p.spin) * 0.9);
+  ctx.scale(k * (1 + sq*0.8), k * (1 - sq));
+  if (p.star > 0) ctx.filter = "hue-rotate(" + ((bba.clock * 220) % 360 | 0) + "deg)";
+  if (p.iframe > 0 && p.star <= 0 && ((bba.clock * 16) | 0) % 2 === 0) ctx.globalAlpha = 0.4;
+  ctx.drawImage(spr, -BBA_DOG.ax, -BBA_DOG.ay);
+  ctx.filter = "none";
+  ctx.restore();
+}
+function bbaDrawWorld(){
+  const ctx = bba.ctx;
+  const S = bba.sprites;
+  const camX = bba.camX;
+  const camY = bba.camY;
+  const gy = bba.groundY;
+  ctx.save();
+  if (bba.shake > 0){
+    const m = bba.shake * 10;
+    ctx.translate((Math.random()-0.5)*m, (Math.random()-0.5)*m);
+  }
+  ctx.translate(-Math.round(camX), -Math.round(camY));
+  // ground dirt + grass, only real collision runs
+  const sols = bba.solids;
+  const viewL = camX - 48, viewR = camX + BBA_VW + 48;
+  const viewB = camY + BBA_VH + 8;
+  for (let i=0;i<sols.length;i++){
+    const s = sols[i];
+    if (s.kind !== "ground") continue;
+    if (s.x > viewR || s.x+s.w < viewL) continue;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(s.x, gy - 20, s.w, viewB - gy + 24);
+    ctx.clip();
+    ctx.fillStyle = BBA_COLORS.dirt;
+    ctx.fillRect(s.x, gy, s.w, Math.max(0, viewB - gy));
+    ctx.fillStyle = BBA_COLORS.dirtDeep;
+    ctx.fillRect(s.x, gy, 14, Math.max(0, viewB - gy));
+    ctx.fillRect(s.x + s.w - 14, gy, 14, Math.max(0, viewB - gy));
+    for (let x=s.x; x<s.x+s.w; x+=48){
+      if (x > viewR || x+48 < viewL) continue;
+      const tile = ((x/48)|0) % 2 ? S.grassB : S.grass;
+      ctx.drawImage(tile, x, gy-18, 48, 32);
+    }
+    ctx.restore();
+  }
+  // platforms, bricks, boxes
+  const plats = bba.plats;
+  for (let i=0;i<plats.length;i++){
+    const pl = plats[i];
+    if (pl.x > viewR || pl.x+pl.w < viewL) continue;
+    ctx.drawImage(S.plat, pl.x, pl.y, pl.w, 18);
+  }
+  for (let i=0;i<sols.length;i++){
+    const s = sols[i];
+    if (s.kind === "ground" || s.kind === "hydrant" || !s.alive) continue;
+    if (s.x > viewR || s.x+s.w < viewL) continue;
+    const bob = s.bump > 0 ? -Math.sin((0.18-s.bump)/0.18*Math.PI)*12 : 0;
+    const img = s.kind === "brick" ? S.brick : s.used ? S.used : s.kind === "n" ? S.boxN : S.box;
+    ctx.drawImage(img, s.x, s.y+bob, s.w, s.h);
+  }
+  // marks
+  const marks = bba.marks;
+  for (let i=0;i<marks.length;i++){
+    const d = marks[i];
+    if (d.x < viewL || d.x > viewR) continue;
+    if (d.kind === "h") ctx.drawImage(S.hydrant, d.x-20, d.y-72, 40, 74);
+    else if (d.kind === "p"){
+      ctx.save();
+      if (d.got) ctx.filter = "saturate(1.4)";
+      ctx.drawImage(S.bowl, d.x-30, d.y-28, 60, 32);
+      ctx.filter = "none";
+      ctx.restore();
+    } else if (d.kind === "d"){
+      ctx.drawImage(S.house, d.x, d.y-78, 90, 80);
+      ctx.save();
+      ctx.translate(d.x+78, d.y-92);
+      const wave = Math.sin(bba.clock*6)*0.25;
+      ctx.rotate(wave);
+      ctx.drawImage(S.flag, 0, -8, 34, 22);
+      ctx.restore();
+      ctx.fillStyle = BBA_COLORS.outline;
+      ctx.fillRect(d.x+76, d.y-96, 4, 28);
+    }
+  }
+  // items
+  const spin = (bba.clock * 10) | 0;
+  const items = bba.items;
+  for (let i=0;i<items.length;i++){
+    const it = items[i];
+    if (it.got) continue;
+    if (it.x < viewL || it.x > viewR) continue;
+    const bob = Math.sin(bba.clock*3 + it.bob) * 5;
+    if (it.kind === "q") ctx.drawImage(S.toy, it.x-20, it.y-28+bob, 40, 36);
+    else {
+      const frames = it.kind === "r" ? S.ballR : S.ballG;
+      const fr = frames[(spin + (it.bob|0)) % 8];
+      ctx.drawImage(fr, it.x-16, it.y-22+bob, 32, 32);
+    }
+  }
+  for (let i=0;i<bba.bones.length;i++){
+    const b = bba.bones[i];
+    ctx.drawImage(S.bone, b.x, b.y, b.w, b.h);
+  }
+  // foes
+  const foes = bba.foes;
+  const step = ((bba.clock*8)|0) % 2;
+  for (let i=0;i<foes.length;i++){
+    const f = foes[i];
+    if (!f.alive && !f.flat) continue;
+    if (f.x > viewR || f.x+f.w < viewL) continue;
+    ctx.save();
+    if (f.stun > 0) ctx.globalAlpha = 0.75;
+    if (f.kind === "s"){
+      const img = f.flat ? S.sq.f : (step ? S.sq.b : S.sq.a);
+      const dh = f.flat ? 22 : 40;
+      ctx.translate(f.x+f.w/2, f.y+f.h);
+      ctx.scale(f.dir < 0 ? -1 : 1, 1);
+      ctx.drawImage(img, -24, -dh, 48, dh);
+    } else if (f.kind === "c"){
+      const img = f.curl || f.roll ? S.cat.c : (step ? S.cat.b : S.cat.a);
+      ctx.translate(f.x+f.w/2, f.y+f.h);
+      if (f.roll) ctx.rotate(bba.clock * f.dir * 10);
+      else ctx.scale(f.dir < 0 ? -1 : 1, 1);
+      ctx.drawImage(img, -28, -44, 56, 44);
+    } else {
+      const img = step ? S.crow.b : S.crow.a;
+      ctx.translate(f.x+f.w/2, f.y+f.h/2);
+      ctx.scale(f.dir < 0 ? -1 : 1, 1);
+      ctx.drawImage(img, -28, -18, 56, 36);
+    }
+    ctx.restore();
+    if (f.stun > 0){
+      bbaText("z", f.x+f.w, f.y-6, 12, "#fff6c9", "#1c140f", "center");
+    }
+  }
+  // particles + barks
+  for (let i=0;i<bba.parts.length;i++){
+    const q = bba.parts[i];
+    ctx.globalAlpha = Math.max(0, q.life*2);
+    ctx.fillStyle = q.c;
+    ctx.beginPath();
+    ctx.arc(q.x, q.y, q.s, 0, 7);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  for (let i=0;i<bba.barks.length;i++){
+    const bk = bba.barks[i];
+    ctx.strokeStyle = "rgba(255,246,201," + (bk.life*3) + ")";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(bk.x, bk.y, (0.28-bk.life)*160, 0, 7);
+    ctx.stroke();
+  }
+  // player shadow + dog
+  const p = bba.player;
+  if (bba.phase !== "over"){
+    ctx.save();
+    ctx.fillStyle = "rgba(20,16,12,.28)";
+    ctx.beginPath();
+    ctx.ellipse(p.x+p.w/2, bbaFeet(p)+2, p.w*0.7, 5, 0, 0, 7);
+    ctx.fill();
+    ctx.restore();
+    let pose = p.anim;
+    if (pose === "idle"){
+      const blink = Math.floor(p.ft*2) % 8 === 0;
+      pose = blink ? "idle3" : ["idle0","idle1","idle2"][Math.floor(p.ft*6)%3];
+    } else if (pose === "run") pose = "run" + (Math.floor(p.ft*12)%4);
+    else if (pose === "win") pose = "win";
+    bbaDrawDog(p, pose);
+  }
+  for (let i=0;i<bba.pops.length;i++){
+    const pop = bba.pops[i];
+    ctx.globalAlpha = Math.max(0, pop.life);
+    bbaText(pop.text, pop.x, pop.y, 16, "#fff6c9", "#1c140f", "center");
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+function bbaDrawParallax(){
+  const ctx = bba.ctx;
+  const S = bba.sprites;
+  const camX = bba.camX;
+  ctx.drawImage(S.sky, 0, 0, BBA_VW, BBA_VH);
+  ctx.drawImage(S.sun, 760, 18, 130, 130);
+  function strip(img, speed, y, h){
+    const w = img.width * (h / img.height);
+    let x = -((camX * speed) % w);
+    if (x > 0) x -= w;
+    for (let i=x; i<BBA_VW+w; i+=w) ctx.drawImage(img, i, y, w, h);
+  }
+  strip(S.hills, 0.12, 230, 180);
+  strip(S.clouds, 0.08, 16, 120);
+  strip(S.houses, 0.32, 148, 140);
+  // close fence, clipped to real ground so pits stay open
+  ctx.save();
+  ctx.beginPath();
+  const sols = bba.solids;
+  for (let i=0;i<sols.length;i++){
+    const s = sols[i];
+    if (s.kind !== "ground") continue;
+    const x0 = s.x - camX;
+    const x1 = s.x + s.w - camX;
+    if (x1 < 0 || x0 > BBA_VW) continue;
+    ctx.rect(x0, 0, x1-x0, BBA_VH);
+  }
+  ctx.clip();
+  strip(S.fence, 0.55, 196, 72);
+  ctx.restore();
+}
+function bbaHud(){
+  const ctx = bba.ctx;
+  const S = bba.sprites;
+  ctx.drawImage(S.ballG[0], 16, 12, 28, 28);
+  bbaText(String(bba.balls), 52, 26, 20, "#f4ffc4", "#1c140f", "left");
+  bbaText(String(Math.round(bba.show)), BBA_VW/2, 26, 22, "#fff6c9", "#1c140f", "center");
+  const t = Math.max(0, bba.time);
+  const mm = (t/60)|0;
+  const ss = (t%60)|0;
+  bbaText(mm+":"+(ss<10?"0":"")+ss, BBA_VW-20, 26, 20, "#fff6c9", "#1c140f", "right");
+  for (let i=0;i<bba.lives;i++) ctx.drawImage(S.heart, 16+i*26, 46, 22, 20);
+  if (bba.player.star > 0){
+    bbaText("SQUEAK " + Math.ceil(bba.player.star), 16, 78, 14, "#ffe14a", "#1c140f", "left");
+  }
+}
+function bbaPanel(x, y, w, h){
+  const ctx = bba.ctx;
+  bbaRoundScreen(x, y, w, h, 22);
+  ctx.fillStyle = "rgba(18,12,8,.84)";
+  ctx.fill();
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "#ffcf3a";
+  ctx.stroke();
+}
+function bbaOption(label, x, y, w, on){
+  const ctx = bba.ctx;
+  bbaRoundScreen(x, y, w, 46, 16);
+  ctx.fillStyle = on ? "#d6ff4a" : "rgba(255,255,255,.08)";
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = on ? "#1c140f" : "rgba(255,246,201,.45)";
+  ctx.stroke();
+  bbaText(label, x+w/2, y+23, 18, on ? "#17300a" : "#fff6c9", on ? "#ffffff" : "#1c140f", "center");
+}
+function bbaDrawMenu(){
+  const ph = bba.phase;
+  if (ph === "play" || ph === "win") return;
+  const ctx = bba.ctx;
+  ctx.fillStyle = "rgba(8,16,32,.28)";
+  ctx.fillRect(0, 0, BBA_VW, BBA_VH);
+  if (ph === "setup"){
+    bbaPanel(180, 70, 600, 400);
+    bbaText("Controller setup", 480, 110, 32, "#ffe07a", "#4a1f08", "center");
+    bbaText("Press a button for", 480, 168, 18, "#fff6c9", "#1c140f", "center");
+    bbaText(bba.setupLabel || "", 480, 214, 36, "#d6ff4a", "#17300a", "center");
+    const names = ["Jump","Run","Bark","Start","Select","Look left","Look right"];
+    for (let i=0;i<names.length;i++){
+      const col = i < bba.setupI ? "#d6ff4a" : i === bba.setupI ? "#fff" : "rgba(255,246,201,.45)";
+      bbaText((i<bba.setupI?"OK  ":"") + names[i], 480, 260+i*24, 16, col, "#1c140f", "center");
+    }
+    bbaText("Start cancels until you bind it", 480, 440, 14, "#ffe7a8", "#1c140f", "center");
+    return;
+  }
+  const items = bbaMenuItems();
+  let title = "Bernard's Big Adventure";
+  let sub = "Arrows move   ·   Space jump   ·   Shift run   ·   Z bark";
+  if (ph === "pause"){ title = "Paused"; sub = "Start resumes"; }
+  else if (ph === "quit"){ title = "Quit to the arcade?"; sub = "Select goes back"; }
+  else if (ph === "over"){ title = "Out of lives"; sub = "Score " + bba.score; }
+  else if (ph === "tally"){
+    title = "Home!";
+    const u = Math.min(1, bba.tallyT / 0.8);
+    sub = "Score " + Math.round(bba.score * u);
+  }
+  const h = 150 + items.length * 56;
+  const y0 = ph === "title" ? 36 : (BBA_VH - h) / 2;
+  bbaPanel(200, y0, 560, h);
+  bbaText(title, 480, y0+42, ph==="title"?30:34, "#ffe07a", "#4a1f08", "center");
+  bbaText(sub, 480, y0+78, 15, "#fff6c9", "#1c140f", "center");
+  if (ph === "tally"){
+    bbaText("Time bonus " + bba.bonus, 480, y0+102, 15, "#d6ff4a", "#1c140f", "center");
+    bbaText("Balls " + bba.balls + "    Best " + (bba.best||0), 480, y0+124, 14, "#fff6c9", "#1c140f", "center");
+  } else if (ph === "title"){
+    bbaText("Best " + (bba.best||0), 480, y0+102, 14, "#ffe7a8", "#1c140f", "center");
+  }
+  const top = y0 + (ph === "tally" ? 150 : ph === "title" ? 124 : 108);
+  for (let i=0;i<items.length;i++) bbaOption(items[i], 250, top+i*56, 460, i === bba.menuI);
+}
+function bbaDrawToast(){
+  if (bba.toastT <= 0 || !bba.toast) return;
+  const ctx = bba.ctx;
+  ctx.globalAlpha = Math.min(1, bba.toastT*2);
+  bbaRoundScreen(280, BBA_VH-64, 400, 36, 18);
+  ctx.fillStyle = "rgba(6,20,12,.82)";
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "#d6ff4a";
+  ctx.stroke();
+  bbaText(bba.toast, 480, BBA_VH-46, 16, "#f3ffd2", "#102008", "center");
+  ctx.globalAlpha = 1;
+}
+function bbaDraw(){
+  const ctx = bba.ctx;
+  const c = bba.cv;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = BBA_COLORS.skyTop;
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.setTransform(bba.fit.a, 0, 0, bba.fit.d, bba.fit.e, bba.fit.f);
+  ctx.imageSmoothingEnabled = true;
+  bbaDrawParallax();
+  bbaDrawWorld();
+  if (bba.phase === "play" || bba.phase === "pause" || bba.phase === "win" || bba.phase === "quit") bbaHud();
+  bbaDrawMenu();
+  bbaDrawToast();
+}
+function bbaFit(){
+  const stage = bba.root;
+  const cw = stage.clientWidth || 960;
+  const ch = stage.clientHeight || 540;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const c = bba.cv;
+  c.width = Math.max(2, Math.round(cw * dpr));
+  c.height = Math.max(2, Math.round(ch * dpr));
+  const s = Math.min(cw / BBA_VW, ch / BBA_VH);
+  const ox = (cw - BBA_VW * s) / 2;
+  const oy = Math.max(0, ch - BBA_VH * s);
+  bba.fit = { a:dpr*s, d:dpr*s, e:dpr*ox, f:dpr*oy };
+}
+function bbaFrame(ts){
+  if (!bba) return;
+  const dt = Math.min(0.033, Math.max(0, (ts - bba.last) / 1000) || 0.016);
+  bba.last = ts;
+  bbaPoll();
+  if (bba.boot > 0){
+    bba.boot -= 1;
+    bbaDraw();
+    if (!bba) return;
+    bba.raf = requestAnimationFrame(bbaFrame);
+    return;
+  }
+  bbaInputGame();
+  if (!bba) return;
+  bbaTick(dt);
+  bbaDraw();
+  if (!bba) return;
+  bba.raf = requestAnimationFrame(bbaFrame);
+}
+function bbaMount(){
+  const stage = document.getElementById("stage");
+  if (!stage) return;
+  const root = document.createElement("div");
+  root.id = "bba-root";
+  root.innerHTML =
+    '<style>'+
+    '#bba-root{position:absolute;inset:0;z-index:7;background:#1d5fd6;overflow:hidden;touch-action:none;font-family:Fredoka,system-ui,sans-serif}'+
+    '#bba-root canvas{position:absolute;inset:0;width:100%;height:100%;display:block}'+
+    '#bba-touch{position:absolute;left:0;right:0;bottom:0;z-index:2;display:flex;justify-content:space-between;gap:10px;padding:10px;pointer-events:none}'+
+    '#bba-touch .grp{display:flex;gap:8px;pointer-events:auto}'+
+    '#bba-touch button{min-width:64px;min-height:54px;border-radius:16px;border:3px solid #1c140f;background:linear-gradient(#fff6c9,#f0c14d);color:#4a2408;font:700 13px Fredoka,system-ui,sans-serif;box-shadow:0 4px 0 #6a3a08;touch-action:none}'+
+    '#bba-touch button.jump{min-width:84px;background:linear-gradient(#d6ff4a,#7dcc22)}'+
+    '#bba-pausebtn{position:absolute;right:10px;top:10px;z-index:3;border-radius:12px;border:3px solid #1c140f;background:#fff6c9;color:#4a2408;font:700 12px Fredoka,system-ui,sans-serif;padding:6px 8px}'+
+    '</style>'+
+    '<canvas id="bba-cv"></canvas>'+
+    '<button type="button" id="bba-pausebtn" tabindex="-1">PAUSE</button>'+
+    '<div id="bba-touch"><div class="grp"><button type="button" data-k="left" tabindex="-1">LEFT</button><button type="button" data-k="down" tabindex="-1">DUCK</button><button type="button" data-k="right" tabindex="-1">RIGHT</button></div>'+
+    '<div class="grp"><button type="button" data-k="bark" tabindex="-1">BARK</button><button type="button" data-k="run" tabindex="-1">RUN</button><button type="button" class="jump" data-k="jump" tabindex="-1">JUMP</button></div></div>';
+  stage.appendChild(root);
+  const blank = { left:false, right:false, up:false, down:false, jump:false, run:false, bark:false, start:false, select:false, lookL:false, lookR:false };
+  bba = {
+    root:root, phase:"title", raf:0, padMap:bbaLoadPad(), touch:{},
+    prevHeld:blank, held:blank, edge:{}, menuI:0, clock:0, last:performance.now(),
+    toast:"", toastT:0, sawPad:false, best:0, setupI:0, setupPrev:[], padDraft:{},
+    look:0, score:0, show:0, balls:0, lives:3, time:0
+  };
+  bba.boot = 1;
+  bba.cv = root.querySelector("#bba-cv");
+  bba.ctx = bba.cv.getContext("2d");
+  const touch = root.querySelector("#bba-touch");
+  const pauseBtn = root.querySelector("#bba-pausebtn");
+  if (typeof IS_TOUCH === "undefined" || !IS_TOUCH){
+    touch.style.display = "none";
+    pauseBtn.style.display = "none";
+  }
+  touch.querySelectorAll("button").forEach(function(btn){
+    const k = btn.getAttribute("data-k");
+    const down = function(ev){ ev.preventDefault(); bba.touch[k] = true; };
+    const up = function(ev){ ev.preventDefault(); bba.touch[k] = false; };
+    btn.addEventListener("pointerdown", down);
+    btn.addEventListener("pointerup", up);
+    btn.addEventListener("pointercancel", up);
+    btn.addEventListener("pointerleave", up);
+  });
+  pauseBtn.addEventListener("pointerdown", function(ev){
+    ev.preventDefault();
+    bbaTogglePause();
+  });
+  bba.sprites = bbaBakeWorld();
+  bbaReset();
+  bba.onResize = function(){ if (bba) bbaFit(); };
+  bba.onKey = function(e){
+    if (!bba || e.repeat) return;
+    if (bba.phase === "play" || bba.phase === "win" || bba.phase === "setup") return;
+    const c = e.code || "";
+    if (c === "ArrowDown" || c === "ArrowRight") bba.nav = (bba.nav || 0) + 1;
+    else if (c === "ArrowUp" || c === "ArrowLeft") bba.nav = (bba.nav || 0) - 1;
+  };
+  addEventListener("resize", bba.onResize);
+  addEventListener("keydown", bba.onKey);
+  bbaFit();
+  bbaDraw();
+  bba.raf = requestAnimationFrame(bbaFrame);
+}
 function bbaOpen(){
   hideAll();
   setMark("bba");
@@ -9741,1350 +11545,32 @@ function bbaShutdown(){
   bba = null;
   if (st.raf) cancelAnimationFrame(st.raf);
   if (st.onResize) removeEventListener("resize", st.onResize);
-  if (st.renderer){
-    try{ st.renderer.dispose(); st.renderer.forceContextLoss(); }catch(e){}
-  }
-  if (st.world) bbaDispose(st.world);
+  if (st.onKey) removeEventListener("keydown", st.onKey);
   if (st.root && st.root.parentNode) st.root.parentNode.removeChild(st.root);
-  const tag = document.getElementById("bba-three");
-  if (tag && tag.parentNode) tag.parentNode.removeChild(tag);
-  try{ delete window.THREE; }catch(e){}
 }
-function bbaDispose(obj){
-  if (!obj) return;
-  obj.traverse(o=>{
-    if (o.geometry) o.geometry.dispose();
-    if (o.material){
-      const list = Array.isArray(o.material) ? o.material : [o.material];
-      for (const m of list){ if (m.map) m.map.dispose(); m.dispose(); }
-    }
-  });
+function bbaSelect(){
+  if (!bba) return;
+  if (bba.phase === "setup"){ bba.phase = bba.setupReturn || "title"; bba.menuI = 0; return; }
+  if (bba.phase === "quit"){ bba.phase = bba.quitBack || "play"; return; }
+  if (bba.phase === "win") return;
+  if (bba.phase === "play"){ bba.quitBack = "play"; bba.phase = "quit"; bba.menuI = 1; return; }
+  if (bba.phase === "pause"){ bba.quitBack = "pause"; bba.phase = "quit"; bba.menuI = 1; return; }
+  bba.quitBack = bba.phase;
+  bba.phase = "quit";
+  bba.menuI = 1;
 }
-
-function bbaMount(){
-  const stage = document.getElementById("stage");
-  const root = document.createElement("div");
-  root.id = "bba-root";
-  root.innerHTML =
-    '<style>'+
-    '#bba-root{position:absolute;inset:0;z-index:5;background:#1d5fd6;overflow:hidden;font-family:Fredoka,system-ui,sans-serif;color:#fff6c9}'+
-    '#bba-root canvas{display:block;width:100%;height:100%}'+
-    '#bba-hud{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;gap:8px;padding:10px 12px;pointer-events:none}'+
-    '#bba-hud .bba-pill{background:linear-gradient(#fff6c9,#f0c14d);color:#4a2408;border:3px solid #a86a12;border-radius:14px;padding:6px 12px;font-weight:700;min-width:84px;text-align:center;box-shadow:0 3px 0 #6a3a08}'+
-    '#bba-hud small{display:block;font-size:10px;letter-spacing:.14em}'+
-    '#bba-menu{position:absolute;left:50%;top:50%;transform:translate(-50%,-46%);width:min(440px,88%);background:rgba(18,12,8,.78);border:3px solid #f0c14d;border-radius:22px;padding:22px 20px 16px;text-align:center;box-shadow:0 16px 40px rgba(0,0,0,.35)}'+
-    '#bba-menu h2{margin:0 0 6px;font-size:28px;color:#ffe07a;-webkit-text-stroke:3px #4a1f08;paint-order:stroke fill}'+
-    '#bba-menu p{margin:0 0 12px;color:#fff6c9;font-size:14px;line-height:1.35}'+
-    '#bba-menu button{display:block;width:100%;margin:6px 0;font:700 16px Fredoka,system-ui,sans-serif;padding:10px;border-radius:999px;border:2px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff6c9;cursor:pointer}'+
-    '#bba-menu button.on{background:linear-gradient(#c9f24d,#8fd11f);color:#17300a;border-color:#fff}'+
-    '#bba-toast{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);background:rgba(6,16,10,.8);border:2px solid #c9f24d;color:#eaffc4;border-radius:999px;padding:6px 14px;font-weight:700;font-size:13px}'+
-    '#bba-touch{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;padding:10px;gap:8px}'+
-    '#bba-touch button{min-width:64px;min-height:54px;border-radius:16px;border:2px solid rgba(255,255,255,.4);background:rgba(8,16,12,.55);color:#fff;font:700 13px Fredoka,system-ui,sans-serif}'+
-    '</style>'+
-    '<div id="bba-hud"></div><div id="bba-menu"></div><div id="bba-toast" hidden></div>'+
-    '<div id="bba-touch"><button data-k="left">LEFT</button><button data-k="down">DUCK</button><button data-k="bark">BARK</button><button data-k="run">RUN</button><button data-k="jump">JUMP</button><button data-k="right">RIGHT</button></div>';
-  stage.appendChild(root);
-  bba = {
-    root, phase:"loading", raf:0, padMap:bbaLoadPad(), touch:{},
-    keyPrev:{}, btnPrev:{}, menuI:0, look:0, time:0, clock:0, score:0, displayScore:0,
-    ballN:0, lives:3, best:0, toastT:0, setupI:0, setupWait:false
-  };
-  try{ bba.best = +localStorage.getItem("bba_best") || 0; }catch(e){}
-  const touch = root.querySelector("#bba-touch");
-  if (typeof IS_TOUCH !== "undefined" && !IS_TOUCH) touch.style.display = "none";
-  touch.querySelectorAll("button").forEach(btn=>{
-    const k = btn.getAttribute("data-k");
-    const down = ev=>{ ev.preventDefault(); bba.touch[k] = true; };
-    const up = ev=>{ ev.preventDefault(); bba.touch[k] = false; };
-    btn.addEventListener("pointerdown", down);
-    btn.addEventListener("pointerup", up);
-    btn.addEventListener("pointercancel", up);
-    btn.addEventListener("pointerleave", up);
-  });
-  bba.onResize = ()=> bbaResize();
-  addEventListener("resize", bba.onResize);
-  bbaPaintMenu();
-  bbaLoadThree().then(()=>{
-    if (!bba || bba.root !== root) return;
-    bbaBoot3d();
-  }).catch(()=>{
-    if (!bba) return;
-    const m = root.querySelector("#bba-menu");
-    m.hidden = false;
-    m.innerHTML = "<h2>Couldn't start</h2><p>The 3D piece didn't load. Check the connection and try the cabinet again.</p>";
-  });
-}
-
-function bbaBoot3d(){
-  const THREE = window.THREE;
-  if (THREE.ColorManagement) THREE.ColorManagement.enabled = true;
-  bba.THREE = THREE;
-  const root = bba.root;
-  const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:false });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  root.insertBefore(renderer.domElement, root.firstChild);
-  const scene = new THREE.Scene();
-  scene.background = bbaSkyTex();
-  scene.fog = new THREE.Fog(new THREE.Color("#c5eaff"), 42, 96);
-  const camera = new THREE.PerspectiveCamera(34, 1, 0.08, 140);
-  const hemi = new THREE.HemisphereLight("#9ad4ff", "#5ec24a", 1.15);
-  scene.add(hemi);
-  const amb = new THREE.AmbientLight("#fff8ee", 0.38);
-  scene.add(amb);
-  const sun = new THREE.DirectionalLight("#ffe2a8", 2.7);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.near = 0.5;
-  sun.shadow.camera.far = 48;
-  sun.shadow.bias = -0.00015;
-  sun.shadow.normalBias = 0.045;
-  if ("radius" in sun.shadow) sun.shadow.radius = 3.5;
-  scene.add(sun);
-  scene.add(sun.target);
-  const world = new THREE.Group();
-  scene.add(world);
-  bba.renderer = renderer;
-  bba.scene = scene;
-  bba.camera = camera;
-  bba.world = world;
-  bba.sun = sun;
-  bba.THREE = THREE;
-  bbaMakeBackdrop();
-  bbaRebuild();
-  bba.phase = "title";
-  bba.menuI = 0;
-  bbaPaintMenu();
-  bbaResize();
-  bba.last = performance.now();
-  const loop = now=>{
-    if (!bba || bba.renderer !== renderer) return;
-    bba.raf = requestAnimationFrame(loop);
-    const dt = Math.min(0.033, (now - bba.last) / 1000);
-    bba.last = now;
-    bbaFrame(dt);
-  };
-  bba.raf = requestAnimationFrame(loop);
-}
-
-function bbaHex(c){
-  if (c && c.isColor) return null;
-  if (typeof c === "string") return c.charAt(0) === "#" ? c : "#" + c;
-  const n = (Number(c) >>> 0) & 0xffffff;
-  return "#" + n.toString(16).padStart(6, "0");
-}
-function bbaColor(c){
-  if (c && c.isColor) return c;
-  return new bba.THREE.Color(bbaHex(c));
-}
-function bbaMat(color, opt){
-  const o = Object.assign({ roughness:0.48, metalness:0.04 }, opt || {});
-  o.color = bbaColor(color);
-  if (o.emissive != null) o.emissive = bbaColor(o.emissive);
-  return new bba.THREE.MeshStandardMaterial(o);
-}
-function bbaRoundGeo(w, h, d, rad){
-  const THREE = bba.THREE;
-  const r = Math.max(0.012, Math.min(rad || 0.08, w * 0.45, h * 0.45, d * 0.45));
-  try{
-    const s = new THREE.Shape();
-    const x = -w / 2, y = -h / 2;
-    s.moveTo(x + r, y);
-    s.lineTo(x + w - r, y);
-    s.absarc(x + w - r, y + r, r, -Math.PI / 2, 0, false);
-    s.lineTo(x + w, y + h - r);
-    s.absarc(x + w - r, y + h - r, r, 0, Math.PI / 2, false);
-    s.lineTo(x + r, y + h);
-    s.absarc(x + r, y + h - r, r, Math.PI / 2, Math.PI, false);
-    s.lineTo(x, y + r);
-    s.absarc(x + r, y + r, r, Math.PI, Math.PI * 1.5, false);
-    const bevelT = Math.min(r * 0.55, d * 0.22);
-    const geo = new THREE.ExtrudeGeometry(s, {
-      depth: Math.max(0.04, d - bevelT * 2),
-      bevelEnabled: true,
-      bevelThickness: bevelT,
-      bevelSize: Math.min(r * 0.5, h * 0.2),
-      bevelSegments: 2,
-      curveSegments: 3
-    });
-    geo.translate(0, 0, -d / 2);
-    geo.computeVertexNormals();
-    return geo;
-  }catch(e){
-    return new THREE.BoxGeometry(w, h, d);
-  }
-}
-function bbaGableGeo(w, h, d){
-  const THREE = bba.THREE;
-  const s = new THREE.Shape();
-  s.moveTo(-w / 2, 0);
-  s.lineTo(w / 2, 0);
-  s.lineTo(0, h);
-  const geo = new THREE.ExtrudeGeometry(s, {
-    depth: d, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.05, bevelSegments: 1
-  });
-  geo.translate(0, 0, -d / 2);
-  return geo;
-}
-function bbaBox(w, h, d, mat, x, y, z, rad){
-  const geo = bbaRoundGeo(w, h, d, rad == null ? Math.min(0.09, w, h, d) * 0.28 : rad);
-  const m = new bba.THREE.Mesh(geo, mat);
-  m.position.set(x, y, z);
-  m.castShadow = true;
-  m.receiveShadow = true;
-  return m;
-}
-function bbaSkyTex(){
-  const THREE = bba.THREE;
-  const c = document.createElement("canvas");
-  c.width = 4;
-  c.height = 512;
-  const g = c.getContext("2d");
-  const grd = g.createLinearGradient(0, 0, 0, 512);
-  grd.addColorStop(0, BBA_COLORS.skyTop);
-  grd.addColorStop(0.45, "#4aa4ef");
-  grd.addColorStop(0.78, "#9fd8fb");
-  grd.addColorStop(1, BBA_COLORS.sky);
-  g.fillStyle = grd;
-  g.fillRect(0, 0, 4, 512);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.magFilter = THREE.LinearFilter;
-  tex.minFilter = THREE.LinearFilter;
-  return tex;
-}
-function bbaShade(obj){
-  if (!obj) return;
-  obj.traverse(o=>{
-    if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; }
-  });
-}
-
-function bbaMakeBackdrop(){
-  const THREE = bba.THREE;
-  const near = new THREE.Group();
-  const mid = new THREE.Group();
-  const far = new THREE.Group();
-  bba.world.add(far);
-  bba.world.add(mid);
-  bba.world.add(near);
-  bba.near = near;
-  bba.mid = mid;
-  bba.far = far;
-
-  // Far hills sit on the visual horizon. Bases are dropped so perspective
-  // lines them up with the playfield ground instead of floating.
-  const hillCols = ["#3eae45", "#2f9a55", "#57c44e"];
-  for (let i=0;i<16;i++){
-    const rad = 5.2 + (i % 3) * 1.1;
-    const hill = new THREE.Mesh(new THREE.SphereGeometry(rad, 20, 12), bbaMat(hillCols[i % 3], {roughness:0.92}));
-    hill.scale.set(1.15, 0.42, 1);
-    hill.position.set(i * 16 - 12, -1.15, -20);
-    hill.castShadow = false;
-    hill.receiveShadow = true;
-    far.add(hill);
-  }
-  bba.clouds = [];
-  for (let i=0;i<9;i++){
-    const c = new THREE.Group();
-    const mat = bbaMat("#ffffff", {roughness:0.85, metalness:0});
-    const puff = (rx, ry, rz, px, py)=>{
-      const m = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), mat);
-      m.scale.set(rx, ry, rz);
-      m.position.set(px, py, 0);
-      m.castShadow = false;
-      c.add(m);
-    };
-    puff(1.3, 0.85, 0.9, 0, 0);
-    puff(0.85, 0.7, 0.75, 1.05, 0.15);
-    puff(0.7, 0.55, 0.6, -0.95, 0.05);
-    c.userData.baseX = i * 22;
-    c.position.set(c.userData.baseX, 7.4 + (i % 3) * 0.55, -26);
-    far.add(c);
-    bba.clouds.push(c);
-  }
-  const sunBall = new THREE.Mesh(
-    new THREE.SphereGeometry(1.35, 20, 14),
-    bbaMat("#fff4b0", {emissive:new THREE.Color("#ffe28a"), emissiveIntensity:0.85, roughness:0.4})
-  );
-  sunBall.position.set(-6, 8.6, -28);
-  far.add(sunBall);
-
-  // Middle: colorful houses, walls vertical, gable roofs level, bases on the ground line.
-  const wallCols = ["#fff6dc", "#ffe3c4", "#fff1b8", "#f3ffe4"];
-  const roofCols = ["#e23b32", "#2f7fe0", "#2f9d4a", "#e23b32", "#3a6fd4"];
-  for (let i=0;i<18;i++){
-    const x = i * 13 - 8;
-    const tall = 1.85 + (i % 3) * 0.38;
-    const walls = bbaMat(wallCols[i % wallCols.length], {roughness:0.72});
-    const body = bbaBox(3.3, tall, 2.35, walls, 0, tall / 2, 0, 0.08);
-    const roof = new THREE.Mesh(bbaGableGeo(3.7, 1.15, 2.6), bbaMat(roofCols[i % roofCols.length], {roughness:0.5}));
-    roof.position.y = tall;
-    const door = bbaBox(0.58, 0.95, 0.12, bbaMat("#7a3e22", {roughness:0.6}), -0.35, 0.48, 1.2, 0.05);
-    const glass = bbaMat("#c9f4ff", {emissive:new THREE.Color("#9ad8f0"), emissiveIntensity:0.35, roughness:0.15, metalness:0.05});
-    const win = bbaBox(0.52, 0.52, 0.1, glass, 0.85, tall * 0.62, 1.22, 0.06);
-    const chim = bbaBox(0.32, 0.55, 0.32, bbaMat("#c4563a", {roughness:0.7}), 0.9, tall + 0.7, -0.2, 0.04);
-    const house = new THREE.Group();
-    house.add(body, roof, door, win, chim);
-    house.position.set(x, 0.05, -9);
-    bbaShade(house);
-    mid.add(house);
-  }
-
-  // Close: fence and bushes planted on the ground, just behind the play plane.
-  const fenceMat = bbaMat(BBA_COLORS.wood, {roughness:0.62});
-  const bushMat = bbaMat("#2f9a3a", {roughness:0.8});
-  const bushMat2 = bbaMat("#46c44a", {roughness:0.75});
-  for (let i=0;i<80;i++){
-    const x = i * 3.05 - 4;
-    const post = bbaBox(0.14, 1.15, 0.14, fenceMat, x, 0.58, 0, 0.03);
-    near.add(post);
-    if (i < 79){
-      near.add(bbaBox(3.05, 0.09, 0.09, fenceMat, x + 1.52, 0.95, 0, 0.03));
-      near.add(bbaBox(3.05, 0.08, 0.08, fenceMat, x + 1.52, 0.48, 0, 0.03));
-    }
-    if (i % 2 === 0){
-      const bush = new THREE.Mesh(new THREE.SphereGeometry(0.38, 12, 10), i % 4 ? bushMat : bushMat2);
-      bush.scale.set(1.2, 0.75, 0.9);
-      bush.position.set(x + 1.2, 0.28, 0.35);
-      bush.castShadow = true;
-      bush.receiveShadow = true;
-      near.add(bush);
-    }
-  }
-  near.position.z = -2.15;
-}
-
-function bbaPawMat(){
-  const THREE = bba.THREE;
-  const c = document.createElement("canvas");
-  c.width = c.height = 128;
-  const g = c.getContext("2d");
-  const grd = g.createLinearGradient(0, 0, 128, 128);
-  grd.addColorStop(0, "#ffe98a");
-  grd.addColorStop(0.55, "#ffc83d");
-  grd.addColorStop(1, "#f0a020");
-  g.fillStyle = grd;
-  g.fillRect(0, 0, 128, 128);
-  g.fillStyle = "#a85a12";
-  g.beginPath(); g.arc(64, 80, 18, 0, Math.PI * 2); g.fill();
-  [[36, 46], [64, 34], [92, 46]].forEach(([x, y])=>{
-    g.beginPath(); g.arc(x, y, 9, 0, Math.PI * 2); g.fill();
-  });
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return bbaMat("#ffffff", {
-    map: tex, roughness: 0.2, metalness: 0.62,
-    emissive: new THREE.Color("#c47a12"), emissiveIntensity: 0.16
-  });
-}
-
-function bbaMakeOrb(kind){
-  const THREE = bba.THREE;
-  const neon = kind === "R" ? BBA_COLORS.ballRed : kind === "Q" ? BBA_COLORS.gold : BBA_COLORS.ball;
-  const mat = bbaMat(neon, {
-    emissive: new THREE.Color(neon),
-    emissiveIntensity: kind === "Q" ? 0.42 : 0.72,
-    roughness: 0.2,
-    metalness: 0.04
-  });
-  const r = kind === "Q" ? 0.28 : 0.23;
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, 22, 16), mat);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  if (kind !== "Q"){
-    const seamMat = bbaMat("#ffffff", {roughness:0.28, metalness:0.02});
-    const a = new THREE.Mesh(new THREE.TorusGeometry(r * 0.8, 0.013, 8, 28, Math.PI * 1.28), seamMat);
-    a.rotation.set(1.15, 0.45, 0.15);
-    const b = new THREE.Mesh(new THREE.TorusGeometry(r * 0.8, 0.013, 8, 28, Math.PI * 1.28), seamMat);
-    b.rotation.set(-0.35, -0.95, 0.55);
-    mesh.add(a, b);
-  }
-  return mesh;
-}
-
-function bbaTuft(x, y, z, flower){
-  const g = new bba.THREE.Group();
-  const blade = bbaMat("#2fbf3a", {roughness:0.7});
-  for (let i=0;i<3;i++){
-    const m = new bba.THREE.Mesh(new bba.THREE.ConeGeometry(0.05, 0.36, 5), blade);
-    m.position.set((i - 1) * 0.045, 0.1, 0);
-    m.rotation.z = (i - 1) * 0.28;
-    m.castShadow = true;
-    g.add(m);
-  }
-  if (flower){
-    const cols = ["#ff4d6a", "#ffe14a", "#ffffff", "#5ad0ff"];
-    const head = new bba.THREE.Mesh(
-      new bba.THREE.SphereGeometry(0.075, 8, 6),
-      bbaMat(cols[Math.abs(Math.floor(x * 3)) % cols.length], {roughness:0.4})
-    );
-    head.position.set(0.02, 0.24, 0);
-    g.add(head);
-  }
-  g.position.set(x, y, z);
-  return g;
-}
-
-function bbaDressGround(level){
-  const cells = bba.solids.filter(s=>s.kind==="ground").slice().sort((a,b)=>a.y-b.y || a.x-b.x);
-  const runs = [];
-  for (const s of cells){
-    const last = runs[runs.length - 1];
-    if (last && last.y === s.y && s.x === last.x1 + 1) last.x1 = s.x;
-    else runs.push({y:s.y, x0:s.x, x1:s.x});
-  }
-  const grass = bbaMat(BBA_COLORS.grass, {roughness:0.7});
-  const top = bbaMat(BBA_COLORS.grassTop, {roughness:0.45});
-  const dirt = bbaMat(BBA_COLORS.dirt, {roughness:0.94});
-  const soil = bbaMat("#5a3018", {roughness:0.9});
-  for (const run of runs){
-    const w = run.x1 - run.x0 + 1;
-    const cx = run.x0 + w / 2;
-    const topY = run.y + 1;
-    const grassH = 0.88;
-    const dirtH = 22;
-    level.add(bbaBox(w, dirtH, 1.7, dirt, cx, topY - grassH - dirtH / 2 + 0.02, -0.02, 0.06));
-    level.add(bbaBox(w + 0.04, grassH, 1.86, grass, cx, topY - grassH / 2, 0.06, 0.12));
-    level.add(bbaBox(w + 0.08, 0.16, 1.94, top, cx, topY - 0.1, 0.12, 0.06));
-    level.add(bbaBox(w + 0.02, 0.07, 1.7, soil, cx, topY - grassH + 0.02, 0.02, 0.02));
-    for (let x = run.x0 + 0.8; x < run.x1 + 0.2; x += 2.7){
-      level.add(bbaTuft(x, topY, 0.72, true));
-      if (Math.floor(x) % 2 === 0) level.add(bbaTuft(x + 0.7, topY, -0.55, false));
-    }
-  }
-}
-
-function bbaMakeDog(){
-  const THREE = bba.THREE;
-  const g = new THREE.Group();
-  const fur = bbaMat(BBA_COLORS.fur, {roughness:0.58});
-  const black = bbaMat(BBA_COLORS.saddle, {roughness:0.42});
-  const white = bbaMat(BBA_COLORS.chest, {roughness:0.48});
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.32, 22, 16), fur);
-  body.scale.set(1.55, 0.8, 0.86);
-  body.position.set(0.02, 0.5, 0);
-  body.userData.base = [1.55, 0.8, 0.86];
-  body.castShadow = true;
-  // Black saddle blankets the whole back so he doesn't read as a tan blob.
-  const saddle = new THREE.Mesh(new THREE.SphereGeometry(0.28, 18, 14), black);
-  saddle.scale.set(1.25, 0.46, 0.82);
-  saddle.position.set(-0.02, 0.7, 0);
-  saddle.castShadow = true;
-  const chest = new THREE.Mesh(new THREE.SphereGeometry(0.15, 14, 12), white);
-  chest.scale.set(0.9, 1.2, 0.72);
-  chest.position.set(0.24, 0.44, 0.02);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 20, 16), fur);
-  head.position.set(0.48, 0.74, 0);
-  head.castShadow = true;
-  const mask = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), black);
-  mask.scale.set(1.28, 0.7, 1.02);
-  mask.position.set(0.58, 0.78, 0);
-  const muzzleMask = new THREE.Mesh(new THREE.SphereGeometry(0.095, 12, 10), black);
-  muzzleMask.scale.set(1.45, 0.72, 0.9);
-  muzzleMask.position.set(0.72, 0.66, 0);
-  const snout = new THREE.Mesh(new THREE.SphereGeometry(0.085, 12, 10), fur);
-  snout.position.set(0.74, 0.62, 0);
-  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.042, 10, 8), bbaMat(BBA_COLORS.nose, {roughness:0.32}));
-  nose.position.set(0.82, 0.64, 0);
-  function bbaEye(z, sc){
-    const eg = new THREE.Group();
-    const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.052 * sc, 12, 10), bbaMat("#fffef8", {roughness:0.22}));
-    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.03 * sc, 10, 8), bbaMat("#1a120c", {roughness:0.3}));
-    pupil.position.set(0.028, 0.004, 0);
-    const glint = new THREE.Mesh(
-      new THREE.SphereGeometry(0.014 * sc, 8, 6),
-      bbaMat("#ffffff", {emissive:new THREE.Color("#ffffff"), emissiveIntensity:0.55, roughness:0.2})
-    );
-    glint.position.set(0.04, 0.022, 0.012 * (z < 0 ? -1 : 1));
-    eg.add(sclera, pupil, glint);
-    eg.position.set(0.66, 0.82, z);
-    return eg;
-  }
-  g.add(body, saddle, chest, head, mask, muzzleMask, snout, nose, bbaEye(0.11, 1.2), bbaEye(-0.11, 1));
-  const ears = [];
-  [-0.12, 0.12].forEach(z=>{
-    const pivot = new THREE.Group();
-    pivot.position.set(0.4, 0.96, z);
-    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.38, 8), black);
-    ear.position.y = 0.18;
-    ear.castShadow = true;
-    const inner = new THREE.Mesh(new THREE.ConeGeometry(0.036, 0.2, 6), fur);
-    inner.position.set(0.02, 0.15, 0);
-    pivot.add(ear, inner);
-    g.add(pivot);
-    ears.push(pivot);
-  });
-  const legs = [];
-  [[0.22, 0.15], [0.22, -0.15], [-0.2, 0.13], [-0.2, -0.13]].forEach(([x, z])=>{
-    const pivot = new THREE.Group();
-    pivot.position.set(x, 0.42, z);
-    const upper = new THREE.Mesh(new THREE.SphereGeometry(0.072, 10, 8), fur);
-    upper.scale.set(0.85, 1.5, 0.85);
-    upper.position.y = -0.1;
-    const paw = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), fur);
-    paw.position.y = -0.36;
-    pivot.add(upper, paw);
-    g.add(pivot);
-    legs.push(pivot);
-  });
-  const tail = new THREE.Group();
-  tail.position.set(-0.44, 0.56, 0);
-  const t1 = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), fur);
-  t1.position.set(-0.08, 0.05, 0);
-  const t2 = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), white);
-  t2.position.set(-0.18, 0.14, 0);
-  tail.add(t1, t2);
-  g.add(tail);
-  bbaShade(g);
-  bba.world.add(g);
-  bba.dog = { group:g, legs, tail, ears, fur, black, body:body };
-}
-
-function bbaRebuild(){
-  const THREE = bba.THREE;
-  if (bba.level){
-    bba.world.remove(bba.level);
-    bbaDispose(bba.level);
-  }
-  const level = new THREE.Group();
-  bba.world.add(level);
-  bba.level = level;
-  if (!bba.dog) bbaMakeDog();
-  const solids = [];
-  const plats = [];
-  const balls = [];
-  const enemies = [];
-  const rows = BBA_MAP;
-  const n = rows.length;
-  const brickM = bbaMat(BBA_COLORS.brick, {roughness:0.62});
-  const wood = bbaMat(BBA_COLORS.wood, {roughness:0.55});
-  const paw = bbaPawMat();
-  bba.goal = null;
-  bba.check = null;
-  for (let r=0;r<n;r++){
-    const y = n - 1 - r;
-    const line = rows[r];
-    for (let x=0;x<line.length;x++){
-      const ch = line[x];
-      if (ch === "="){
-        // Collision only. The thick grass/dirt shell is built afterwards.
-        solids.push({x, y, w:1, h:1, kind:"ground"});
-      } else if (ch === "#"){
-        const mesh = bbaBox(0.9, 0.9, 0.9, brickM, x+0.5, y+0.5, 0, 0.12);
-        level.add(mesh);
-        solids.push({x, y, w:1, h:1, kind:"brick", mesh});
-      } else if (ch === "?" || ch === "B"){
-        const mesh = bbaBox(0.84, 0.84, 0.84, paw, x+0.5, y+0.5, 0, 0.12);
-        level.add(mesh);
-        solids.push({x, y, w:1, h:1, kind: ch==="B"?"bonebox":"box", mesh, used:false, baseY:y+0.5});
-      } else if (ch === "-" || ch === "M"){
-        const mesh = bbaBox(0.96, 0.22, 0.72, wood, x+0.5, y+0.12, 0, 0.05);
-        level.add(mesh);
-        plats.push({x, y, w:1, h:0.22, origin:x, range: ch==="M"?BBA_SPEED.plat:0, moving:ch==="M", phase:x*0.4, mesh});
-      } else if (ch === "H"){
-        const hyd = new THREE.Group();
-        const red = bbaMat(BBA_COLORS.hydrant, {roughness:0.4, metalness:0.15});
-        const cap = bbaMat(0xf4f4f4, {metalness:0.3, roughness:0.35});
-        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.18, 0.92, 12), red);
-        pole.position.y = 0.5;
-        pole.castShadow = true;
-        const top = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), red);
-        top.position.y = 0.98;
-        const side = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.32, 8), cap);
-        side.rotation.z = Math.PI/2;
-        side.position.set(0.2, 0.7, 0);
-        hyd.add(pole, top, side);
-        hyd.position.set(x+0.5, y, 0);
-        bbaShade(hyd);
-        level.add(hyd);
-        // Short enough that a held jump clears it. A tap does not.
-        solids.push({x:x+0.2, y, w:0.6, h:1.26, kind:"hydrant"});
-      } else if (ch === "o" || ch === "R" || ch === "Q"){
-        const mesh = bbaMakeOrb(ch);
-        mesh.position.set(x+0.5, y+0.45, 0);
-        level.add(mesh);
-        balls.push({x:x+0.5, y:y+0.45, kind:ch, mesh, got:false, ph:x});
-      } else if (ch === "S" || ch === "C" || ch === "W"){
-        enemies.push(bbaMakeEnemy(ch, x+0.5, y, level));
-      } else if (ch === "P"){
-        const bowl = new THREE.Group();
-        const bowlM = bbaMat(0x3aa0d8, {roughness:0.25, metalness:0.1, transparent:true, opacity:0.9});
-        const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.2, 0.22, 14), bbaMat(0xd8d2c8));
-        const water = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.18, 0.08, 14), bowlM);
-        water.position.y = 0.1;
-        bowl.add(cup, water);
-        bowl.position.set(x+0.5, y, 0);
-        bbaShade(bowl);
-        level.add(bowl);
-        bba.check = {x:x+0.5, y, mesh:bowl, got:false};
-      } else if (ch === "D"){
-        const house = bbaMakeDoghouse();
-        house.position.set(x+0.5, y, 0);
-        level.add(house);
-        bba.goal = {x:x+0.2, w:1.3, y, mesh:house};
-      }
-    }
-  }
-  bba.solids = solids;
-  bba.plats = plats;
-  bba.balls = balls;
-  bba.enemies = enemies;
-  bba.drops = [];
-  bba.bits = [];
-  bbaDressGround(level);
-  bba.p = {
-    x:3.2, y:1, vx:0, vy:0, hw:0.28, h:0.86, face:1, big:false, inv:0,
-    coyote:0, jumpBuf:0, onGround:false, crouch:false, barkCd:0, iframes:0,
-    runPhase:0, ride:null, wasGround:false
-  };
-  bba.respawn = {x:3.2, y:1};
-  bba.score = 0;
-  bba.displayScore = 0;
-  bba.ballN = 0;
-  bba.lives = 3;
-  bba.time = 0;
-  bba.winPlayed = false;
-  bba.spin = 0;
-  bbaSyncDog();
-}
-
-function bbaMakeEnemy(ch, x, y, level){
-  const THREE = bba.THREE;
-  const g = new THREE.Group();
-  if (ch === "S"){
-    const fur = bbaMat("#e09040", {roughness:0.55});
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), fur);
-    body.scale.set(1.2, 0.8, 0.7);
-    body.position.y = 0.28;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), fur);
-    head.position.set(0.18, 0.42, 0);
-    const tail = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), bbaMat("#b86a32"));
-    tail.position.set(-0.22, 0.48, 0);
-    g.add(body, head, tail);
-  } else if (ch === "C"){
-    const fur = bbaMat("#9aa2b0", {roughness:0.5});
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10), fur);
-    body.scale.set(1.3, 0.75, 0.7);
-    body.position.y = 0.3;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), fur);
-    head.position.set(0.22, 0.46, 0);
-    g.add(body, head);
-  } else {
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8), bbaMat("#241f2c", {roughness:0.45}));
-    body.scale.set(1.4, 0.7, 0.6);
-    body.position.y = 0.2;
-    const wing = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.28, 0.5), bbaMat("#3a3544"));
-    wing.position.set(0, 0.28, 0);
-    g.add(body, wing);
-    g.userData.wing = wing;
-  }
-  g.position.set(x, y, 0);
-  g.traverse(o=>{ if (o.isMesh) o.castShadow = true; });
-  level.add(g);
-  return {
-    kind: ch==="S"?"squirrel":ch==="C"?"cat":"crow",
-    x, y, baseX:x, baseY:y, dir: x%2?1:-1, vx:0, vy:0,
-    speed: ch==="S"?BBA_SPEED.squirrel:BBA_SPEED.cat,
-    w:0.7, h: ch==="W"?0.4:0.55,
-    mesh:g, dead:false, stun:0, curl:false, t:x*0.2
-  };
-}
-
-function bbaMakeDoghouse(){
-  const g = new bba.THREE.Group();
-  const wood = bbaMat("#e09a48", {roughness:0.58});
-  const dark = bbaMat("#4a2c18", {roughness:0.7});
-  const body = bbaBox(1.35, 1.02, 1.15, wood, 0, 0.51, 0, 0.08);
-  const hole = bbaBox(0.46, 0.52, 0.16, dark, 0.12, 0.36, 0.52, 0.08);
-  const roof = new bba.THREE.Mesh(bbaGableGeo(1.7, 0.72, 1.4), bbaMat(BBA_COLORS.roof, {roughness:0.48}));
-  roof.position.y = 1.02;
-  const pole = new bba.THREE.Mesh(new bba.THREE.CylinderGeometry(0.03, 0.03, 0.85, 6), bbaMat("#f7f7f7"));
-  pole.position.set(-0.48, 1.62, 0);
-  const flag = bbaBox(0.4, 0.24, 0.04, bbaMat("#ff3b30"), -0.24, 1.98, 0, 0.02);
-  g.add(body, hole, roof, pole, flag);
-  g.userData.flag = flag;
-  bbaShade(g);
-  return g;
-}
-
-function bbaHasFloor(x, feet){
-  for (const s of bba.solids){
-    if (s.kind === "brick" && s.gone) continue;
-    const top = s.y + s.h;
-    if (Math.abs(top - feet) < 0.2 && x > s.x && x < s.x + s.w) return true;
-  }
-  for (const p of bba.plats){
-    const top = p.y + p.h;
-    if (Math.abs(top - feet) < 0.25 && x > p.x && x < p.x + p.w) return true;
-  }
-  return false;
-}
-function bbaWallAt(x, feet, h){
-  for (const s of bba.solids){
-    if (s.gone) continue;
-    if (x > s.x && x < s.x+s.w && feet + 0.05 < s.y+s.h && feet + h > s.y + 0.05) return true;
-  }
-  return false;
-}
-function bbaHits(px, py, hw, h){
-  const out = [];
-  for (const s of bba.solids){
-    if (s.gone) continue;
-    if (px+hw > s.x && px-hw < s.x+s.w && py < s.y+s.h - 0.001 && py+h > s.y + 0.001) out.push(s);
-  }
-  return out;
-}
-
-function bbaBreak(s){
-  if (!s || s.gone || s.kind !== "brick") return;
-  s.gone = true;
-  if (s.mesh) s.mesh.visible = false;
-  bbaSfxStomp();
-  bba.score += 20;
-  bbaBurst(s.x+0.5, s.y+0.5, BBA_COLORS.brick);
-}
-function bbaBump(s){
-  if (!s || s.used) return;
-  if (s.kind !== "box" && s.kind !== "bonebox") return;
-  s.used = true;
-  if (s.mesh && s.mesh.material && s.mesh.material.color) s.mesh.material.color.set(0x9a7a48);
-  bba.score += 20;
-  const bone = s.kind === "bonebox";
-  bba.drops.push({
-    kind: bone ? "bone" : "ball",
-    ball: Math.random()<0.3 ? "R" : "o",
-    x: s.x+0.5, y: s.y+1.15, vx: bone ? 2.1 : 1.1, vy: bone ? 2.2 : 4.2
-  });
-  if (bone) bbaSfxBone(); else bbaSfxBall();
-}
-
-function bbaBurst(x, y, color){
-  for (let i=0;i<6;i++){
-    const m = new bba.THREE.Mesh(new bba.THREE.SphereGeometry(0.06, 6, 6), bbaMat(color));
-    m.position.set(x, y, 0);
-    bba.level.add(m);
-    bba.bits.push({mesh:m, x, y, vx:(Math.random()-0.5)*3, vy:1+Math.random()*2, life:0.45});
-  }
-}
-
-function bbaHurt(kind){
-  const p = bba.p;
-  if (!p || bba.phase !== "play") return;
-  const fall = kind === "fall";
-  // A pit always costs a life. A hit while big only shrinks him.
-  if (!fall && (p.iframes > 0 || p.inv > 0)) return;
-  if (!fall && p.big){
-    p.big = false;
-    p.iframes = 1.4;
-    bbaSfxHurt();
-    return;
-  }
-  bbaSfxHurt();
-  bba.lives -= 1;
-  if (bba.lives <= 0){
-    bba.phase = "over";
-    bba.menuI = 0;
-    p.vx = 0; p.vy = 0;
-    bbaSaveBest(bba.score);
-    bbaPaintMenu();
-    return;
-  }
-  p.iframes = 1.5;
-  p.x = bba.respawn.x;
-  p.y = bba.respawn.y;
-  p.vx = 0; p.vy = 0;
-}
-
-function bbaCollect(kind){
-  if (kind === "Q"){
-    bba.p.inv = 8;
-    bba.score += 200;
-    bbaSfxPower();
-    return;
-  }
-  if (kind === "bone"){
-    bba.p.big = true;
-    bba.score += 100;
-    bbaSfxBone();
-    return;
-  }
-  bba.ballN += 1;
-  bba.score += kind === "R" ? 25 : 10;
-  if (bba.ballN > 0 && bba.ballN % 100 === 0) bba.lives += 1;
-  bbaSfxBall();
-  bbaBurst(bba.p.x, bba.p.y+0.6, kind==="R"?BBA_COLORS.ballRed:BBA_COLORS.ball);
-}
-
-function bbaStepPlayer(dt){
-  const p = bba.p;
-  const inp = bba.inp;
-  p.iframes = Math.max(0, p.iframes - dt);
-  p.inv = Math.max(0, p.inv - dt);
-  p.barkCd = Math.max(0, p.barkCd - dt);
-  p.crouch = !!(inp.down && p.onGround);
-  p.h = (p.big ? 1.32 : 0.86) * (p.crouch ? 0.6 : 1);
-  p.hw = p.big ? 0.38 : 0.28;
-  const speed = ((inp.run || p.inv > 0) ? BBA_SPEED.run : BBA_SPEED.walk) * (p.crouch ? 0.45 : 1) * (p.big ? 0.92 : 1);
-  let dir = (inp.right?1:0) - (inp.left?1:0);
-  if (dir) p.face = dir;
-  const accel = 42 * dt;
-  if (dir) p.vx = bbaApproach(p.vx, dir * speed, accel);
-  else p.vx = bbaApproach(p.vx, 0, accel * 1.4);
-  if (inp.jumpEdge) p.jumpBuf = 0.12;
-  else p.jumpBuf = Math.max(0, p.jumpBuf - dt);
-  if (p.jumpBuf > 0 && (p.onGround || p.coyote > 0) && !p.crouch){
-    p.vy = BBA_SPEED.jump * (p.big ? 1.04 : 1);
-    p.jumpBuf = 0;
-    p.coyote = 0;
-    p.onGround = false;
-    bbaSfxJump();
-  }
-  // Letting go early cuts the hop. Holding it carries him higher, with a little hang at the top.
-  if (inp.jumpRelease && p.vy > 0) p.vy *= 0.5;
-  let grav = BBA_SPEED.gravity;
-  if (Math.abs(p.vy) < 1.6) grav *= 0.46;
-  if (inp.jump && p.vy > 0) grav *= 0.66;
-  p.vy = Math.max(-16, p.vy - grav * dt);
-
-  p.x += p.vx * dt;
-  let broke = [];
-  for (const s of bbaHits(p.x, p.y, p.hw, p.h)){
-    if (s.kind === "brick" && p.big){ broke.push(s); continue; }
-    if (p.x < s.x + s.w/2) p.x = s.x - p.hw - 0.001;
-    else p.x = s.x + s.w + p.hw + 0.001;
-    p.vx = 0;
-  }
-  broke.forEach(bbaBreak);
-
-  const oldY = p.y;
-  p.y += p.vy * dt;
-  let grounded = false;
-  let hardLand = false;
-  p.ride = null;
-  broke = [];
-  for (const s of bbaHits(p.x, p.y, p.hw, p.h)){
-    if (p.vy > 0){
-      p.y = s.y - p.h - 0.001;
-      p.vy = 0;
-      if (s.kind === "box" || s.kind === "bonebox") bbaBump(s);
-      if (s.kind === "brick" && p.big) broke.push(s);
-    } else {
-      if (p.vy < -4) hardLand = true;
-      p.y = s.y + s.h;
-      p.vy = 0;
-      grounded = true;
-    }
-  }
-  broke.forEach(bbaBreak);
-  for (const plat of bba.plats){
-    const top = plat.y + plat.h;
-    const over = p.x+p.hw > plat.x+0.05 && p.x-p.hw < plat.x+plat.w-0.05;
-    if (p.vy <= 0 && over && oldY >= top - 0.08 && p.y <= top + 0.02){
-      if (p.vy < -4) hardLand = true;
-      p.y = top;
-      p.vy = 0;
-      grounded = true;
-      p.ride = plat;
-    }
-  }
-  if (grounded){ p.onGround = true; p.coyote = 0.14; }
-  else { p.onGround = false; p.coyote = Math.max(0, p.coyote - dt); }
-  if (!p.wasGround && p.onGround && hardLand) bbaBurst(p.x, p.y, 0xd8c39a);
-  p.wasGround = p.onGround;
-  if (Math.abs(p.vx) > 0.4 && p.onGround) p.runPhase += dt * Math.abs(p.vx) * 1.4;
-  if (p.y < -2.2) bbaHurt("fall");
-}
-
-function bbaApproach(v, to, dv){
-  if (v < to) return Math.min(to, v + dv);
-  return Math.max(to, v - dv);
-}
-
-function bbaStepWorld(dt){
-  if (!bba || bba.phase !== "play") return;
-  for (const plat of bba.plats){
-    if (!plat.moving) continue;
-    const prev = plat.x;
-    plat.x = plat.origin + Math.sin((bba.clock||0) * 1.15 + plat.phase) * plat.range;
-    if (bba.p.ride === plat) bba.p.x += plat.x - prev;
-    plat.mesh.position.x = plat.x + plat.w/2;
-  }
-  for (const e of bba.enemies){
-    if (e.dead) continue;
-    e.t += dt;
-    if (e.stun > 0){ e.stun -= dt; e.mesh.position.set(e.x, e.y, 0); continue; }
-    if (e.kind === "crow"){
-      const cycle = e.t * BBA_SPEED.crow;
-      const dip = Math.pow(Math.max(0, Math.sin(cycle)), 1.35);
-      e.x = e.baseX + Math.sin(cycle * 0.5) * 2.6;
-      e.y = e.baseY - dip * (e.baseY - 1.18);
-      if (e.mesh.userData.wing) e.mesh.userData.wing.rotation.z = Math.sin(e.t*18)*0.7;
-    } else if (e.kind === "cat" && e.curl){
-      e.x += e.vx * dt;
-      e.vy -= 30 * dt;
-      e.y += e.vy * dt;
-      if (bbaHasFloor(e.x, e.y) || bbaHasFloor(e.x, e.y+0.05)){
-        // settle onto the floor height we already use
-        if (e.vy < 0 && e.y <= e.baseY + 0.05){ e.y = e.baseY; e.vy = 0; }
-      }
-      if (bbaWallAt(e.x + Math.sign(e.vx||1)*0.3, e.y, 0.3)) e.vx = 0;
-      if (!bbaHasFloor(e.x, e.y) && e.vy === 0) e.vy = -1;
-      if (Math.abs(e.vx) > 2){
-        for (const o of bba.enemies){
-          if (o === e || o.dead) continue;
-          if (Math.abs(o.x-e.x) < 0.5 && Math.abs(o.y-e.y) < 0.6){
-            o.dead = true; o.mesh.visible = false; bba.score += 50; bbaSfxStomp();
-          }
-        }
-      }
-    } else {
-      const ahead = e.x + e.dir * 0.4;
-      if (!bbaHasFloor(ahead, e.y) || bbaWallAt(ahead, e.y, e.h*0.6)) e.dir *= -1;
-      e.x += e.dir * e.speed * dt;
-    }
-    if (e.y < -2.5){ e.dead = true; e.mesh.visible = false; continue; }
-    e.mesh.position.set(e.x, e.y, 0);
-    if (e.kind !== "crow") e.mesh.scale.x = e.dir;
-    if (e.kind === "cat") e.mesh.scale.y = e.curl ? 0.55 : 1;
-  }
-  for (const d of bba.drops){
-    d.vy -= 28*dt;
-    d.x += d.vx*dt;
-    d.y += d.vy*dt;
-    if (d.vy < 0 && bbaHasFloor(d.x, d.y)){
-      d.vy = 0;
-      let top = d.y;
-      for (const s of bba.solids){
-        if (s.gone) continue;
-        const t = s.y + s.h;
-        if (Math.abs(t - d.y) < 0.35 && d.x > s.x && d.x < s.x + s.w) top = t;
-      }
-      d.y = top;
-    }
-  }
-  // drops become pickups once they've landed
-  for (let i=bba.drops.length-1;i>=0;i--){
-    const d = bba.drops[i];
-    if (d.vy === 0){
-      const kind = d.kind === "bone" ? "bone" : d.ball;
-      const mesh = kind === "bone"
-        ? bbaBox(0.36, 0.12, 0.12, bbaMat("#fff4e4", {roughness:0.45}), d.x, d.y+0.2, 0, 0.04)
-        : bbaMakeOrb(kind === "R" ? "R" : "o");
-      if (kind !== "bone") mesh.position.set(d.x, d.y+0.35, 0);
-      bba.level.add(mesh);
-      bba.balls.push({x:d.x, y:d.y+0.35, kind, mesh, got:false, ph:d.x, bone:kind==="bone"});
-      bba.drops.splice(i,1);
-    }
-  }
-  const p = bba.p;
-  for (const b of bba.balls){
-    if (b.got) continue;
-    const bob = Math.sin(bba.time*3 + b.ph)*0.08;
-    b.mesh.position.y = b.y + bob;
-    b.mesh.rotation.y += dt*3;
-    const dx = p.x - b.x, dy = (p.y+p.h*0.5) - b.y;
-    if (dx*dx + dy*dy < 0.55){
-      b.got = true;
-      b.mesh.visible = false;
-      bbaCollect(b.bone ? "bone" : b.kind);
-    }
-  }
-  if (bba.check && !bba.check.got && p.onGround && Math.abs(p.x - bba.check.x) < 0.7 && Math.abs(p.y - bba.check.y) < 0.4){
-    bba.check.got = true;
-    bba.respawn.x = bba.check.x;
-    bba.respawn.y = p.y;
-    beep(660,.12,"triangle",.05);
-  }
-  for (const e of bba.enemies){
-    if (e.dead) continue;
-    const overlap = Math.abs(p.x - e.x) < (p.hw + e.w*0.45) && p.y < e.y + e.h && p.y + p.h > e.y + 0.05;
-    if (!overlap) continue;
-    const stomp = p.vy < 0 && p.y > e.y + e.h * 0.45;
-    if (p.inv > 0){
-      e.dead = true; e.mesh.visible = false; bba.score += 50;
-      continue;
-    }
-    if (stomp){
-      p.vy = 8.2;
-      bba.score += 50;
-      bbaSfxStomp();
-      if (e.kind === "cat"){ e.curl = true; e.vx = 0; e.h = 0.35; }
-      else { e.dead = true; e.mesh.visible = false; }
-    } else if (e.kind === "cat" && e.curl && Math.abs(p.vx) > 0.4){
-      e.vx = Math.sign(p.face) * BBA_SPEED.kick;
-    } else if (!(e.kind === "cat" && e.curl && Math.abs(e.vx) < 0.2)){
-      bbaHurt();
-    }
-  }
-  if (inpBark()){
-    bbaSfxBark();
-    p.barkCd = 1.15;
-    bbaBurst(p.x + p.face * 0.45, p.y + 0.55, 0xffe7a0);
-    for (const e of bba.enemies){
-      if (e.dead) continue;
-      if (Math.abs(e.x-p.x) < 2.6 && Math.abs(e.y-p.y) < 1.6) e.stun = 1;
-    }
-  }
-  if (bba.goal && p.x > bba.goal.x && p.x < bba.goal.x + bba.goal.w && Math.abs(p.y - bba.goal.y) < 1.2){
-    const bonus = Math.max(0, Math.round((150 - bba.time) * 8));
-    bba.score += bonus;
-    bba.timeBonus = bonus;
-    bba.phase = "clear";
-    bba.menuI = 0;
-    bba.displayScore = 0;
-    bbaSaveBest(bba.score);
-    bbaPaintMenu();
-  }
-  for (const bit of bba.bits){
-    bit.life -= dt;
-    bit.vy -= 10*dt;
-    bit.x += bit.vx*dt;
-    bit.y += bit.vy*dt;
-    bit.mesh.position.set(bit.x, bit.y, 0);
-    if (bit.life <= 0){ bit.mesh.visible = false; }
-  }
-  bba.bits = bba.bits.filter(b=>{
-    if (b.life > 0) return true;
-    if (b.mesh && b.mesh.parent) b.mesh.parent.remove(b.mesh);
-    if (b.mesh && b.mesh.geometry) b.mesh.geometry.dispose();
-    if (b.mesh && b.mesh.material) b.mesh.material.dispose();
-    return false;
-  });
-}
-function inpBark(){
-  return bba.inp.barkEdge && bba.p.barkCd <= 0;
-}
-
-function bbaSyncDog(){
-  const p = bba.p;
-  const d = bba.dog;
-  if (!d || !p) return;
-  const s = p.big ? 1.55 : 1;
-  const crouch = p.crouch ? 0.72 : 1;
-  const stretch = p.onGround ? 1 : 1 + Math.max(-0.14, Math.min(0.16, p.vy * 0.012));
-  const vis = 1.18;
-  d.group.position.set(p.x, p.y, 0);
-  d.group.scale.set((p.face || 1) * s * vis / Math.pow(stretch, 0.4), s * crouch * stretch * vis, s * vis);
-  if (bba.phase === "clear") d.group.rotation.y = bba.spin || 0;
-  else d.group.rotation.y = 0;
-  const moving = Math.abs(p.vx) > 0.35 && p.onGround;
-  const swing = moving ? Math.sin(p.runPhase) * 0.75 : 0;
-  d.legs[0].rotation.z = swing;
-  d.legs[1].rotation.z = swing;
-  d.legs[2].rotation.z = -swing;
-  d.legs[3].rotation.z = -swing;
-  const wagT = bba.clock || bba.time || 0;
-  if (!moving) d.tail.rotation.z = Math.sin(wagT * 8) * 0.6;
-  else d.tail.rotation.z = 0.28 + Math.sin(p.runPhase) * 0.18;
-  if (d.body && d.body.userData.base){
-    const b = d.body.userData.base;
-    const breathe = (!moving && p.onGround) ? 1 + Math.sin(wagT * 2.5) * 0.045 : 1;
-    d.body.scale.set(b[0], b[1] * breathe, b[2]);
-  }
-  const ear = p.onGround ? 0 : -0.5 + Math.sin(wagT * 16) * 0.18;
-  d.ears[0].rotation.z = ear;
-  d.ears[1].rotation.z = -ear;
-  const blink = p.iframes > 0 && Math.sin(wagT * 30) > 0;
-  d.group.visible = !blink;
-  if (p.inv > 0){
-    d.fur.emissive = d.fur.emissive || new bba.THREE.Color();
-    d.fur.emissive.set("#ffe08a");
-    d.fur.emissiveIntensity = 0.4 + Math.sin(wagT * 22) * 0.28;
-  } else if (d.fur.emissive){
-    d.fur.emissiveIntensity = 0;
-  }
-}
-
-function bbaReadInput(){
-  const pad = bbaReadPad();
-  const left = !!(pad.left || keys.has("ArrowLeft") || bba.touch.left);
-  const right = !!(pad.right || keys.has("ArrowRight") || bba.touch.right);
-  const down = !!(pad.down || keys.has("ArrowDown") || bba.touch.down);
-  const jump = !!(pad.jump || keys.has("Space") || keys.has("KeyX") || bba.touch.jump);
-  const run = !!(pad.run || keys.has("ShiftLeft") || keys.has("ShiftRight") || bba.touch.run);
-  const bark = !!(pad.bark || keys.has("KeyZ") || bba.touch.bark);
-  const lookL = !!(pad.l || keys.has("KeyQ"));
-  const lookR = !!(pad.r || keys.has("KeyE"));
-  const prev = bba._prev || {};
-  bba.inp = {
-    left, right, down, jump, run, bark, lookL, lookR,
-    jumpEdge: jump && !prev.jump,
-    jumpRelease: !jump && prev.jump,
-    barkEdge: bark && !prev.bark,
-    upEdge: (keys.has("ArrowUp") || pad.up) && !prev.up,
-    downEdge: (keys.has("ArrowDown") || pad.down) && !prev.down,
-    startEdge: pad.startEdge || bbaKeyEdge("Enter"),
-    selectEdge: pad.selectEdge
-  };
-  bba._prev = { jump, bark, up: keys.has("ArrowUp") || pad.up, down: keys.has("ArrowDown") || pad.down };
-}
-function bbaKeyEdge(code){
-  const down = keys.has(code);
-  const prev = !!bba.keyPrev[code];
-  bba.keyPrev[code] = down;
-  return down && !prev;
-}
-function bbaReadPad(){
-  const out = { left:false, right:false, up:false, down:false, jump:false, run:false, bark:false, l:false, r:false, startEdge:false, selectEdge:false };
-  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-  let gp = null;
-  for (let i=0;i<(pads?pads.length:0);i++) if (pads[i] && pads[i].connected){ gp = pads[i]; break; }
-  const was = bba.padOn;
-  bba.padOn = !!gp;
-  if (gp && !was){ bba.toastT = 2.4; bba.toast = "Controller connected"; }
-  if (!gp) return out;
-  const b = gp.buttons;
-  const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
-  const dead = 0.42;
-  const pressed = i => !!(b[i] && (b[i].pressed || b[i].value > 0.5));
-  out.left = pressed(14) || ax < -dead;
-  out.right = pressed(15) || ax > dead;
-  out.up = pressed(12) || ay < -dead;
-  out.down = pressed(13) || ay > dead;
-  const map = bba.padMap;
-  if (bba.phase === "setup"){
-    // Wait for a clean press, then store that button and move on.
-    let hit = -1;
-    for (let i=0;i<b.length;i++) if (pressed(i)){ hit = i; break; }
-    if (hit < 0) bba.setupWait = false;
-    else if (!bba.setupWait){
-      const order = ["jump","run","bark","start","select","l","r"];
-      const key = order[bba.setupI];
-      bba.padMap[key] = hit;
-      if (key === "jump") bba.padMap.jump2 = hit;
-      bba.setupI += 1;
-      bba.setupWait = true;
-      if (bba.setupI >= order.length){
-        bbaSavePad(bba.padMap);
-        bba.phase = "title";
-        bba.menuI = 0;
-        bba.toast = "Controller saved";
-        bba.toastT = 2;
-      }
-      bbaPaintMenu();
-    }
-    return out;
-  }
-  out.jump = pressed(map.jump) || pressed(map.jump2);
-  out.run = pressed(map.run);
-  out.bark = pressed(map.bark);
-  out.l = pressed(map.l);
-  out.r = pressed(map.r);
-  const st = pressed(map.start), sel = pressed(map.select);
-  out.startEdge = st && !bba.btnPrev.start;
-  out.selectEdge = sel && !bba.btnPrev.select;
-  bba.btnPrev.start = st;
-  bba.btnPrev.select = sel;
-  return out;
-}
-
-function bbaMenuItems(){
-  if (bba.phase === "title") return [["start","Start"], ["setup","Controller Setup"]];
-  if (bba.phase === "pause") return [["resume","Resume"], ["setup","Controller Setup"], ["quit","Quit to arcade"]];
-  if (bba.phase === "quit") return [["no","Keep playing"], ["yes","Quit to arcade"]];
-  if (bba.phase === "over") return [["again","Try again"], ["arcade","Back to the arcade"]];
-  if (bba.phase === "clear") return [["again","Play the stage again"], ["arcade","Back to the arcade"]];
-  return [];
-}
-function bbaPaintMenu(){
-  if (!bba || !bba.root) return;
-  const menu = bba.root.querySelector("#bba-menu");
-  if (!menu) return;
-  if (bba.phase === "play" || bba.phase === "loading"){ menu.hidden = true; return; }
-  menu.hidden = false;
-  if (bba.phase === "setup"){
-    const names = ["Jump (B)","Run (Y)","Bark (A)","Start","Select","L","R"];
-    menu.innerHTML = "<h2>Controller Setup</h2><p>Press "+names[Math.min(bba.setupI, names.length-1)]+" on the pad.</p><p>Escape cancels.</p>";
-    return;
-  }
-  const items = bbaMenuItems();
-  if (bba.menuI >= items.length) bba.menuI = 0;
-  let title = "Bernard's Big Adventure";
-  let sub = "Press Start. Run the yard, jump the hydrants, bark. A bone makes him big.";
-  if (bba.phase === "pause"){ title = "Paused"; sub = "The neighborhood can wait."; }
-  if (bba.phase === "quit"){ title = "Quit to arcade?"; sub = "This run will end."; }
-  if (bba.phase === "over"){ title = "Oh no"; sub = "Out of lives. Score "+bba.score+"."; }
-  if (bba.phase === "clear"){ title = "Stage Clear!"; sub = "He made it home."+(bba.timeBonus?" Time bonus "+bba.timeBonus+".":""); }
-  const buttons = items.map((it,i)=>'<button type="button" class="'+(i===bba.menuI?"on":"")+'" data-i="'+i+'">'+it[1]+"</button>").join("");
-  const hint = bba.phase==="title" ? "<p>D-pad moves. B or Start chooses. Arrows and Enter work too.</p>" : "";
-  menu.innerHTML = "<h2>"+title+"</h2><p>"+sub+"</p>"+buttons+hint;
-  menu.querySelectorAll("button").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      bba.menuI = +btn.getAttribute("data-i");
-      bbaConfirm();
-    });
-  });
-}
-function bbaConfirm(){
-  const items = bbaMenuItems();
-  const id = (items[bba.menuI] || items[0] || ["noop"])[0];
-  if (id === "start" || id === "again"){
-    bbaRebuild();
-    bba.phase = "play";
-    bba.lives = 3;
-  } else if (id === "setup"){
-    bba.phase = "setup";
-    bba.setupI = 0;
-    bba.setupWait = true;
-  } else if (id === "resume"){
-    bba.phase = "play";
-  } else if (id === "no"){
-    bba.phase = bba._quitFrom || "title";
-  } else if (id === "quit"){
-    bba._quitFrom = "pause";
-    bba.phase = "quit";
-    bba.menuI = 0;
-  } else if (id === "yes" || id === "arcade"){
-    bbaQuit();
-    return;
-  }
-  bbaPaintMenu();
+function bbaTogglePause(){
+  if (!bba) return;
+  if (bba.phase === "play"){ bba.phase = "pause"; bba.menuI = 0; return; }
+  if (bba.phase === "pause"){ bba.phase = "play"; bba.player.jumpLock = true; return; }
+  if (bba.phase === "title"){ bbaBegin(); return; }
+  if (bba.phase === "over"){ bbaReset(); bba.phase = "play"; bba.player.jumpLock = true; return; }
+  if (bba.phase === "tally"){ bbaQuit(); return; }
+  if (bba.phase === "quit"){ bba.phase = bba.quitBack || "play"; return; }
 }
 function bbaQuit(){
   bbaShutdown();
   goHome();
-}
-function bbaSelect(){
-  if (!bba) return;
-  if (bba.phase === "setup"){ bba.phase = "title"; bba.menuI = 0; bbaPaintMenu(); return; }
-  if (bba.phase === "quit"){ bba.phase = bba._quitFrom || "title"; bbaPaintMenu(); return; }
-  if (bba.phase === "loading") return;
-  bba._quitFrom = bba.phase;
-  bba.phase = "quit";
-  bba.menuI = 0;
-  bbaPaintMenu();
-}
-function bbaTogglePause(){
-  if (!bba) return;
-  if (bba.phase === "play"){ bba.phase = "pause"; bba.menuI = 0; bbaPaintMenu(); }
-  else if (bba.phase === "pause"){ bba.phase = "play"; bbaPaintMenu(); }
-  else bbaConfirm();
-}
-
-function bbaHud(){
-  const hud = bba.root.querySelector("#bba-hud");
-  if (!hud) return;
-  const show = bba.phase==="clear" ? Math.round(bba.displayScore) : bba.score;
-  const t = Math.max(0, Math.floor(bba.time));
-  const mm = String(Math.floor(t/60)).padStart(1,"0");
-  const ss = String(t%60).padStart(2,"0");
-  const big = bba.p && bba.p.big ? "BIG" : "small";
-  const inv = bba.p && bba.p.inv>0 ? " · glow "+bba.p.inv.toFixed(0)+"s" : "";
-  hud.innerHTML =
-    '<div class="bba-pill"><small>BALLS</small>'+bba.ballN+'</div>'+
-    '<div class="bba-pill"><small>SCORE</small>'+show+'</div>'+
-    '<div class="bba-pill"><small>LIVES</small>'+bba.lives+'</div>'+
-    '<div class="bba-pill"><small>TIME</small>'+mm+':'+ss+'</div>'+
-    '<div class="bba-pill"><small>BERNARD</small>'+big+inv+'</div>';
-  const toast = bba.root.querySelector("#bba-toast");
-  if (toast){
-    toast.hidden = bba.toastT <= 0;
-    if (bba.toastT > 0) toast.textContent = bba.toast || "";
-  }
-}
-
-function bbaFrame(dt){
-  if (!bba || !bba.renderer) return;
-  bba.clock = (bba.clock || 0) + dt;
-  if (bba.phase === "play") bba.time += dt;
-  if (bba.toastT > 0) bba.toastT -= dt;
-  bbaReadInput();
-  if (bba.inp.selectEdge) bbaSelect();
-  if (!bba) return;
-
-  if (bba.phase === "play"){
-    if (bba.inp.startEdge) bbaTogglePause();
-    else {
-      bbaStepPlayer(dt);
-      if (bba && bba.phase === "play") bbaStepWorld(dt);
-    }
-  } else if (bba.phase !== "setup" && bba.phase !== "loading"){
-    const items = bbaMenuItems();
-    if (items.length){
-      if (bba.inp.upEdge){
-        bba.menuI = (bba.menuI - 1 + items.length) % items.length;
-        bbaPaintMenu();
-      }
-      if (bba.inp.downEdge){
-        bba.menuI = (bba.menuI + 1) % items.length;
-        bbaPaintMenu();
-      }
-      // D-pad moves the highlight. B chooses. Start confirms.
-      if ((bba.inp.startEdge || bba.inp.jumpEdge) && bba) bbaConfirm();
-    }
-    if (bba && bba.phase === "clear"){
-      bba.spin += dt * 7;
-      bba.displayScore = Math.min(bba.score, bba.displayScore + dt * Math.max(80, bba.score * 0.65));
-      if (!bba.winPlayed){ bba.winPlayed = true; bbaSfxWin(); bbaSfxBark(); }
-    }
-  }
-  if (!bba || !bba.renderer) return;
-
-  for (const c of bba.clouds || []){
-    const span = 180;
-    const base = c.userData.baseX || 0;
-    c.position.x = ((base + bba.clock * 1.4) % span) - 12;
-  }
-  const px = bba.p ? bba.p.x : 0;
-  if (bba.near) bba.near.position.x = px * 0.14;
-  if (bba.mid) bba.mid.position.x = px * 0.36;
-  if (bba.far) bba.far.position.x = px * 0.62;
-  if (bba.goal && bba.goal.mesh && bba.goal.mesh.userData.flag){
-    bba.goal.mesh.userData.flag.rotation.z = Math.sin(bba.clock * 3) * 0.28;
-  }
-  for (const plat of bba.plats || []){
-    if (bba.phase !== "play" && plat.moving){
-      plat.x = plat.origin + Math.sin(bba.clock * 1.15 + plat.phase) * plat.range;
-      plat.mesh.position.x = plat.x + plat.w / 2;
-    }
-  }
-  for (const b of bba.balls || []){
-    if (b.got || !b.mesh) continue;
-    b.mesh.position.y = b.y + Math.sin(bba.clock * 3 + (b.ph || 0)) * 0.08;
-    b.mesh.rotation.y += dt * 3;
-  }
-  for (const s of bba.solids || []){
-    if (!s.mesh || s.gone || s.used) continue;
-    if (s.kind === "box" || s.kind === "bonebox"){
-      s.mesh.position.y = s.baseY + Math.sin(bba.clock * 3.1 + s.x) * 0.07;
-      s.mesh.rotation.y = Math.sin(bba.clock * 1.2 + s.x * 0.5) * 0.15;
-    }
-  }
-  bbaSyncDog();
-  const p = bba.p;
-  if (!p) return;
-  const wantLook = (bba.inp.lookR ? 3.2 : 0) - (bba.inp.lookL ? 3.2 : 0);
-  bba.look += (wantLook - bba.look) * Math.min(1, dt * 6);
-  const cam = bba.camera;
-  cam.position.set(p.x + bba.look, p.y + 1.4, 12.15);
-  cam.lookAt(p.x + bba.look * 0.35, p.y + 1.4, 0);
-  const sun = bba.sun;
-  sun.position.set(p.x - 11, p.y + 15, 9);
-  sun.target.position.set(p.x, p.y, 0);
-  sun.target.updateMatrixWorld();
-  const s = 9;
-  sun.shadow.camera.left = -s;
-  sun.shadow.camera.right = s;
-  sun.shadow.camera.top = s;
-  sun.shadow.camera.bottom = -s;
-  sun.shadow.camera.updateProjectionMatrix();
-  bbaHud();
-  bba.renderer.render(bba.scene, cam);
-}
-
-function bbaResize(){
-  if (!bba || !bba.renderer) return;
-  const stage = document.getElementById("stage");
-  const w = stage.clientWidth || 900;
-  const h = stage.clientHeight || 680;
-  bba.renderer.setSize(w, h, false);
-  bba.camera.aspect = w / h;
-  bba.camera.updateProjectionMatrix();
 }
 
 window.bbaOpen = bbaOpen;
