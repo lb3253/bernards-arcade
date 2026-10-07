@@ -275,7 +275,7 @@ function chunky(c,txt,x,y,size,fill,stroke,weight){
 
 // ---------------------------------------------------------------- audio
 let audioOn=true, glare=true, ac=null;
-const ARCADE_FLASH = {flap:false, hop:false, air:false, ballies:false, memo:false, catch:false, bba:false};
+const ARCADE_FLASH = {flap:false, hop:false, air:false, ballies:false, memo:false, catch:false, bba:false, brt:false};
 function beep(f,dur,type,vol){
   if (!audioOn) return;
   try{
@@ -510,7 +510,7 @@ let pointer={down:false,x:0,y:0};
 const GP = { idx:null, id:"", prev:{}, focus:0, lastScreen:"", navHold:0, lastBtn:"" };
 
 const GP_ITEMS = {
-  home:     ["pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickCatch","pickBba"],
+  home:     ["pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickCatch","pickBba","pickBrt"],
   memomenu: ["memoStartBtn","memoBack"],
   catchmenu: ["catchStartBtn","catchBack"],
   menu:     ["startBtn","menuBack"],
@@ -614,9 +614,9 @@ function uiBack(){ const sc=gpScreen(); if (sc==="pause") quitToArcade(); else i
 
 // ---------------------------------------------------------------- lobby carousel
 const CAR = {
-  items:["pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickCatch","pickBba"],
-  flashKey:{pickFlap:"flap", pickHop:"hop", pickAir:"air", pickBallies:"ballies", pickMemo:"memo", pickCatch:"catch", pickBba:"bba"},
-  spill:{pickFlap:"rgba(80,190,255,.32)", pickHop:"rgba(110,220,90,.30)", pickAir:"rgba(255,90,160,.32)", pickBallies:"rgba(255,207,58,.30)", pickMemo:"rgba(170,110,255,.32)", pickCatch:"rgba(255,140,60,.34)", pickBba:"rgba(90,190,255,.34)"},
+  items:["pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickCatch","pickBba","pickBrt"],
+  flashKey:{pickFlap:"flap", pickHop:"hop", pickAir:"air", pickBallies:"ballies", pickMemo:"memo", pickCatch:"catch", pickBba:"bba", pickBrt:"brt"},
+  spill:{pickFlap:"rgba(80,190,255,.32)", pickHop:"rgba(110,220,90,.30)", pickAir:"rgba(255,90,160,.32)", pickBallies:"rgba(255,207,58,.30)", pickMemo:"rgba(170,110,255,.32)", pickCatch:"rgba(255,140,60,.34)", pickBba:"rgba(90,190,255,.34)", pickBrt:"rgba(255,140,60,.36)"},
   index:0, pos:0, vel:0, target:0, bounce:0,
   tiltX:0, tiltY:0, wantTiltX:0, wantTiltY:0,
   drag:null, lastIdx:-1, chaseT:0, ready:false
@@ -662,6 +662,29 @@ function carouselLaunch(){
   else if (id==="pickMemo") openMemo();
   else if (id==="pickCatch") openCatch();
   else if (id==="pickBba") bbaOpen();
+  else if (id==="pickBrt") brtOpen();
+}
+function brtOpen(){
+  if (!window.BRT || typeof window.BRT.start!=="function") return;
+  hideAll();
+  menuHumStop();
+  try{ if (typeof musicStop==="function") musicStop(true); }catch(e){}
+  setMark("brt");
+  MODE="brt";
+  const root=document.getElementById("brt-root");
+  if (root) root.classList.add("on");
+  let seen=0;
+  try{ seen=+localStorage.getItem("brt_best")||0; }catch(e){}
+  window.BRT.onQuit=function(){
+    const r=document.getElementById("brt-root");
+    if (r) r.classList.remove("on");
+    try{
+      const now=+localStorage.getItem("brt_best")||0;
+      if (now>seen) ARCADE_FLASH.brt=true;
+    }catch(e){}
+    goHome();
+  };
+  window.BRT.start();
 }
 function carouselOnClick(id){
   const i=CAR.items.indexOf(id);
@@ -1128,6 +1151,17 @@ function pollGamepad(){
     gpEdge("face", face);
     return;
   }
+  if (MODE==="brt"){
+    // Road Trip reads the pad itself. From its title, Select still steps back to the picker.
+    const selEdge = gpEdge("selPlay", selB);
+    gpEdge("pausePlay", startB);
+    gpEdge("face", face);
+    if (selEdge && window.BRT && window.BRT.state==="title" && typeof window.BRT.onQuit==="function"){
+      try{ window.BRT.stop(); }catch(err){}
+      window.BRT.onQuit();
+    }
+    return;
+  }
   gpApplyFocus();   // clears the ring once a round is running
   // only touch an arrow when the pad changes it, so keyboard/remote arrows keep working
   const padDir=(name,on,key)=>{
@@ -1206,6 +1240,14 @@ addEventListener("keydown",e=>{
       if (code==="KeyP") bbaTogglePause();
       else bbaSelect();
       e.preventDefault(); return;
+    }
+    if (MODE==="brt"){
+      e.preventDefault();
+      if (!e.repeat && window.BRT && window.BRT.state==="title" && typeof window.BRT.onQuit==="function"){
+        try{ window.BRT.stop(); }catch(err){}
+        window.BRT.onQuit();
+      }
+      return;
     }
     togglePause(); e.preventDefault(); return;
   }
@@ -1314,6 +1356,7 @@ function actionDown(){
   else if (MODE==="memo"){ /* Bernard Says reads its buttons itself */ }
   else if (MODE==="catch") catchJump();
   else if (MODE==="bba") return;
+  else if (MODE==="brt") return;
   else startCharge();
 }
 function actionUp(){
@@ -8812,6 +8855,7 @@ function frame(now){
       else if (MODE==="memo"){ if (M){ if(!PAUSED) updateMemo(d); drawMemo(); } }
       else if (MODE==="catch"){ if (C){ if(!PAUSED) updateCatch(d); drawCatch(); } }
       else if (MODE==="bba"){ /* Bernard's Big Adventure draws on its own canvas */ }
+      else if (MODE==="brt"){ /* Bernard's Road Trip draws on its own canvas */ }
       else { if (G){ if(!PAUSED) update(d); draw(); } }
     }
   }catch(err){
@@ -9171,6 +9215,7 @@ const MARKS={
   hop:   ["Lane Hoppers","BERNARD"],
   catch: ["Catch with","BERNARD"],
   bba:   ["Bernard's","ADVENTURE"],
+  brt:   ["Bernard's","ROAD TRIP"],
   memo:  ["Bernard","SAYS"],
   jeep:  ["Bernard Goes","OFF ROAD"]
 };
@@ -9201,9 +9246,13 @@ function refreshBests(){
   set("bestMemo",get("memo_best"));
   set("bestCatch",get("catch_best"));
   set("bestBba",get("bba_best"));
+  set("bestBrt",get("brt_best"));
 }
 function goHome(){
   if (typeof bbaShutdown==="function") bbaShutdown();
+  if (MODE==="brt" && window.BRT && typeof window.BRT.stop==="function"){ try{ window.BRT.stop(); }catch(e){} }
+  const brtRoot=document.getElementById("brt-root");
+  if (brtRoot) brtRoot.classList.remove("on");
   refreshBests();
   hideAll(); homeEl.classList.add("on"); setMark("home");
   MODE="ballies";
@@ -9315,14 +9364,14 @@ function updateStar(){
   const id=(GP_ITEMS.home||[])[GP.focus]||"pickFlap";
   const air=id==="pickAir";
   const hop=id==="pickHop";
-  const yard=id==="pickBallies", memo=id==="pickMemo", cat=id==="pickCatch", bbaCard=id==="pickBba";
-  const which=bbaCard?"bba":cat?"catch":memo?"memo":yard?"yard":hop?"hop":air?(A_PLANE==="jet"?"jet":"air"):"flap";
+  const yard=id==="pickBallies", memo=id==="pickMemo", cat=id==="pickCatch", bbaCard=id==="pickBba", brtCard=id==="pickBrt";
+  const which=brtCard?"brt":bbaCard?"bba":cat?"catch":memo?"memo":yard?"yard":hop?"hop":air?(A_PLANE==="jet"?"jet":"air"):"flap";
   if (img.getAttribute("data-which")===which){ img.style.opacity="1"; return; }
   img.style.opacity="0";
   setTimeout(()=>{
     img.src=hop?"/art/bernard-portrait.jpg":air?(which==="jet"?"/art/bernard-jet-portrait.jpg":"/art/bernard-pilot-portrait.jpg"):"/art/bernard-portrait.jpg";
     img.setAttribute("data-which",which);
-    if (cap) cap.textContent=bbaCard?"Big adventure":cat?"Catch!":memo?"Simon says":yard?"Ball thief":hop?"The hoppers":air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
+    if (cap) cap.textContent=brtCard?"Road trip":bbaCard?"Big adventure":cat?"Catch!":memo?"Simon says":yard?"Ball thief":hop?"The hoppers":air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
     img.style.opacity="1";
   },90);
 }
