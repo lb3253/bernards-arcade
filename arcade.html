@@ -389,7 +389,7 @@
   </div>
 </div>
 
-<script>window.BRT_NO_AUTOSTART=true;window.BRT_SHOW_ROUTES=true;</script>
+<script>window.BRT_NO_AUTOSTART=true;</script>
 <script src="arcade.js"></script>
 <script>
 /* =====================================================================
@@ -540,31 +540,9 @@ function bernardHead(g, x, y, s, earFlap, tongue, dizzy) {
   else { g.beginPath(); g.moveTo(-5, 18.5); g.quadraticCurveTo(0, 22, 5, 18.5); g.strokeStyle = C.out; g.lineWidth = 1.6; g.stroke(); }
   g.restore();
 }
-function hairLock(g, x0, y0, cx, cy, x1, y1, w0, w1, fill, edge) {
-  const steps = 8, pts = [];
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps, u = 1 - t;
-    pts.push({ x: u * u * x0 + 2 * u * t * cx + t * t * x1, y: u * u * y0 + 2 * u * t * cy + t * t * y1 });
-  }
-  const left = [], right = [];
-  for (let i = 0; i < pts.length; i++) {
-    const t = i / (pts.length - 1), w = w0 + (w1 - w0) * t;
-    const p = pts[i], A = pts[Math.max(0, i - 1)], B = pts[Math.min(pts.length - 1, i + 1)];
-    let dx = B.x - A.x, dy = B.y - A.y, len = Math.hypot(dx, dy) || 1; dx /= len; dy /= len;
-    left.push([p.x - dy * w, p.y + dx * w]); right.push([p.x + dy * w, p.y - dx * w]);
-  }
-  g.beginPath(); g.moveTo(left[0][0], left[0][1]);
-  for (let i = 1; i < left.length; i++) g.lineTo(left[i][0], left[i][1]);
-  for (let i = right.length - 1; i >= 0; i--) g.lineTo(right[i][0], right[i][1]);
-  g.closePath(); fs(g, fill, edge, 1.15);
-  g.beginPath(); g.moveTo(pts[1].x, pts[1].y);
-  for (let i = 2; i < pts.length - 1; i++) g.lineTo(pts[i].x, pts[i].y);
-  g.strokeStyle = 'rgba(255,236,220,.22)'; g.lineWidth = Math.max(0.8, w0 * 0.22); g.stroke();
-}
 function drawJeep(g, steer, earFrame, braking, boost, dizzy, hair, kids) {
-  // design box 220 x 190, origin top-left. steer: -1 left, 0, 1 right. hair: {amp 0..2, frame 0..3}. kids: Nic + Giulia in the back seat
+  // design box 220 x 190, origin top-left. steer: -1 left, 0, 1 right. kids: Nic + Giulia in the back seat
   const sh = steer * 0.07, lean = steer * 4, flap = [-1, 0, 1][earFrame];
-  const amp = hair ? hair.amp : 0, ph = hair ? hair.frame * Math.PI / 3 : 0, sway = Math.sin(ph) * amp * 8, lift = amp * 6;
   g.save(); g.translate(110, 190); g.transform(1, 0, sh, 1, 0, 0); g.translate(-110, -190);
   // shadow
   ell(g, 110, 182, 96, 10); fs(g, 'rgba(0,0,0,.35)', null);
@@ -577,34 +555,15 @@ function drawJeep(g, steer, earFrame, braking, boost, dizzy, hair, kids) {
   g.fillStyle = '#2B2B30'; g.fillRect(34 - lean * 0.5, 56, 8, 18); g.fillRect(178 - lean * 0.5, 56, 8, 18);
   // front seats / headrests
   rr(g, 52 - lean * 0.6, 58, 44, 34, 8); fs(g, '#1F1F24', C.out, 2); rr(g, 124 - lean * 0.6, 58, 44, 34, 8); fs(g, '#1F1F24', C.out, 2);
-  // Tita, from behind. Separate filled locks so the hair reads, and the tips flap in the wind.
+  // Tita, from behind. Hair stays still.
   g.save(); g.translate(74 - lean * 0.7, 46);
-  const HAIR = '#3A241C', HAIR_M = '#5C3A2E', HAIR_D = '#241610';
-  const flapX = (k) => Math.sin(ph + k) * (4 + amp * 9);
-  const flapY = (k) => Math.cos(ph + k * 0.8) * (2 + amp * 4) - amp * 3;
-  const behind = [
-    [-8, 0, -24, -14 + flapY(0), -50 + flapX(0), -2 + flapY(0.5), 4.8, 0.85, HAIR_D],
-    [-6, 5, -20, 2 + flapY(1), -44 + flapX(1.3), 14 + flapY(1.1), 5.6, 1.05, HAIR],
-    [-4, 10, -16, 14, -34 + flapX(2.1), 22 + flapY(2), 4.0, 0.8, HAIR_M],
-    [6, -1, 22, -12 + flapY(3), 46 + flapX(3.2), 0 + flapY(3), 4.6, 0.8, HAIR_D],
-    [5, 6, 18, 6 + flapY(4), 38 + flapX(4.4), 16 + flapY(4.2), 5.0, 0.95, HAIR]
-  ];
-  for (const [x0, y0, cx, cy, x1, y1, w0, w1, col] of behind) hairLock(g, x0, y0, cx, cy, x1, y1, w0, w1, col, C.out);
-  ell(g, 0, 12, 16, 13); fs(g, HAIR_D, C.out, 1.6);
+  const HAIR = '#1E1A1A', HAIR_L = '#3A3236';
+  ell(g, 0, 14, 20, 20); fs(g, HAIR, C.out, 2.2);
   ell(g, 0, 0, 15, 15); fs(g, '#E6B892', C.out, 2.2);
-  g.beginPath(); g.moveTo(-14, 1); g.bezierCurveTo(-13, -16, 13, -16, 14, 1); g.bezierCurveTo(8, -4, -8, -4, -14, 1); g.closePath(); fs(g, HAIR_D, null);
-  g.beginPath(); g.moveTo(-7, -8); g.quadraticCurveTo(0, -13, 6, -7); g.strokeStyle = '#C4A090'; g.lineWidth = 2; g.stroke();
-  const front = [
-    [-13, -2, -30, -10 + flapY(0.4), -52 + flapX(0.2), 6 + flapY(0.7), 4.2, 0.75, HAIR],
-    [-12, 7, -26, 10, -40 + flapX(1.6), 18 + flapY(1.5), 3.8, 0.7, HAIR_M],
-    [13, -1, 28, -8 + flapY(3.3), 50 + flapX(3.1), 4 + flapY(3.5), 4.0, 0.75, HAIR],
-    [12, 8, 24, 12, 40 + flapX(4.7), 20 + flapY(4.5), 3.6, 0.65, HAIR_M]
-  ];
-  for (const [x0, y0, cx, cy, x1, y1, w0, w1, col] of front) hairLock(g, x0, y0, cx, cy, x1, y1, w0, w1, col, C.out);
-  const swing = Math.sin(ph) * (10 + amp * 14);
-  hairLock(g, 0, 9, swing * 0.35, 6 - amp * 3, swing, -2 - amp * 6, 5.2, 1.3, HAIR, C.out);
-  hairLock(g, 2, 10, swing * 0.7, 12, swing * 0.9 + 6, 8 - amp * 2, 3.4, 0.9, HAIR_M, C.out);
-  ell(g, swing * 0.12, 10, 4.5, 3.2); fs(g, '#E07A9C', C.out, 1.2);
+  g.beginPath(); g.moveTo(-15, 2); g.bezierCurveTo(-14, -16, 14, -16, 15, 2); g.bezierCurveTo(10, -4, -10, -4, -15, 2); g.closePath(); fs(g, HAIR, null);
+  g.beginPath(); g.moveTo(-16, 0); g.bezierCurveTo(-18, 10, -12, 22, -7, 32); g.lineTo(7, 32); g.bezierCurveTo(12, 22, 18, 10, 16, 0); g.closePath(); fs(g, HAIR, C.out, 2);
+  g.beginPath(); g.moveTo(-6, -8); g.quadraticCurveTo(0, -12, 7, -8); g.strokeStyle = HAIR_L; g.lineWidth = 2.5; g.stroke();
+  ell(g, 0, 13, 4, 3); fs(g, '#E07A9C', C.out, 1.2);
   g.beginPath(); g.arc(-14, 6, 3, 0, TAU); g.strokeStyle = C.gold; g.lineWidth = 1.5; g.stroke();
   g.restore();
   // Bernard (passenger) looking back at us
@@ -613,7 +572,7 @@ function drawJeep(g, steer, earFrame, braking, boost, dizzy, hair, kids) {
   if (kids) {
     const kid = (x, who) => { g.save(); g.translate(x - lean * 0.8, 56); g.scale(1.4, 1.4);
       if (who === 'nic') { ell(g, 0, 0, 13, 13); fs(g, '#D9A77A', C.out, 2); g.beginPath(); g.moveTo(-13, 0); g.bezierCurveTo(-12, -14, 12, -14, 13, 0); g.bezierCurveTo(8, -3, -8, -3, -13, 0); g.closePath(); fs(g, '#2B1A12', null); rr(g, -14, -6, 28, 9, 4); fs(g, '#2F6FD8', C.out, 1.8); rr(g, -17, -2, 10, 5, 2); fs(g, '#2F6FD8', C.out, 1.5); /* backwards cap */ }
-      else { for (const [sx, k, dir] of [[-9, 0, -1], [9, 1, 1]]) { const wob = Math.sin(ph + k * 2) * (0.5 + amp) * 6; hairLock(g, sx, 1, sx * 1.15 + wob * 0.35, 10, dir * (14 + amp * 4) + wob, 22 - amp, 3.3, 1.05, '#3B2314', C.out); } ell(g, 0, 0, 13, 13); fs(g, '#E6B892', C.out, 2); g.beginPath(); g.moveTo(-13, 1); g.bezierCurveTo(-12, -14, 12, -14, 13, 1); g.bezierCurveTo(8, -3, -8, -3, -13, 1); g.closePath(); fs(g, '#3B2314', null); ell(g, -5, -9, 4, 3, -0.5); fs(g, '#FF7FB1', C.out, 1.2); ell(g, 2, -9, 4, 3, 0.5); fs(g, '#FF7FB1', C.out, 1.2); ell(g, -1.5, -9, 1.8, 1.8); fs(g, '#FF7FB1', C.out, 1); }
+      else { for (const sx of [-10, 10]) { g.beginPath(); g.moveTo(sx, 4); g.quadraticCurveTo(sx * 1.4, 16, sx * 1.6, 28); g.strokeStyle = C.out; g.lineWidth = 7; g.stroke(); g.strokeStyle = '#3B2314'; g.lineWidth = 5; g.stroke(); } ell(g, 0, 0, 13, 13); fs(g, '#E6B892', C.out, 2); g.beginPath(); g.moveTo(-13, 1); g.bezierCurveTo(-12, -14, 12, -14, 13, 1); g.bezierCurveTo(8, -3, -8, -3, -13, 1); g.closePath(); fs(g, '#3B2314', null); ell(g, -5, -9, 4, 3, -0.5); fs(g, '#FF7FB1', C.out, 1.2); ell(g, 2, -9, 4, 3, 0.5); fs(g, '#FF7FB1', C.out, 1.2); ell(g, -1.5, -9, 1.8, 1.8); fs(g, '#FF7FB1', C.out, 1); }
       g.restore(); };
     kid(96, 'nic'); kid(126, 'giulia');
   }
@@ -1016,7 +975,7 @@ function forkSign(leftName, rightName) { return sprite('forksign_' + leftName + 
 // game jumps between them at the split and at the rejoin, so the drive always feels continuous.
 function fork(leftName, rightName, leftBuild, rightBuild, offroadSide) {
   const stage = curStage, id = forks.length;
-  for (let i = 0; i < 70; i++) { addSegment(0, lastY(), stage); const sg = segments[segments.length - 1]; sg.fork = Math.min(1, i / 38); sg.forkApproach = id; }
+  for (let i = 0; i < 70; i++) { addSegment(0, lastY(), stage); const sg = segments[segments.length - 1]; sg.fork = Math.min(1, i / 55); sg.forkApproach = id; }
   const decision = segments.length - 1, yD = lastY(); segments[decision].forkId = id;
   const merge = (branch) => { for (let i = 0; i < 40; i++) { addSegment(0, lastY(), stage); const sg = segments[segments.length - 1]; sg.fork = 1 - i / 40; sg.branch = branch; } };
   const L0 = segments.length; merge('L'); const Lb = segments.length; leftBuild(); levelTo(yD); const L1 = segments.length;
@@ -1024,7 +983,7 @@ function fork(leftName, rightName, leftBuild, rightBuild, offroadSide) {
   for (let i = 0; i < 6; i++) { addSegment(0, lastY(), stage); segments[segments.length - 1].fork = 1; segments[segments.length - 1].buffer = true; }
   forceStartY = yD; const R0 = segments.length; merge('R'); const Rb = segments.length; rightBuild(); levelTo(yD); const R1 = segments.length;
   for (let k = Rb; k < R1; k++) { segments[k].branch = 'R'; if (offroadSide === 'R') segments[k].offroad = true; }
-  segments[L1 - 1].jumpTo = R1;
+  segments[L1 - 1].jumpDelta = R1 - L1;
   const f = { id, decision, L0, Lb, L1, R0, Rb, R1, leftName, rightName, offroadSide, chosen: null, signAt: decision - 64 };
   forks.push(f); return f;
 }
@@ -1398,20 +1357,14 @@ function updatePlaying(dt) {
   else if (inp.gas) speed += (TUNE.maxSpeed / 5) * dt;
   else if (inp.brake) speed -= (TUNE.maxSpeed / 2.2) * dt;
   else speed -= (TUNE.maxSpeed / 5) * dt;
-  // forks: settle into a lane, then the chosen road becomes the road under the tires
-  settleFork(dt, playerSeg);
   const segNow = findSegment(position + playerZ);
-  glideFork(dt, segNow);
-  // off-road
-  const onLot = segNow.lot && playerX > 1, fkT = segNow.fork || 0;
-  const sepNow = fkT > 0.12 ? (fkT >= 0.98 ? 1.44 : forkSep(fkT)) : 0;
-  const roadEdge = sepNow ? Math.max(1, sepNow + 1.08) : 1;
-  const island = sepNow ? Math.max(0, sepNow - 0.92) : 0;
-  const committed = !!(segNow.branch && forks.some(f => f.chosen === segNow.branch));
+  const onLot = segNow.lot && playerX > 1, fkT = segNow.fork || 0, roadEdge = 1 + 1.3 * fkT, island = 0.5 * fkT;
   if (segNow.offroad) { bounce = rnd(-1, 1) * 1.6 * speedPct; if (frame % 4 === 0 && speedPct > 0.2) dust(W / 2 + rnd(-90, 90), H - 40, 1, route.id === 1 ? 'rgba(235,220,170,.8)' : 'rgba(190,160,110,.8)'); }
-  if ((Math.abs(playerX) > roadEdge || (island > 0.12 && Math.abs(playerX) < island && !committed)) && !onLot) { if (speed > TUNE.maxSpeed / 4 && boosting <= 0) speed -= (TUNE.maxSpeed / 2) * dt; if (frame % 3 === 0) dust(W / 2 + (playerX > 0 ? 120 : -120), H - 40, 2, stage === 1 ? 'rgba(180,220,255,.8)' : 'rgba(190,160,110,.8)'); bounce = rnd(-1, 1) * 2.5 * speedPct; }
+  if ((Math.abs(playerX) > roadEdge || (fkT > 0.2 && Math.abs(playerX) < island)) && !onLot) { if (speed > TUNE.maxSpeed / 4 && boosting <= 0) speed -= (TUNE.maxSpeed / 2) * dt; if (frame % 3 === 0) dust(W / 2 + (playerX > 0 ? 120 : -120), H - 40, 2, stage === 1 ? 'rgba(180,220,255,.8)' : 'rgba(190,160,110,.8)'); bounce = rnd(-1, 1) * 2.5 * speedPct; }
   else bounce *= 0.8;
-  speed = clamp(speed, 0, maxNow); playerX = clamp(playerX, -2.7 - fkT * 0.4, 2.7 + fkT * 0.4);
+  speed = clamp(speed, 0, maxNow); playerX = clamp(playerX, -2.4 - fkT, 2.4 + fkT);
+  if (segNow.forkId !== undefined) { const f = forks[segNow.forkId]; if (f && !f.chosen) { f.chosen = playerX >= 0 ? 'R' : 'L'; const name = f.chosen === 'R' ? f.rightName : f.leftName, dirtPick = f.offroadSide === f.chosen; if (f.chosen === 'R') position += (f.R0 - f.L0) * TUNE.segLen; floatText(W / 2, 230, (f.chosen === 'R' ? '▶ ' : '◀ ') + name, C.gold); say(dirtPick ? pick(['OFF-ROAD!! BUMPY!!', 'DIRT!! YES!!', 'ZOOM ZOOM!!']) : pick(['This way!', 'Smooth road!'])); titaBubble = { text: dirtPick ? 'Hold on, everybody!' : name + ', here we go.', life: 130 }; sfx.check(); } }
+  if (segNow.jumpDelta) position += segNow.jumpDelta * TUNE.segLen;
   // roadside collisions + pickups across the segments we cross this frame
   const stepSegs = Math.max(1, Math.ceil(speed * dt / TUNE.segLen));
   for (let k = 0; k < stepSegs + 1; k++) {
@@ -1577,91 +1530,20 @@ function drawBackdrop(pal, playerY) {
   const si = STAGES.indexOf(pal.a), sj = STAGES.indexOf(pal.b);
   draw(backdrops[si], 1 - pal.t, hillOff); if (pal.t > 0) draw(backdrops[sj], pal.t, hillOff);
 }
-function forkSep(fk) {
-  const x = clamp((fk - 0.1) / 0.42, 0, 1), open = x * x * (3 - 2 * x);
-  return 1.44 * open;
-}
-function forkGeom(fk, chosen) {
-  const sep = chosen ? 1.44 * clamp(fk, 0, 1) : forkSep(fk);
-  if (!chosen) return { cL: -sep, cR: sep, aL: 1, aR: 1, single: sep < 0.78 };
-  const close = clamp(1 - fk, 0, 1), mouth = sep;
-  if (chosen > 0) return { cR: mouth, cL: -1.44 - 1.55 * close, aR: 1, aL: clamp(1 - close * 1.25, 0, 1), single: fk < 0.045 };
-  return { cL: -mouth, cR: 1.44 + 1.55 * close, aL: 1, aR: clamp(1 - close * 1.25, 0, 1), single: fk < 0.045 };
-}
-function forkChosenSign(seg) {
-  if (!seg) return 0;
-  const f = seg.branch ? forks.find(q => q.chosen === seg.branch) : seg.forkId !== undefined ? forks[seg.forkId] : seg.forkApproach !== undefined ? forks[seg.forkApproach] : null;
-  if (!f || !f.chosen) return 0;
-  return f.chosen === 'R' ? 1 : -1;
-}
-function settleFork(dt, seg) {
-  const fk = seg.fork || 0;
-  if ((seg.forkApproach !== undefined || seg.forkId !== undefined) && fk > 0.4) {
-    const f = forks[seg.forkApproach !== undefined ? seg.forkApproach : seg.forkId];
-    if (f && !f.chosen && Math.abs(playerX) > 0.2) {
-      const sign = playerX >= 0 ? 1 : -1, g = forkGeom(fk, 0), center = sign > 0 ? g.cR : g.cL;
-      playerX += (center - playerX) * Math.min(1, dt * 1.8);
-    }
-  }
-  if (seg.forkId !== undefined) {
-    const f = forks[seg.forkId];
-    if (f && !f.chosen) {
-      const side = Math.abs(playerX) < 0.1 ? (steer < -0.15 ? -1 : 1) : (playerX >= 0 ? 1 : -1);
-      f.chosen = side > 0 ? 'R' : 'L';
-      const name = side > 0 ? f.rightName : f.leftName, dirtPick = f.offroadSide === f.chosen;
-      const dest = side > 0 ? f.R0 : f.L0;
-      position += (dest - seg.index) * TUNE.segLen;
-      const mouth = forkGeom(1, side), lane = side > 0 ? mouth.cR : mouth.cL;
-      playerX += (lane - playerX) * 0.55;
-      floatText(W / 2, 230, (side > 0 ? '▶ ' : '◀ ') + name, C.gold);
-      say(dirtPick ? pick(['OFF-ROAD!! BUMPY!!', 'DIRT!! YES!!', 'ZOOM ZOOM!!']) : pick(['This way!', 'Smooth road!']));
-      titaBubble = { text: dirtPick ? 'Hold on, everybody!' : name + ', here we go.', life: 140 };
-      sfx.check();
-    }
-  }
-  if (seg.jumpTo != null) position += (seg.jumpTo - seg.index) * TUNE.segLen;
-}
-function glideFork(dt, seg) {
-  const sign = forkChosenSign(seg), fk = seg.fork || 0;
-  if (!sign || fk < 0.05) return;
-  const g = forkGeom(fk, sign), center = sign > 0 ? g.cR : g.cL;
-  playerX += (center - playerX) * Math.min(1, dt * 3.4);
-}
-function drawSplitHorizon(lastSeg, camX, camDX, playerY, camZ, n0, pal, maxy) {
-  let prev = lastSeg.p2, my = maxy, cx = camX;
-  const camY = playerY + TUNE.camH;
-  for (let i = 1; i < TUNE.drawDist - n0; i++) {
-    const p = { world: { y: prev.world.y, z: prev.world.z + TUNE.segLen }, camera: {}, screen: {} };
-    project(p, cx - camDX, camY, camZ); cx -= camDX;
-    const n = n0 + i, fog = Math.exp(-(n / TUNE.drawDist) * (n / TUNE.drawDist) * TUNE.fog * 0.6);
-    if (p.camera.z <= camDepth || p.screen.y >= prev.screen.y || p.screen.y >= my) { prev = p; continue; }
-    drawSegment(prev.screen.x, prev.screen.y, prev.screen.w, p.screen.x, p.screen.y, p.screen.w, fog, (n % 2) === 0, pal, false, false, false, 1, false, 0);
-    my = prev.screen.y; prev = p;
-  }
-}
-function drawSegment(x1, y1, w1, x2, y2, w2, fog, alt, pal, lot, water, brick, fk, dirt, chosen) {
+function drawSegment(x1, y1, w1, x2, y2, w2, fog, alt, pal, lot, water, brick, fk, dirt) {
   const DIRT = { roadL: '#A8794A', roadD: '#9D6E42', rumbleL: '#7FAA55', rumbleD: '#6F9A48', lane: '#8F6238' };
   const col = k => dirt && DIRT[k] ? DIRT[k] : brick && (k === 'roadL' || k === 'roadD') ? '#A2503E' : mixHex(pal.a[k], pal.b[k], pal.t);
   const r1 = w1 / 6, r2 = w2 / 6, l1 = w1 / 24, l2 = w2 / 24;
   ctx.fillStyle = col(alt ? 'grassL' : 'grassD'); ctx.fillRect(0, y2, W, y1 - y2);
-  const geom = fk > 0 ? forkGeom(fk, chosen || 0) : null;
-  if (geom && !geom.single) {
-    const lane = (c, alpha) => {
-      if (alpha < 0.04) return;
-      ctx.save(); ctx.globalAlpha = alpha;
-      const hw = 0.98, rum = 0.16;
-      const x1L = x1 + w1 * (c - hw), x1R = x1 + w1 * (c + hw), x2L = x2 + w2 * (c - hw), x2R = x2 + w2 * (c + hw);
-      poly(ctx, x1L - w1 * rum, y1, x1L, y1, x2L, y2, x2L - w2 * rum, y2, col(alt ? 'rumbleL' : 'rumbleD'));
-      poly(ctx, x1R, y1, x1R + w1 * rum, y1, x2R + w2 * rum, y2, x2R, y2, col(alt ? 'rumbleL' : 'rumbleD'));
-      poly(ctx, x1L, y1, x1R, y1, x2R, y2, x2L, y2, col(alt ? 'roadL' : 'roadD'));
-      const e = 0.05;
-      poly(ctx, x1L, y1, x1L + w1 * e, y1, x2L + w2 * e, y2, x2L, y2, col('lane'));
-      poly(ctx, x1R - w1 * e, y1, x1R, y1, x2R, y2, x2R - w2 * e, y2, col('lane'));
-      if (alt) { const m1 = x1 + w1 * c, m2 = x2 + w2 * c; poly(ctx, m1 - w1 * 0.035, y1, m1 + w1 * 0.035, y1, m2 + w2 * 0.035, y2, m2 - w2 * 0.035, y2, col('lane')); }
-      ctx.restore();
-    };
-    if ((chosen || 0) >= 0) { lane(geom.cL, geom.aL); lane(geom.cR, geom.aR); }
-    else { lane(geom.cR, geom.aR); lane(geom.cL, geom.aL); }
+  if (fk > 0) {
+    const e1 = w1 * (1 + 1.3 * fk), e2 = w2 * (1 + 1.3 * fk), i1 = w1 * 0.5 * fk, i2 = w2 * 0.5 * fk;
+    poly(ctx, x1 - e1 - r1, y1, x1 - e1, y1, x2 - e2, y2, x2 - e2 - r2, y2, col(alt ? 'rumbleL' : 'rumbleD'));
+    poly(ctx, x1 + e1 + r1, y1, x1 + e1, y1, x2 + e2, y2, x2 + e2 + r2, y2, col(alt ? 'rumbleL' : 'rumbleD'));
+    poly(ctx, x1 - e1, y1, x1 + e1, y1, x2 + e2, y2, x2 - e2, y2, col(alt ? 'roadL' : 'roadD'));
+    if (i1 > 0.6) { poly(ctx, x1 - i1, y1, x1 + i1, y1, x2 + i2, y2, x2 - i2, y2, col(alt ? 'grassL' : 'grassD')); poly(ctx, x1 - i1 - r1 * 0.6, y1, x1 - i1, y1, x2 - i2, y2, x2 - i2 - r2 * 0.6, y2, col(alt ? 'rumbleL' : 'rumbleD')); poly(ctx, x1 + i1, y1, x1 + i1 + r1 * 0.6, y1, x2 + i2 + r2 * 0.6, y2, x2 + i2, y2, col(alt ? 'rumbleL' : 'rumbleD')); }
+    poly(ctx, x1 - e1 - l1 * 0.9, y1, x1 - e1 + l1 * 0.9, y1, x2 - e2 + l2 * 0.9, y2, x2 - e2 - l2 * 0.9, y2, col('lane'));
+    poly(ctx, x1 + e1 - l1 * 0.9, y1, x1 + e1 + l1 * 0.9, y1, x2 + e2 + l2 * 0.9, y2, x2 + e2 - l2 * 0.9, y2, col('lane'));
+    if (alt) for (const sg of [-1, 1]) { const c1 = sg * (i1 + (e1 - i1) / 2), c2 = sg * (i2 + (e2 - i2) / 2); poly(ctx, x1 + c1 - l1 / 2, y1, x1 + c1 + l1 / 2, y1, x2 + c2 + l2 / 2, y2, x2 + c2 - l2 / 2, y2, col('lane')); }
     if (fog < 1) { ctx.globalAlpha = 1 - fog; ctx.fillStyle = col('fog'); ctx.fillRect(0, y1, W, y2 - y1); ctx.globalAlpha = 1; }
     return;
   }
@@ -1684,33 +1566,19 @@ function drawRoad() {
   drawSky(pal); drawBackdrop(pal, playerY);
   let maxy = H, x = 0, dx = -(base.curve * basePct);
   const N = segments.length;
-  let roadCut = Infinity;
   for (let n = 0; n < TUNE.drawDist; n++) {
-    const idx = base.index + n;
-    if (idx >= roadCut) break;
-    const seg = segments[idx % N];
+    const seg = segments[(base.index + n) % N];
     seg.looped = seg.index < base.index; seg.fog = Math.exp(-(n / TUNE.drawDist) * (n / TUNE.drawDist) * TUNE.fog * 0.6); seg.clip = maxy;
     const camZ = position - (seg.looped ? trackLength : 0);
     project(seg.p1, playerX * TUNE.roadW - x, playerY + TUNE.camH, camZ);
     project(seg.p2, playerX * TUNE.roadW - x - dx, playerY + TUNE.camH, camZ);
     x += dx; dx += seg.curve;
-    const unchosen = seg.forkId !== undefined && forks[seg.forkId] && !forks[seg.forkId].chosen;
-    const hidden = seg.p1.camera.z <= camDepth || seg.p2.screen.y >= seg.p1.screen.y || seg.p2.screen.y >= maxy;
-    if (!hidden) {
-      drawSegment(seg.p1.screen.x, seg.p1.screen.y, seg.p1.screen.w, seg.p2.screen.x, seg.p2.screen.y, seg.p2.screen.w, seg.fog, seg.alt, pal, seg.lot, seg.water, seg.brick, seg.fork, seg.offroad, forkChosenSign(seg));
-      maxy = seg.p1.screen.y;
-    }
-    if (unchosen) {
-      roadCut = seg.index + 1;
-      if (!hidden) drawSplitHorizon(seg, playerX * TUNE.roadW - x, dx, playerY, camZ, n, pal, maxy);
-      break;
-    }
+    if (seg.p1.camera.z <= camDepth || seg.p2.screen.y >= seg.p1.screen.y || seg.p2.screen.y >= maxy) continue;
+    drawSegment(seg.p1.screen.x, seg.p1.screen.y, seg.p1.screen.w, seg.p2.screen.x, seg.p2.screen.y, seg.p2.screen.w, seg.fog, seg.alt, pal, seg.lot, seg.water, seg.brick, seg.fork, seg.offroad);
+    maxy = seg.p1.screen.y;
   }
-  // sprites + cars, back to front — hide the untaken branch until a side is chosen
   for (let n = TUNE.drawDist - 1; n > 0; n--) {
-    const idx = base.index + n;
-    if (idx >= roadCut) continue;
-    const seg = segments[idx % N];
+    const seg = segments[(base.index + n) % N];
     if (seg.p1.camera.z <= camDepth) continue;
     for (const car of seg.cars) { const pct = (car.z % TUNE.segLen) / TUNE.segLen; const scale = lerp(seg.p1.screen.scale, seg.p2.screen.scale, pct), sx = lerp(seg.p1.screen.x, seg.p2.screen.x, pct) + scale * car.offset * TUNE.roadW * W / 2, sy = lerp(seg.p1.screen.y, seg.p2.screen.y, pct); drawSprite(car.s, scale, sx, sy, -0.5, -1, seg.clip); }
     for (const sp of seg.sprites) {
@@ -1721,8 +1589,7 @@ function drawRoad() {
   }
   // player
   const steerIdx = steer < -0.3 ? 0 : steer > 0.3 ? 2 : 1; const earFrame = Math.floor(time * (6 + speed / TUNE.maxSpeed * 14)) % 3;
-  const spd = speed / TUNE.maxSpeed, hairAmp = spd < 0.08 ? 0 : spd < 0.5 ? 1 : 2, hairFrame = Math.floor(time * (4 + spd * 14)) % 6;
-  const js = jeepSprite(steerIdx, earFrame, inp.brake && speed > 0, boosting > 0, dizzy > 0, hairAmp, hairFrame, !!(route.story && storyKids));
+  const js = jeepSprite(steerIdx, earFrame, inp.brake && speed > 0, boosting > 0, dizzy > 0, 0, 0, !!(route.story && storyKids));
   const scale = camDepth / playerZ; const destW = js.ww * scale * (W / 2), destH = destW * js.h / js.w;
   const jx = W / 2 - destW / 2, jy = H - destH - 8 + bounce;
   if (boosting > 0) { const gl = ctx.createRadialGradient(W / 2, jy + destH * 0.6, 20, W / 2, jy + destH * 0.6, destW * 0.8); gl.addColorStop(0, 'rgba(255,200,80,.35)'); gl.addColorStop(1, 'rgba(255,200,80,0)'); ctx.fillStyle = gl; ctx.fillRect(jx - 150, jy - 100, destW + 300, destH + 200); }
@@ -1954,7 +1821,6 @@ function loop(ts) {
 }
 function start() {
   if (running) return; running = true; buildSprites(); buildBackdrops(); buildTrack(); goTitle();
-  if (window.BRT_SHOW_ROUTES) { window.BRT_SHOW_ROUTES = false; state = 'route'; routeIdx = 2; }
   window.addEventListener('keydown', onKeyDown); window.addEventListener('keyup', onKeyUp); window.addEventListener('blur', onBlur);
   document.addEventListener('visibilitychange', onVis); window.addEventListener('gamepadconnected', onGpc);
   setupTouch(); last = 0; raf = requestAnimationFrame(loop);
@@ -1971,7 +1837,7 @@ if (location.hash === '#sprites') {
   x = 10; for (const k of ['lamp', 'boat1', 'buoy', 'b1', 'b3', 'cone', 'finish', 'ballG', 'bone', 'puddle', 'flowers']) { const s = SPR[k]; const h = 120, w = h * s.w / s.h; ctx.drawImage(s.c, x, 390, w, h); x += w + 8; }
   x = 700; for (const s of [carSprites.sedan[0], carSprites.pickup[0], carSprites.semi[0]]) { const h = 150, w = h * s.w / s.h; ctx.drawImage(s.c, x, 220, w, h); x += w + 8; }
 } else {
-  const boot = () => { if (window.BRT_NO_AUTOSTART && typeof window.brtOpen === 'function') window.brtOpen(); else start(); };
+  const boot = () => { if (!window.BRT_NO_AUTOSTART) start(); };
   if (document.fonts && document.fonts.load) Promise.race([document.fonts.load('700 40px Fredoka'), new Promise(r => setTimeout(r, 1500))]).then(boot, boot); else boot();
 }
 })();
