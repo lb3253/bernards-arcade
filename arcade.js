@@ -510,7 +510,7 @@ let pointer={down:false,x:0,y:0};
 const GP = { idx:null, id:"", prev:{}, focus:0, lastScreen:"", navHold:0, lastBtn:"" };
 
 const GP_ITEMS = {
-  home:     ["pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickCatch","pickBba","pickBrt"],
+  home:     ["pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickBrt"],
   memomenu: ["memoStartBtn","memoBack"],
   catchmenu: ["catchStartBtn","catchBack"],
   menu:     ["startBtn","menuBack"],
@@ -614,7 +614,7 @@ function uiBack(){ const sc=gpScreen(); if (sc==="pause") quitToArcade(); else i
 
 // ---------------------------------------------------------------- lobby carousel
 const CAR = {
-  items:["pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickCatch","pickBba","pickBrt"],
+  items:["pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickBrt"],
   flashKey:{pickFlap:"flap", pickHop:"hop", pickAir:"air", pickBallies:"ballies", pickMemo:"memo", pickCatch:"catch", pickBba:"bba", pickBrt:"brt"},
   spill:{pickFlap:"rgba(80,190,255,.32)", pickHop:"rgba(110,220,90,.30)", pickAir:"rgba(255,90,160,.32)", pickBallies:"rgba(255,207,58,.30)", pickMemo:"rgba(170,110,255,.32)", pickCatch:"rgba(255,140,60,.34)", pickBba:"rgba(90,190,255,.34)", pickBrt:"rgba(255,140,60,.36)"},
   index:0, pos:0, vel:0, target:0, bounce:0,
@@ -8909,12 +8909,19 @@ const MEMO_POS = {
   y:    ()=>({x:MEMO_PAD.face.x-MEMO_PAD.face.off, y:MEMO_PAD.face.y}),
   a:    ()=>({x:MEMO_PAD.face.x+MEMO_PAD.face.off, y:MEMO_PAD.face.y})
 };
+function memoCrowdBalls(){
+  const cols=["#e83a2c","#c6ff1a","#ffcf3a","#fff6c9"];
+  const a=[];
+  for (let i=0;i<7;i++) a.push({x:70+i*125, y:H-70-rand(0,50), vx:rand(-50,50), vy:rand(-30,30), r:11+rand(0,5), col:cols[i%cols.length]});
+  return a;
+}
 function newMemo(best){
   return {
     running:true, started:false, over:false, t:0, pulse:0,
     seq:[], step:0, phase:"idle", showI:0, showT:0, waitT:0,
     lit:null, litT:0, wrong:null, score:0, best:best||0, bestRun:0,
-    toasts:[], sparks:[], bark:null, wag:0, mood:"idle", prevKey:{}
+    toasts:[], sparks:[], bark:null, wag:0, mood:"idle", prevKey:{},
+    balls:memoCrowdBalls(), party:0, wash:null, lean:0, demoI:0, demoT:.4
   };
 }
 function saveMemoBest(v){ try{ const o=+localStorage.getItem("memo_best")||0; if(v>o){ ARCADE_FLASH.memo=true; localStorage.setItem("memo_best",String(v)); } }catch(e){} }
@@ -8925,6 +8932,7 @@ function memoLight(k,dur){
   M.lit=k; M.litT=dur||memoShowDur();
   const info=MEMO_INFO[k];
   beep(info.note,Math.max(.12,M.litT*.9),"square",.06);
+  M.wash={col:info.lit, life:.42};
   const p=MEMO_POS[k]();
   for (let i=0;i<6;i++) M.sparks.push({x:p.x,y:p.y,vx:rand(-90,90),vy:rand(-120,-20),life:.5,col:info.lit});
 }
@@ -8950,8 +8958,10 @@ function memoPress(k){
       M.bestRun=Math.max(M.bestRun,M.score);
       if (M.score>M.best){ M.best=M.score; saveMemoBest(M.best); }
       M.phase="wait"; M.waitT=.85;
-      M.mood="happy"; M.wag=1.2;
-      memoToast(["GOOD DOG!","WOOF!","HE'S IMPRESSED","NAILED IT"][Math.floor(rand(0,4))],"#c9f24d");
+      M.mood="happy"; M.wag=1.2; M.party=1.35;
+      if (M.balls) for (const b of M.balls){ b.vy=-rand(280,520); b.vx=rand(-90,90); }
+      const cheer=M.seq.length>=10?"THE YARD GOES WILD":M.seq.length>=6?"NIC & GIULIA CHEER":["GOOD DOG!","WOOF!","HE'S IMPRESSED","NAILED IT"][Math.floor(rand(0,4))];
+      memoToast(cheer,"#c9f24d");
       sfx.bank(Math.min(3,1+(M.seq.length%3)));
       M.bark={text:["Woof!","Again!","Nice!"][Math.floor(rand(0,3))],life:1};
       setTimeout(()=>{ if (M && M.running && M.phase==="wait") memoNextRound(); }, 700);
@@ -9011,8 +9021,32 @@ function updateMemo(dt){
   M.toasts=M.toasts.filter(t=>t.life>0);
   for (const s of M.sparks){ s.x+=s.vx*dt; s.y+=s.vy*dt; s.vy+=260*dt; s.life-=dt*1.6; }
   M.sparks=M.sparks.filter(s=>s.life>0);
+  M.party=Math.max(0,M.party-dt*.55);
+  if (M.wash){ M.wash.life-=dt; if (M.wash.life<=0) M.wash=null; }
+  if (M.balls){
+    for (const b of M.balls){
+      b.vy+=820*dt; b.x+=b.vx*dt; b.y+=b.vy*dt;
+      if (b.y>H-36){ b.y=H-36; b.vy*=-.62; if (Math.abs(b.vy)<50) b.vy=-rand(160,280); }
+      if (b.x<16||b.x>W-16) b.vx*=-1;
+    }
+  }
+  if (M.lit){
+    const target=(MEMO_POS[M.lit]().x-W/2)/420;
+    M.lean+=(target-M.lean)*Math.min(1,dt*7);
+  } else if (M.lean) M.lean+=(0-M.lean)*Math.min(1,dt*3);
   if (M.litT>0){ M.litT-=dt; if (M.litT<=0 && M.phase!=="over"){ M.lit=null; } }
   if (!M.running) return;
+  if (!M.started){
+    M.demoT-=dt;
+    if (M.demoT<=0){
+      M.demoI=(M.demoI+1)%MEMO_KEYS.length;
+      const k=MEMO_KEYS[M.demoI];
+      M.lit=k; M.litT=.28; M.demoT=.48;
+      M.wash={col:MEMO_INFO[k].lit, life:.22};
+      beep(MEMO_INFO[k].note,.07,"square",.015);
+    }
+    return;
+  }
   if (M.phase==="wait"){
     M.waitT-=dt;
     if (M.waitT<=0 && M.mood==="show") memoStartShowing();
@@ -9053,6 +9087,38 @@ function bakeMemoRoom(){
   g.fillStyle=fl; g.fillRect(0,H*.78,W,H*.22);
   g.strokeStyle="rgba(255,255,255,.06)"; g.lineWidth=2;
   for (let x=-200;x<W+200;x+=70){ g.beginPath(); g.moveTo(x,H); g.lineTo(x+120,H*.78); g.stroke(); }
+}
+function drawMemoCrowd(){
+  if (M.wash){
+    ctx.globalAlpha=clamp(M.wash.life,0,1)*.28;
+    ctx.fillStyle=M.wash.col; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1;
+  }
+  for (let i=0;i<16;i++){
+    const x=36+i*((W-72)/15);
+    const chase=Math.sin(M.t*5-i*.55)>0.15;
+    const hot=M.lit && i%4===MEMO_KEYS.indexOf(M.lit)%4;
+    ctx.fillStyle=hot?(MEMO_INFO[M.lit].lit):chase?"#ffcf3a":"rgba(255,255,255,.14)";
+    ctx.beginPath(); ctx.arc(x,26,hot||chase?6:3.5,0,Math.PI*2); ctx.fill();
+  }
+  const hop=6+M.party*26+(M.phase==="show"?10:0);
+  const kid=(name,x,flip)=>{
+    const y=H*.74-Math.abs(Math.sin(M.t*(M.party>0?7:3)+(flip?1:0)))*hop;
+    if (!drawSprC(name,x,y,78,100,0,flip)){
+      ctx.fillStyle=name==="hopNic"?"#2f6fd8":"#ff7fb1";
+      ctx.beginPath(); ctx.arc(x,y,16,0,Math.PI*2); ctx.fill();
+      ctx.fillRect(x-14,y+10,28,36);
+    }
+  };
+  kid("hopNic",210,false);
+  kid("hopGiulia",750,true);
+  if (M.balls){
+    for (const b of M.balls){
+      ctx.fillStyle=b.col;
+      ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle="rgba(255,255,255,.65)"; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(b.x-b.r*.25,b.y-b.r*.25,b.r*.28,0,Math.PI*2); ctx.stroke();
+    }
+  }
 }
 function drawMemoPad(){
   const P=MEMO_PAD;
@@ -9139,7 +9205,7 @@ function drawMemoButton(k){
   ctx.restore();
 }
 function drawMemoBernard(){
-  const x=118, y=H-118;
+  const x=118+(M.lean||0)*70, y=H-118;
   const bob=M.mood==="happy" ? Math.abs(Math.sin(M.t*12))*10 : Math.sin(M.t*2)*2;
   const tilt=M.mood==="show" ? Math.sin(M.t*6)*.06 : M.mood==="sad" ? .12 : 0;
   softShadow(ctx,x+8,y+8,60,16,.45);
@@ -9160,6 +9226,12 @@ function drawMemoHUD(){
   ctx.textAlign="left"; ctx.font="600 11px Fredoka, system-ui, sans-serif";
   ctx.fillStyle="#ffe9b0"; ctx.fillText("BEST",W-162,32);
   chunky(ctx,String(M.best),W-162,56,26,"#fff6c9","#4a2408");
+  const heat=clamp((M.seq.length+(M.party||0))/14,0,1);
+  goldPanel(ctx,W/2-120,12,240,28,10);
+  ctx.fillStyle="rgba(0,0,0,.25)"; ctx.beginPath(); ctx.roundRect(W/2-108,20,216,12,6); ctx.fill();
+  if (heat>0){ ctx.fillStyle=heat>.7?"#ff5a45":"#ffcf3a"; ctx.beginPath(); ctx.roundRect(W/2-108,20,216*heat,12,6); ctx.fill(); }
+  ctx.font="700 10px Fredoka, system-ui, sans-serif"; ctx.fillStyle="#4a2408"; ctx.textAlign="center";
+  ctx.fillText(heat>.7?"YARD IS LOUD":"YARD",W/2,30);
   // progress dots through this round's sequence
   if (M.seq.length){
     const n=M.seq.length, dw=Math.min(22,560/n), x0=W/2-(n-1)*dw/2, y=100;
@@ -9194,6 +9266,7 @@ function drawMemoHUD(){
 function drawMemo(){
   ctx.drawImage(mbg,0,0);
   ctx.save();
+  drawMemoCrowd();
   drawMemoPad();
   drawMemoBernard();
   for (const s of M.sparks){
