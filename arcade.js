@@ -510,7 +510,7 @@ let pointer={down:false,x:0,y:0};
 const GP = { idx:null, id:"", prev:{}, focus:0, lastScreen:"", navHold:0, lastBtn:"" };
 
 const GP_ITEMS = {
-  home:     ["pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickCatch","pickBba","pickBrt"],
+  home:     ["pickBrt","pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickCatch","pickBba"],
   memomenu: ["memoStartBtn","memoBack"],
   catchmenu: ["catchStartBtn","catchBack"],
   menu:     ["startBtn","menuBack"],
@@ -614,7 +614,7 @@ function uiBack(){ const sc=gpScreen(); if (sc==="pause") quitToArcade(); else i
 
 // ---------------------------------------------------------------- lobby carousel
 const CAR = {
-  items:["pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickCatch","pickBba","pickBrt"],
+  items:["pickBrt","pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickCatch","pickBba"],
   flashKey:{pickFlap:"flap", pickHop:"hop", pickAir:"air", pickBallies:"ballies", pickMemo:"memo", pickCatch:"catch", pickBba:"bba", pickBrt:"brt"},
   spill:{pickFlap:"rgba(80,190,255,.32)", pickHop:"rgba(110,220,90,.30)", pickAir:"rgba(255,90,160,.32)", pickBallies:"rgba(255,207,58,.30)", pickMemo:"rgba(170,110,255,.32)", pickCatch:"rgba(255,140,60,.34)", pickBba:"rgba(90,190,255,.34)", pickBrt:"rgba(255,140,60,.36)"},
   index:0, pos:0, vel:0, target:0, bounce:0,
@@ -686,6 +686,7 @@ function brtOpen(){
   };
   window.BRT.start();
 }
+window.brtOpen = brtOpen;
 function carouselOnClick(id){
   const i=CAR.items.indexOf(id);
   if (i<0) return;

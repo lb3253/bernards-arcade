@@ -19,9 +19,10 @@
   body { margin: 0; background: var(--bg); color: var(--cream); font-family: Fredoka, "Segoe UI", system-ui, sans-serif; overflow: hidden; }
   #brt-root { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; box-sizing: border-box;
     padding: calc(env(safe-area-inset-top, 0px) + 8px) 16px calc(env(safe-area-inset-bottom, 0px) + 8px); }
-  #brt-stage { position: relative; aspect-ratio: 16 / 9; width: min(100%, calc((100vh - 16px) * 16 / 9)); max-height: 100%;
+  #brt-stage { position: relative; aspect-ratio: 16 / 9; width: min(100%, calc((100dvh - 12px) * 16 / 9)); max-width: 100%; max-height: 100%;
     background: #000; border-radius: 14px; box-shadow: 0 0 0 6px var(--frame), 0 24px 60px rgba(0,0,0,.6); overflow: hidden; }
-  #brt-canvas { display: block; width: 100%; height: 100%; }
+  #brt-canvas { display: block; width: 100% !important; height: 100% !important; max-width: 100% !important; max-height: 100% !important;
+    position: relative !important; left: auto !important; top: auto !important; transform: none !important; aspect-ratio: auto !important; object-fit: fill; }
   #brt-touch { position: absolute; inset: 0; pointer-events: none; display: none; }
   #brt-touch.on { display: block; }
   .rb { position: absolute; pointer-events: auto; width: 64px; height: 64px; border-radius: 50%; border: 3px solid rgba(255,244,214,.7);
@@ -144,13 +145,13 @@
                   </span>
                 </button>
                 <button class="pick cab" id="pickBrt" type="button">
-                  <span class="badge">TRIP</span><span class="best" id="bestBrt"></span>
+                  <span class="badge">NEW</span><span class="best" id="bestBrt"></span>
                   <span class="ribbon" aria-hidden="true">NEW HIGH SCORE!</span>
                   <span class="thumb"></span>
                   <span class="cab-bezel"></span>
                   <span class="cap">
                     <span class="nm">Bernard's Road Trip</span>
-                    <span class="sub">Tita drives. Bernard rides. Beat the sunset to the dog park.</span>
+                    <span class="sub">Tita drives. Bernard rides. Dog park, Miami, or the school run.</span>
                   </span>
                 </button>
               </div>
@@ -388,7 +389,7 @@
   </div>
 </div>
 
-<script>window.BRT_NO_AUTOSTART=true;</script>
+<script>window.BRT_NO_AUTOSTART=true;window.BRT_SHOW_ROUTES=true;</script>
 <script src="arcade.js"></script>
 <script>
 /* =====================================================================
@@ -419,7 +420,7 @@ const TUNE = {
   segLen: 200, rumble: 3, lanes: 3, roadW: 2000, camH: 1150, drawDist: 280, fov: 100, fog: 2.4,
   maxSpeed: 9000,      // road units per second at full throttle
   boostMul: 1.35,      // Zoomies speed multiplier
-  startTime: 75, checkpointTime: 55,
+  startTime: 90, checkpointTime: 70,
   trafficSpeed: [0.28, 0.6]  // NPC car speed as a fraction of maxSpeed
 };
 const camDepth = 1 / Math.tan((TUNE.fov / 2) * Math.PI / 180);
@@ -442,18 +443,38 @@ const MIA_STAGES = [
   { name: 'MACARTHUR CAUSEWAY', skyTop: '#2A8FE6', skyMid: '#86CDF4', skyHor: '#E6F7FF', grassL: '#33B9CF', grassD: '#2CAEC4', rumbleL: '#DADADA', rumbleD: '#9A9AA0', roadL: '#52525C', roadD: '#4A4A54', lane: '#F4F4F4', fog: '#D9F3FA' },
   { name: 'DOWNTOWN MIAMI NIGHTS', skyTop: '#0B1033', skyMid: '#4B2A7E', skyHor: '#FF6AA8', grassL: '#2E2E3C', grassD: '#292936', rumbleL: '#FF5FD2', rumbleD: '#2B2B30', roadL: '#3A3A46', roadD: '#33333F', lane: '#FFE6F7', fog: '#C24C92' }
 ];
+// Story mode: the School Run around Little Elm
+const STORY_STAGES = [
+  { name: 'TO OAK POINT ELEMENTARY', skyTop: '#3F86D8', skyMid: '#7FB7EC', skyHor: '#CBE8FF', grassL: '#7CC255', grassD: '#6DB548', rumbleL: '#E6E1D6', rumbleD: '#C9C4B8', roadL: '#8E8E94', roadD: '#86868C', lane: '#F8F8F8', fog: '#CBE8FF' },
+  { name: 'TO TINMAN SOCIAL', skyTop: '#4A8FD8', skyMid: '#9CC8EE', skyHor: '#F3E6C8', grassL: '#86C45C', grassD: '#76B64E', rumbleL: '#E6E1D6', rumbleD: '#C9C4B8', roadL: '#8A8A90', roadD: '#828288', lane: '#F8F8F8', fog: '#EFE3C8' },
+  { name: 'HOME TO JEWELBERRY', skyTop: '#2E2460', skyMid: '#C9486F', skyHor: '#FFB44A', grassL: '#4F8A42', grassD: '#487F3C', rumbleL: '#D9CFB8', rumbleD: '#8E877A', roadL: '#6E6A6A', roadD: '#656161', lane: '#F2E9B0', fog: '#F3A86A' }
+];
 const ROUTES = [
   { id: 0, name: 'Little Elm, Texas', stages: TX_STAGES, shop: 'Black Sheep Coffee', shopStyle: 'sheep', park: 'oak', welcome: ['WELCOME TO', 'LITTLE ELM'], blurb: 'Longhorns, windmills, the lake bridge, Dallas at sunset' },
-  { id: 1, name: 'Miami, Florida', stages: MIA_STAGES, shop: 'CAO Coffee', shopStyle: 'cao', park: 'palm', welcome: ['BIENVENIDOS A', 'MIAMI'], blurb: 'Ocean Drive, the causeway, downtown neon at night' }
+  { id: 1, name: 'Miami, Florida', stages: MIA_STAGES, shop: 'CAO Coffee', shopStyle: 'cao', park: 'palm', welcome: ['BIENVENIDOS A', 'MIAMI'], blurb: 'Ocean Drive, the causeway, downtown neon at night' },
+  { id: 2, name: 'Story: The School Run', stages: STORY_STAGES, shop: 'Black Sheep Coffee', shopStyle: 'sheep', park: 'oak', welcome: ['WELCOME TO', 'LITTLE ELM'], blurb: 'Pick up Nic & Giulia, play Slush Rush at Tinman Social, get home by sunset', story: true, time: 135, cpTime: 115 }
 ];
 let route = ROUTES[0], STAGES = route.stages;
-try { const r = +localStorage.getItem('brt_route'); if (r === 1) { route = ROUTES[1]; STAGES = route.stages; } } catch (e) { }
+try { const r = +localStorage.getItem('brt_route'); if (r === 1 || r === 2) { route = ROUTES[r]; STAGES = route.stages; } } catch (e) { }
 
 // ---------- Canvas ----------
 const canvas = document.getElementById('brt-canvas');
 canvas.width = W * RS; canvas.height = H * RS;
 const ctx = canvas.getContext('2d');
 ctx.setTransform(RS, 0, 0, RS, 0, 0);
+function fitStage() {
+  const stage = document.getElementById('brt-stage');
+  if (!stage) return;
+  const vw = document.documentElement.clientWidth || window.innerWidth;
+  const vh = document.documentElement.clientHeight || window.innerHeight;
+  const maxW = Math.max(280, vw - 8), maxH = Math.max(160, vh - 8);
+  let w = maxW, h = w * 9 / 16;
+  if (h > maxH) { h = maxH; w = h * 16 / 9; }
+  stage.style.width = Math.floor(w) + 'px';
+  stage.style.height = Math.floor(h) + 'px';
+}
+fitStage();
+window.addEventListener('resize', fitStage);
 
 // ---------- Drawing helpers ----------
 function rr(g, x, y, w, h, r) { r = Math.min(r, w / 2, h / 2); g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
@@ -519,16 +540,85 @@ function bernardHead(g, x, y, s, earFlap, tongue, dizzy) {
   else { g.beginPath(); g.moveTo(-5, 18.5); g.quadraticCurveTo(0, 22, 5, 18.5); g.strokeStyle = C.out; g.lineWidth = 1.6; g.stroke(); }
   g.restore();
 }
-function drawJeep(g, steer, earFrame, braking, boost, dizzy) {
-  // design box 220 x 190, origin top-left. steer: -1 left, 0, 1 right
+function hairLock(g, x0, y0, cx, cy, x1, y1, w0, w1, fill, edge) {
+  const steps = 8, pts = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps, u = 1 - t;
+    pts.push({ x: u * u * x0 + 2 * u * t * cx + t * t * x1, y: u * u * y0 + 2 * u * t * cy + t * t * y1 });
+  }
+  const left = [], right = [];
+  for (let i = 0; i < pts.length; i++) {
+    const t = i / (pts.length - 1), w = w0 + (w1 - w0) * t;
+    const p = pts[i], A = pts[Math.max(0, i - 1)], B = pts[Math.min(pts.length - 1, i + 1)];
+    let dx = B.x - A.x, dy = B.y - A.y, len = Math.hypot(dx, dy) || 1; dx /= len; dy /= len;
+    left.push([p.x - dy * w, p.y + dx * w]); right.push([p.x + dy * w, p.y - dx * w]);
+  }
+  g.beginPath(); g.moveTo(left[0][0], left[0][1]);
+  for (let i = 1; i < left.length; i++) g.lineTo(left[i][0], left[i][1]);
+  for (let i = right.length - 1; i >= 0; i--) g.lineTo(right[i][0], right[i][1]);
+  g.closePath(); fs(g, fill, edge, 1.15);
+  g.beginPath(); g.moveTo(pts[1].x, pts[1].y);
+  for (let i = 2; i < pts.length - 1; i++) g.lineTo(pts[i].x, pts[i].y);
+  g.strokeStyle = 'rgba(255,236,220,.22)'; g.lineWidth = Math.max(0.8, w0 * 0.22); g.stroke();
+}
+function drawJeep(g, steer, earFrame, braking, boost, dizzy, hair, kids) {
+  // design box 220 x 190, origin top-left. steer: -1 left, 0, 1 right. hair: {amp 0..2, frame 0..3}. kids: Nic + Giulia in the back seat
   const sh = steer * 0.07, lean = steer * 4, flap = [-1, 0, 1][earFrame];
+  const amp = hair ? hair.amp : 0, ph = hair ? hair.frame * Math.PI / 3 : 0, sway = Math.sin(ph) * amp * 8, lift = amp * 6;
   g.save(); g.translate(110, 190); g.transform(1, 0, sh, 1, 0, 0); g.translate(-110, -190);
   // shadow
   ell(g, 110, 182, 96, 10); fs(g, 'rgba(0,0,0,.35)', null);
   // rear tires
   for (const tx of [34, 186]) { rr(g, tx - 24, 112, 48, 70, 12); fs(g, '#1A1A1C', C.out, 2.5); for (let y = 118; y < 178; y += 10) { g.fillStyle = '#34343A'; g.fillRect(tx - 20, y, 40, 4); } rr(g, tx - 24, 112, 48, 10, 6); fs(g, '#2A2A2E', null); }
-  // body (white Rubicon-style tailgate)
-  rr(g, 28, 70, 164, 86, 10); fs(g, '#F4F4F2', C.out, 2.6);
+  // roll cage + windshield frame (farther = higher & narrower)
+  rr(g, 46 - lean, 18, 128, 8, 3); fs(g, '#2B2B30', C.out, 2);                    // windshield top
+  g.fillStyle = 'rgba(160,210,255,.35)'; g.fillRect(50 - lean, 26, 120, 22);         // glass
+  rr(g, 32 - lean * 0.5, 52, 156, 10, 4); fs(g, '#2B2B30', C.out, 2.2);             // roll bar
+  g.fillStyle = '#2B2B30'; g.fillRect(34 - lean * 0.5, 56, 8, 18); g.fillRect(178 - lean * 0.5, 56, 8, 18);
+  // front seats / headrests
+  rr(g, 52 - lean * 0.6, 58, 44, 34, 8); fs(g, '#1F1F24', C.out, 2); rr(g, 124 - lean * 0.6, 58, 44, 34, 8); fs(g, '#1F1F24', C.out, 2);
+  // Tita, from behind. Separate filled locks so the hair reads, and the tips flap in the wind.
+  g.save(); g.translate(74 - lean * 0.7, 46);
+  const HAIR = '#3A241C', HAIR_M = '#5C3A2E', HAIR_D = '#241610';
+  const flapX = (k) => Math.sin(ph + k) * (4 + amp * 9);
+  const flapY = (k) => Math.cos(ph + k * 0.8) * (2 + amp * 4) - amp * 3;
+  const behind = [
+    [-8, 0, -24, -14 + flapY(0), -50 + flapX(0), -2 + flapY(0.5), 4.8, 0.85, HAIR_D],
+    [-6, 5, -20, 2 + flapY(1), -44 + flapX(1.3), 14 + flapY(1.1), 5.6, 1.05, HAIR],
+    [-4, 10, -16, 14, -34 + flapX(2.1), 22 + flapY(2), 4.0, 0.8, HAIR_M],
+    [6, -1, 22, -12 + flapY(3), 46 + flapX(3.2), 0 + flapY(3), 4.6, 0.8, HAIR_D],
+    [5, 6, 18, 6 + flapY(4), 38 + flapX(4.4), 16 + flapY(4.2), 5.0, 0.95, HAIR]
+  ];
+  for (const [x0, y0, cx, cy, x1, y1, w0, w1, col] of behind) hairLock(g, x0, y0, cx, cy, x1, y1, w0, w1, col, C.out);
+  ell(g, 0, 12, 16, 13); fs(g, HAIR_D, C.out, 1.6);
+  ell(g, 0, 0, 15, 15); fs(g, '#E6B892', C.out, 2.2);
+  g.beginPath(); g.moveTo(-14, 1); g.bezierCurveTo(-13, -16, 13, -16, 14, 1); g.bezierCurveTo(8, -4, -8, -4, -14, 1); g.closePath(); fs(g, HAIR_D, null);
+  g.beginPath(); g.moveTo(-7, -8); g.quadraticCurveTo(0, -13, 6, -7); g.strokeStyle = '#C4A090'; g.lineWidth = 2; g.stroke();
+  const front = [
+    [-13, -2, -30, -10 + flapY(0.4), -52 + flapX(0.2), 6 + flapY(0.7), 4.2, 0.75, HAIR],
+    [-12, 7, -26, 10, -40 + flapX(1.6), 18 + flapY(1.5), 3.8, 0.7, HAIR_M],
+    [13, -1, 28, -8 + flapY(3.3), 50 + flapX(3.1), 4 + flapY(3.5), 4.0, 0.75, HAIR],
+    [12, 8, 24, 12, 40 + flapX(4.7), 20 + flapY(4.5), 3.6, 0.65, HAIR_M]
+  ];
+  for (const [x0, y0, cx, cy, x1, y1, w0, w1, col] of front) hairLock(g, x0, y0, cx, cy, x1, y1, w0, w1, col, C.out);
+  const swing = Math.sin(ph) * (10 + amp * 14);
+  hairLock(g, 0, 9, swing * 0.35, 6 - amp * 3, swing, -2 - amp * 6, 5.2, 1.3, HAIR, C.out);
+  hairLock(g, 2, 10, swing * 0.7, 12, swing * 0.9 + 6, 8 - amp * 2, 3.4, 0.9, HAIR_M, C.out);
+  ell(g, swing * 0.12, 10, 4.5, 3.2); fs(g, '#E07A9C', C.out, 1.2);
+  g.beginPath(); g.arc(-14, 6, 3, 0, TAU); g.strokeStyle = C.gold; g.lineWidth = 1.5; g.stroke();
+  g.restore();
+  // Bernard (passenger) looking back at us
+  bernardHead(g, 146 - lean * 0.7, 40 + Math.abs(flap) * 1.5, 1.0, flap * (boost ? 1.4 : 1), boost || earFrame !== 1, dizzy);
+  // Nic and Giulia in the back seat (nearer to us, so they sit lower in the frame)
+  if (kids) {
+    const kid = (x, who) => { g.save(); g.translate(x - lean * 0.8, 56); g.scale(1.4, 1.4);
+      if (who === 'nic') { ell(g, 0, 0, 13, 13); fs(g, '#D9A77A', C.out, 2); g.beginPath(); g.moveTo(-13, 0); g.bezierCurveTo(-12, -14, 12, -14, 13, 0); g.bezierCurveTo(8, -3, -8, -3, -13, 0); g.closePath(); fs(g, '#2B1A12', null); rr(g, -14, -6, 28, 9, 4); fs(g, '#2F6FD8', C.out, 1.8); rr(g, -17, -2, 10, 5, 2); fs(g, '#2F6FD8', C.out, 1.5); /* backwards cap */ }
+      else { for (const [sx, k, dir] of [[-9, 0, -1], [9, 1, 1]]) { const wob = Math.sin(ph + k * 2) * (0.5 + amp) * 6; hairLock(g, sx, 1, sx * 1.15 + wob * 0.35, 10, dir * (14 + amp * 4) + wob, 22 - amp, 3.3, 1.05, '#3B2314', C.out); } ell(g, 0, 0, 13, 13); fs(g, '#E6B892', C.out, 2); g.beginPath(); g.moveTo(-13, 1); g.bezierCurveTo(-12, -14, 12, -14, 13, 1); g.bezierCurveTo(8, -3, -8, -3, -13, 1); g.closePath(); fs(g, '#3B2314', null); ell(g, -5, -9, 4, 3, -0.5); fs(g, '#FF7FB1', C.out, 1.2); ell(g, 2, -9, 4, 3, 0.5); fs(g, '#FF7FB1', C.out, 1.2); ell(g, -1.5, -9, 1.8, 1.8); fs(g, '#FF7FB1', C.out, 1); }
+      g.restore(); };
+    kid(96, 'nic'); kid(126, 'giulia');
+  }
+  // body (white Rubicon-style tailgate) — drawn after the passengers so it sits in front of them
+  rr(g, 28, 72, 164, 84, 10); fs(g, '#F4F4F2', C.out, 2.6);
   g.fillStyle = 'rgba(0,0,0,.06)'; g.fillRect(30, 118, 160, 36);
   // bumper + tow hooks
   rr(g, 20, 142, 180, 22, 6); fs(g, '#3A3A40', C.out, 2.4); rr(g, 52, 150, 16, 10, 3); fs(g, '#C8302A', C.out, 1.5); rr(g, 152, 150, 16, 10, 3); fs(g, '#C8302A', C.out, 1.5);
@@ -544,30 +634,12 @@ function drawJeep(g, steer, earFrame, braking, boost, dizzy) {
   rr(g, 86, 140, 48, 16, 3); fs(g, '#FFFFFF', C.out, 1.6); textO(g, 'BRNRD', 110, 148.5, 10, '#2B3A8A', null, 'center', 0);
   // side mirrors
   rr(g, 14, 58, 14, 12, 3); fs(g, '#2B2B30', C.out, 2); rr(g, 192, 58, 14, 12, 3); fs(g, '#2B2B30', C.out, 2);
-  // roll cage + windshield frame (farther = higher & narrower)
-  rr(g, 46 - lean, 18, 128, 8, 3); fs(g, '#2B2B30', C.out, 2);                    // windshield top
-  g.fillStyle = 'rgba(160,210,255,.35)'; g.fillRect(50 - lean, 26, 120, 22);         // glass
-  rr(g, 32 - lean * 0.5, 52, 156, 10, 4); fs(g, '#2B2B30', C.out, 2.2);             // roll bar
-  g.fillStyle = '#2B2B30'; g.fillRect(34 - lean * 0.5, 56, 8, 18); g.fillRect(178 - lean * 0.5, 56, 8, 18);
-  // seats / headrests
-  rr(g, 52 - lean * 0.6, 58, 44, 28, 8); fs(g, '#1F1F24', C.out, 2); rr(g, 124 - lean * 0.6, 58, 44, 28, 8); fs(g, '#1F1F24', C.out, 2);
-  // Tita (driver, seen from behind): long brunette hair, hair tie, hoop earring
-  g.save(); g.translate(74 - lean * 0.7, 46);
-  ell(g, 0, 14, 20, 20); fs(g, '#4A2A17', C.out, 2.2);                              // hair back
-  ell(g, 0, 0, 15, 15); fs(g, '#E6B892', C.out, 2.2);                               // head
-  g.beginPath(); g.moveTo(-15, 2); g.bezierCurveTo(-14, -16, 14, -16, 15, 2); g.bezierCurveTo(10, -4, -10, -4, -15, 2); g.closePath(); fs(g, '#4A2A17', null); // hair top
-  g.beginPath(); g.moveTo(-16, 0); g.bezierCurveTo(-18, 10, -10, 22, -6, 30); g.lineTo(6, 30); g.bezierCurveTo(10, 22, 18, 10, 16, 0); g.closePath(); fs(g, '#4A2A17', C.out, 2); // hair down the back
-  ell(g, 0, 12, 4, 3); fs(g, '#E07A9C', C.out, 1.2);                                // hair tie
-  g.beginPath(); g.arc(-14, 6, 3, 0, TAU); g.strokeStyle = C.gold; g.lineWidth = 1.5; g.stroke(); // earring
-  g.restore();
-  // Bernard (passenger) looking back at us
-  bernardHead(g, 146 - lean * 0.7, 40 + Math.abs(flap) * 1.5, 1.0, flap * (boost ? 1.4 : 1), boost || earFrame !== 1, dizzy);
   // mud spatter
   for (let i = 0; i < 8; i++) { ell(g, 40 + hash(i, 1) * 140, 128 + hash(i, 2) * 24, 2 + hash(i, 3) * 2, 1.5); fs(g, 'rgba(110,70,30,.35)', null); }
   if (boost) { for (const fx of [62, 158]) { ell(g, fx, 170, 10, 6); fs(g, 'rgba(255,170,60,.8)', null); ell(g, fx, 176, 6, 10); fs(g, 'rgba(255,230,120,.8)', null); } }
   g.restore();
 }
-const jeepSprite = (steer, ear, brake, boost, dizzy) => sprite(`jeep_${steer}_${ear}_${brake}_${boost}_${dizzy}`, 220, 190, 560, g => drawJeep(g, steer, ear, brake, boost, dizzy));
+const jeepSprite = (steer, ear, brake, boost, dizzy, hairAmp, hairFrame, kids) => sprite(`jeep_${steer}_${ear}_${brake}_${boost}_${dizzy}_${hairAmp}_${hairFrame}_${kids ? 1 : 0}`, 220, 190, 560, g => drawJeep(g, steer, ear, brake, boost, dizzy, { amp: hairAmp, frame: hairFrame }, kids));
 
 /* =====================================================================
    TRAFFIC + ROADSIDE SPRITES
@@ -681,6 +753,96 @@ function drawPupCup(g, x, y, s, cream, style) { g.save(); g.translate(x, y); g.s
   if (cream > 0) { g.save(); g.translate(30, 18); g.scale(1, cream); const bl = [[-14, -4, 10], [14, -4, 10], [0, -10, 12], [-7, -20, 9], [7, -20, 9], [0, -30, 7]]; for (const [cx, cy, r] of bl) { ell(g, cx, cy, r, r); fs(g, '#FFF9EE', C.out, 2); } for (const [cx, cy, r] of bl) { ell(g, cx, cy, r - 2.5, r - 2.5); fs(g, '#FFF9EE', null); } ell(g, -6, -26, 3, 2, -0.5); fs(g, 'rgba(255,255,255,.9)', null); g.restore(); }
   rr(g, 2, 14, 56, 9, 4); fs(g, '#F0F0F0', C.out, 2);
   g.restore(); }
+function suburbHouse(g, brick, roof, stone, door, two) { // Jewelberry-style new build: brick with a stone gable, carriage garage door, concrete drive
+  const h = two ? 150 : 110; ell(g, 140, 236, 130, 8); fs(g, 'rgba(0,0,0,.2)', null);
+  rr(g, 20, 230 - h, 150, h, 3); fs(g, brick, C.out, 3); for (let y = 236 - h; y < 226; y += 8) { g.fillStyle = 'rgba(0,0,0,.07)'; g.fillRect(22, y, 146, 2); for (let x = 22 + (y % 16 ? 10 : 0); x < 166; x += 20) g.fillRect(x, y, 2, 8); }
+  rr(g, 170, 150, 86, 80, 3); fs(g, brick, C.out, 3); for (let y = 156; y < 226; y += 8) { g.fillStyle = 'rgba(0,0,0,.07)'; g.fillRect(172, y, 82, 2); }
+  // carriage-style garage door with X braces
+  rr(g, 178, 166, 70, 64, 3); fs(g, door, C.out, 2.5); g.strokeStyle = 'rgba(0,0,0,.25)'; g.lineWidth = 2; g.beginPath(); g.moveTo(213, 168); g.lineTo(213, 228); g.moveTo(180, 200); g.lineTo(246, 200); g.stroke(); g.beginPath(); g.moveTo(182, 170); g.lineTo(211, 198); g.moveTo(211, 170); g.lineTo(182, 198); g.moveTo(215, 170); g.lineTo(244, 198); g.moveTo(244, 170); g.lineTo(215, 198); g.stroke();
+  // roofs (dark shingles) + stone gable over the garage
+  g.beginPath(); g.moveTo(8, 232 - h); g.lineTo(95, 186 - h); g.lineTo(182, 232 - h); g.closePath(); fs(g, roof, C.out, 3);
+  g.beginPath(); g.moveTo(164, 152); g.lineTo(213, 118); g.lineTo(262, 152); g.closePath(); fs(g, roof, C.out, 3);
+  g.beginPath(); g.moveTo(176, 150); g.lineTo(213, 126); g.lineTo(250, 150); g.closePath(); fs(g, stone, null); for (let k = 0; k < 10; k++) { ell(g, 186 + hash(k, 1) * 54, 134 + hash(k, 2) * 14, 5, 3); fs(g, 'rgba(0,0,0,.12)', null); }
+  const win = (x, y, w, hh) => { rr(g, x, y, w, hh, 2); fs(g, '#9FC7E8', '#F4F4F4', 3); g.fillStyle = '#F4F4F4'; g.fillRect(x + w / 2 - 1, y, 2, hh); g.fillRect(x, y + hh / 2 - 1, w, 2); g.fillStyle = '#3A2A20'; g.fillRect(x - 7, y - 1, 6, hh + 2); g.fillRect(x + w + 1, y - 1, 6, hh + 2); };
+  if (two) { win(44, 104, 28, 30); win(118, 104, 28, 30); } win(44, 172, 28, 30);
+  rr(g, 110, 170, 32, 60, 3); fs(g, '#4A3328', C.out, 2.5); ell(g, 136, 202, 2, 2); fs(g, C.gold, null); rr(g, 98, 160, 56, 8, 2); fs(g, '#5A4A40', C.out, 2); // front door + small awning
+  for (const lx of [172, 254]) { rr(g, lx - 3, 158, 6, 9, 1.5); fs(g, '#1E1E22', null); ell(g, lx, 156, 3, 3); fs(g, '#FFE9A8', C.out, 1.2); } // carriage lights
+  g.fillStyle = '#D9D4C8'; g.fillRect(176, 230, 90, 6); // concrete drive
+  for (const bx of [40, 76]) { for (const [cx, cy, r] of [[-7, -5, 8], [5, -8, 9], [13, -3, 7]]) { ell(g, bx + cx, 232 + cy, r, r); fs(g, '#4CA34B', C.out, 1.6); } }
+  rr(g, 268, 196, 5, 36, 2); fs(g, '#5A5A62', C.out, 2); rr(g, 262, 184, 18, 14, 4); fs(g, '#2B2B30', C.out, 2); // mailbox
+}
+function sapling(g) { // young front-yard tree with a stake
+  g.beginPath(); g.moveTo(48, 160); g.lineTo(50, 60); g.strokeStyle = C.out; g.lineWidth = 9; g.lineCap = 'round'; g.stroke(); g.strokeStyle = '#8A6A48'; g.lineWidth = 5; g.stroke();
+  g.beginPath(); g.moveTo(60, 160); g.lineTo(60, 110); g.strokeStyle = '#6E4A2A'; g.lineWidth = 3; g.stroke();
+  const B = [[36, 50, 22], [62, 38, 24], [52, 66, 20], [76, 62, 16]]; for (const [x, y, r] of B) { ell(g, x, y + 4, r, r); fs(g, '#4E9A52', null); } for (const [x, y, r] of B) { ell(g, x, y, r, r); fs(g, '#7CC06A', C.out, 2.2); } for (const [x, y, r] of B) { ell(g, x - r * .3, y - r * .3, r * .4, r * .3, -.5); fs(g, '#B5E39A', null); }
+  ell(g, 50, 160, 16, 5); fs(g, '#6E4A2A', null);
+}
+function schoolBus(g) { ell(g, 120, 96, 110, 8); fs(g, 'rgba(0,0,0,.25)', null); for (const tx of [48, 190]) { ell(g, tx, 86, 15, 15); fs(g, '#1A1A1C', C.out, 2.5); ell(g, tx, 86, 6, 6); fs(g, '#8A8A90', null); } rr(g, 10, 20, 230, 70, 8); fs(g, '#F2B01E', C.out, 3); rr(g, 10, 36, 230, 6, 2); fs(g, '#1E1E22', null); rr(g, 10, 78, 230, 6, 2); fs(g, '#1E1E22', null); for (let x = 48; x < 200; x += 26) { rr(g, x, 30, 20, 22, 2); fs(g, '#2A3A50', '#F4F4F4', 2); } rr(g, 206, 28, 26, 48, 3); fs(g, '#2A3A50', '#F4F4F4', 2); rr(g, 14, 28, 26, 26, 3); fs(g, '#2A3A50', '#F4F4F4', 2); textO(g, 'SCHOOL BUS', 120, 14, 11, C.ink, null, 'center', 0); rr(g, 70, 4, 100, 14, 3); fs(g, '#F2B01E', C.out, 2); for (const lx of [14, 230]) { ell(g, lx, 24, 4, 4); fs(g, '#D7322A', C.out, 1.2); } ell(g, 120, 56, 0, 0); }
+function schoolBuilding(g) { // Oak Point Elementary as it looks today: flat roofs, tan brick wings, a two-story glass entry, flags out front
+  ell(g, 240, 236, 230, 8); fs(g, 'rgba(0,0,0,.2)', null);
+  // wings
+  rr(g, 0, 140, 190, 92, 4); fs(g, '#BFAE94', C.out, 3.5); rr(g, 290, 140, 190, 92, 4); fs(g, '#BFAE94', C.out, 3.5);
+  for (const x0 of [0, 290]) { g.fillStyle = 'rgba(0,0,0,.08)'; for (let y = 148; y < 230; y += 8) g.fillRect(x0 + 2, y, 186, 2); g.fillStyle = '#8A7A66'; g.fillRect(x0, 140, 190, 8); for (let x = x0 + 16; x < x0 + 180; x += 42) { rr(g, x, 166, 28, 30, 2); fs(g, '#7FA8C9', '#DDE3E8', 3); } }
+  // glass entry pavilion (two stories)
+  rr(g, 180, 60, 120, 172, 4); fs(g, '#8FB8D8', C.out, 3.5); g.fillStyle = '#5F8FB8'; for (let y = 70; y < 226; y += 26) g.fillRect(184, y, 112, 3); for (let x = 196; x < 300; x += 22) g.fillRect(x, 64, 3, 166); g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(186, 66, 30, 160);
+  rr(g, 170, 50, 140, 14, 3); fs(g, '#5A5A62', C.out, 3); rr(g, 214, 186, 52, 46, 3); fs(g, '#2A3A50', '#DDE3E8', 3);
+  rr(g, 150, 100, 36, 40, 3); fs(g, '#2B4A9A', C.out, 2.5); textO(g, 'OPE', 168, 120, 13, '#F2C14E', null, 'center', 0); // blue & gold panel
+  // lawn sign + flags
+  rr(g, 20, 190, 120, 34, 6); fs(g, '#2B4A9A', '#F2C14E', 3); textO(g, 'OAK POINT', 80, 202, 11, '#FFFFFF', null, 'center', 0); textO(g, 'ELEMENTARY · LOBOS', 80, 216, 8, '#F2C14E', null, 'center', 0, 700);
+  for (const [fx, flag] of [[400, 'us'], [430, 'tx']]) { g.beginPath(); g.moveTo(fx, 232); g.lineTo(fx, 30); g.strokeStyle = C.out; g.lineWidth = 5; g.stroke(); g.strokeStyle = '#D9DEE3'; g.lineWidth = 2.5; g.stroke(); if (flag === 'us') { rr(g, fx + 2, 34, 34, 22, 2); fs(g, '#B22234', C.out, 2); g.fillStyle = '#FFFFFF'; for (let k = 0; k < 4; k++) g.fillRect(fx + 2, 38 + k * 5, 34, 2); g.fillStyle = '#3C3B6E'; g.fillRect(fx + 2, 34, 14, 12); } else { rr(g, fx + 2, 34, 34, 22, 2); fs(g, '#FFFFFF', C.out, 2); g.fillStyle = '#002868'; g.fillRect(fx + 2, 34, 11, 22); g.fillStyle = '#BF0A30'; g.fillRect(fx + 13, 45, 23, 11); } }
+  // light poles
+  for (const px of [60, 340]) { g.beginPath(); g.moveTo(px, 232); g.lineTo(px, 110); g.lineTo(px + 14, 110); g.strokeStyle = C.out; g.lineWidth = 5; g.stroke(); g.strokeStyle = '#8A9098'; g.lineWidth = 3; g.stroke(); rr(g, px + 10, 106, 14, 8, 3); fs(g, '#FFE9A8', C.out, 2); }
+}
+function tinmanBuilding(g) { // Tinman Social: sky-blue metal panels, big dark windows, stone base, red script sign with the water tower + bowling pins
+  ell(g, 200, 236, 190, 8); fs(g, 'rgba(0,0,0,.2)', null);
+  rr(g, 10, 40, 380, 192, 6); fs(g, '#A9CBE8', C.out, 3.5); g.fillStyle = 'rgba(255,255,255,.35)'; for (let x = 20; x < 390; x += 24) g.fillRect(x, 44, 3, 150);
+  g.fillStyle = '#8DB4D6'; g.fillRect(10, 40, 380, 12); g.fillStyle = '#6E6E78'; g.fillRect(10, 196, 380, 36); for (let k = 0; k < 40; k++) { ell(g, 20 + hash(k, 3) * 360, 202 + hash(k, 4) * 24, 7, 4); fs(g, hash(k, 5) < .5 ? '#8A8A94' : '#5A5A64', null); } // stone base
+  for (const [x, w] of [[24, 78], [112, 60], [312, 64]]) { rr(g, x, 70, w, 70, 3); fs(g, '#243444', '#DDE3E8', 3); g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(x + 6, 76, w * .3, 58); }
+  for (const [x, w] of [[24, 78], [112, 60]]) { rr(g, x, 150, w, 44, 3); fs(g, '#243444', '#DDE3E8', 3); }
+  rr(g, 226, 150, 50, 46, 3); fs(g, '#1E1E22', C.out, 3); g.fillStyle = '#FFE9A8'; g.fillRect(232, 156, 18, 36); g.fillRect(254, 156, 18, 36); // entry doors
+  // sign: red script + tower icon with pins
+  textO(g, 'Tinman Social', 262, 86, 24, '#C8302A', null, 'center', 0, 700);
+  g.save(); g.translate(262, 116); g.strokeStyle = '#1E1E22'; g.lineWidth = 3; g.beginPath(); g.moveTo(-12, 30); g.lineTo(-7, 0); g.lineTo(7, 0); g.lineTo(12, 30); g.moveTo(-9, 16); g.lineTo(9, 16); g.stroke(); rr(g, -12, -16, 24, 18, 6); fs(g, '#1E1E22', null); g.beginPath(); g.moveTo(-14, -14); g.lineTo(0, -24); g.lineTo(14, -14); g.closePath(); fs(g, '#1E1E22', null);
+  for (const px of [-40, -26, 26, 40]) { g.beginPath(); g.moveTo(px - 5, 28); g.bezierCurveTo(px - 10, 14, px - 8, 2, px, -4); g.bezierCurveTo(px + 8, 2, px + 10, 14, px + 5, 28); g.closePath(); fs(g, '#1E1E22', null); g.fillStyle = '#A9CBE8'; g.fillRect(px - 4, 8, 8, 2.5); } g.restore();
+  for (const bx of [24, 376]) { for (const [cx, cy, r] of [[-8, -6, 11], [6, -10, 12], [16, -4, 9]]) { ell(g, bx + cx, 232 + cy, r, r); fs(g, '#4CA34B', C.out, 1.8); } }
+}
+function homeHouse(g) { // 112 Jewelberry: blond brick, hip roof, dark shutters, olive carriage garage door, stone accent + metal awning on the left
+  ell(g, 140, 236, 130, 8); fs(g, 'rgba(0,0,0,.2)', null);
+  rr(g, 40, 90, 200, 142, 3); fs(g, '#D8C4A6', C.out, 3); for (let y = 96; y < 228; y += 8) { g.fillStyle = 'rgba(0,0,0,.07)'; g.fillRect(42, y, 196, 2); for (let x = 42 + (y % 16 ? 10 : 0); x < 236; x += 20) g.fillRect(x, y, 2, 8); }
+  // stone accent corner + metal awning (left)
+  rr(g, 40, 150, 34, 82, 2); fs(g, '#C9BFAE', C.out, 2.5); for (let k = 0; k < 12; k++) { ell(g, 46 + hash(k, 6) * 22, 156 + hash(k, 7) * 70, 6, 3.5); fs(g, 'rgba(0,0,0,.12)', null); }
+  g.beginPath(); g.moveTo(34, 150); g.lineTo(96, 150); g.lineTo(90, 134); g.lineTo(40, 134); g.closePath(); fs(g, '#4A4A52', C.out, 2.5); g.strokeStyle = 'rgba(255,255,255,.3)'; g.lineWidth = 1.5; for (const x of [50, 62, 74, 86]) { g.beginPath(); g.moveTo(x, 136); g.lineTo(x - 4, 148); g.stroke(); }
+  rr(g, 58, 160, 28, 70, 3); fs(g, '#4A3328', C.out, 2.5); // front door under the awning
+  // hip roof
+  g.beginPath(); g.moveTo(26, 92); g.lineTo(80, 50); g.lineTo(200, 50); g.lineTo(254, 92); g.closePath(); fs(g, '#4A4A52', C.out, 3); g.fillStyle = 'rgba(255,255,255,.12)'; g.beginPath(); g.moveTo(34, 90); g.lineTo(82, 54); g.lineTo(140, 54); g.lineTo(120, 90); g.closePath(); g.fill();
+  rr(g, 24, 88, 232, 8, 2); fs(g, '#F4F4F2', C.out, 2); // eave trim
+  // upstairs windows with dark shutters
+  for (const wx of [100, 170]) { g.fillStyle = '#3A2A20'; g.fillRect(wx - 9, 104, 8, 40); g.fillRect(wx + 31, 104, 8, 40); rr(g, wx, 104, 30, 40, 2); fs(g, '#9FC7E8', '#F4F4F4', 3); g.fillStyle = '#F4F4F4'; g.fillRect(wx + 14, 104, 2, 40); g.fillRect(wx, 123, 30, 2); }
+  // olive carriage garage door (two bays) with X braces and 112
+  rr(g, 100, 160, 124, 72, 4); fs(g, '#7C7F58', C.out, 2.8); g.strokeStyle = 'rgba(0,0,0,.28)'; g.lineWidth = 2; g.beginPath(); g.moveTo(162, 162); g.lineTo(162, 230); g.moveTo(102, 196); g.lineTo(222, 196); g.stroke();
+  for (const bx of [102, 164]) { g.beginPath(); g.moveTo(bx + 4, 166); g.lineTo(bx + 54, 192); g.moveTo(bx + 54, 166); g.lineTo(bx + 4, 192); g.moveTo(bx + 4, 200); g.lineTo(bx + 54, 226); g.moveTo(bx + 54, 200); g.lineTo(bx + 4, 226); g.stroke(); }
+  for (const lx of [92, 232]) { rr(g, lx - 3, 154, 6, 10, 1.5); fs(g, '#1E1E22', null); ell(g, lx, 152, 3.5, 3.5); fs(g, '#FFE9A8', C.out, 1.2); }
+  rr(g, 228, 170, 22, 12, 2); fs(g, '#F4F4F2', C.out, 1.5); textO(g, '112', 239, 176, 8, C.ink, null, 'center', 0);
+  // driveway, AC unit, fence, young tree, Bernard's ball
+  g.fillStyle = '#D9D4C8'; g.fillRect(96, 232, 136, 6);
+  rr(g, 246, 206, 20, 24, 3); fs(g, '#9AA0A6', C.out, 2); for (let y = 210; y < 228; y += 4) { g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(248, y, 16, 1.5); }
+  for (const [fx, fw] of [[0, 38], [242, 38]]) { rr(g, fx, 176, fw, 56, 2); fs(g, '#A66A3A', C.out, 2); for (let x = fx + 6; x < fx + fw; x += 8) { g.fillStyle = 'rgba(0,0,0,.15)'; g.fillRect(x, 178, 1.5, 52); } }
+  g.save(); g.translate(-10, 90); g.scale(0.55, 0.55); sapling(g); g.restore();
+  ell(g, 86, 234, 6, 6); fs(g, C.ballG, C.out, 2);
+}
+function streetSign(g, lines, col) { rr(g, 56, 70, 8, 170, 3); fs(g, '#6E757D', C.out, 2.5); rr(g, 0, 10, 120, 60, 8); fs(g, col, C.out, 3); rr(g, 6, 16, 108, 48, 5); g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 2; g.stroke(); textO(g, lines[0], 60, lines[1] ? 32 : 40, lines[1] ? 14 : 16, '#FFFFFF', null, 'center', 0); if (lines[1]) textO(g, lines[1], 60, 52, 12, '#FFFFFF', null, 'center', 0, 600); }
+function schoolZone(g) { rr(g, 36, 100, 8, 140, 3); fs(g, '#6E757D', C.out, 2.5); g.beginPath(); g.moveTo(40, 10); g.lineTo(78, 48); g.lineTo(78, 70); g.lineTo(2, 70); g.lineTo(2, 48); g.closePath(); fs(g, '#C6FF1A', C.out, 3); textO(g, 'SCHOOL', 40, 46, 12, C.ink, null, 'center', 0); textO(g, 'ZONE', 40, 60, 12, C.ink, null, 'center', 0); rr(g, 10, 76, 60, 20, 3); fs(g, '#FFFFFF', C.out, 2.5); textO(g, '20 MPH', 40, 86, 11, C.ink, null, 'center', 0); }
+function coveSlides(g) { rr(g, 20, 110, 300, 122, 8); fs(g, '#DDE3E8', C.out, 3.5); g.fillStyle = '#2EC4B6'; g.fillRect(20, 110, 300, 18); textO(g, 'THE COVE', 170, 150, 26, '#2B4A9A', null, 'center', 0); textO(g, 'at The Lakefront', 170, 172, 12, '#5A5A62', null, 'center', 0, 600); g.lineCap = 'round'; for (const [col, off] of [['#F26B4A', 0], ['#FFE066', 30], ['#2EC4B6', 60]]) { g.beginPath(); g.moveTo(230 + off, 20); g.bezierCurveTo(330 + off, 20, 200 + off, 120, 330 + off * 0.6, 110); g.strokeStyle = C.out; g.lineWidth = 18; g.stroke(); g.strokeStyle = col; g.lineWidth = 12; g.stroke(); } rr(g, 226, 12, 100, 16, 4); fs(g, '#9AA0A6', C.out, 2.5); for (const x of [240, 300]) { g.beginPath(); g.moveTo(x, 28); g.lineTo(x, 110); g.strokeStyle = '#9AA0A6'; g.lineWidth = 6; g.stroke(); } }
+function surfShack(g) { rr(g, 20, 110, 200, 100, 6); fs(g, '#8FD2E6', C.out, 3); g.beginPath(); g.moveTo(10, 112); g.lineTo(120, 60); g.lineTo(230, 112); g.closePath(); fs(g, '#C9A068', C.out, 3); for (let x = 20; x < 230; x += 14) { g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(x, 86 + Math.abs(x - 120) * 0.25, 4, 20); } rr(g, 60, 150, 50, 60, 3); fs(g, '#5A3A2E', C.out, 2.5); rr(g, 130, 140, 60, 40, 3); fs(g, '#BDE8FF', '#F4F4F4', 3); rr(g, 50, 118, 140, 22, 6); fs(g, '#F26B4A', C.out, 2.5); textO(g, 'SURF SHACK', 120, 129, 13, '#FFFFFF', null, 'center', 0); g.beginPath(); g.ellipse(222, 160, 10, 46, 0.1, 0, TAU); fs(g, '#FFE066', C.out, 2.5); g.beginPath(); g.ellipse(238, 164, 10, 46, -0.1, 0, TAU); fs(g, '#2EC4B6', C.out, 2.5); }
+function lawnStage(g) { rr(g, 20, 150, 220, 82, 6); fs(g, '#5CB25A', C.out, 3); rr(g, 60, 90, 140, 70, 8); fs(g, '#F4F4F2', C.out, 3); g.beginPath(); g.moveTo(50, 92); g.lineTo(130, 52); g.lineTo(210, 92); g.closePath(); fs(g, '#6E757D', C.out, 3); rr(g, 70, 100, 120, 50, 4); fs(g, '#2B2B30', null); for (const x of [90, 130, 170]) { ell(g, x, 112, 5, 5); fs(g, '#FFE066', null); } rr(g, 160, 170, 70, 40, 5); fs(g, '#FF7FB1', C.out, 2.5); rr(g, 170, 150, 50, 22, 3); fs(g, '#FFFFFF', C.out, 2); textO(g, 'TACOS', 195, 161, 10, C.ink, null, 'center', 0); textO(g, 'THE LAWN', 130, 76, 13, '#FFFFFF', C.out, 'center', 3); }
+function slushCup(g, x, y, s, fill, col) { g.save(); g.translate(x, y); g.scale(s, s); g.beginPath(); g.moveTo(-22, -40); g.lineTo(22, -40); g.lineTo(16, 30); g.lineTo(-16, 30); g.closePath(); fs(g, 'rgba(255,255,255,.85)', C.out, 2.5); if (fill > 0) { g.save(); g.beginPath(); g.moveTo(-21, -39); g.lineTo(21, -39); g.lineTo(15, 29); g.lineTo(-15, 29); g.closePath(); g.clip(); const top = 29 - fill * 68; g.fillStyle = col; g.fillRect(-30, top, 60, 80); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(-12, top + 4, 4, 60 * fill); if (fill > 0.98) { for (const [cx, cy, r] of [[-10, top - 4, 8], [8, top - 6, 9], [0, top - 14, 7]]) { ell(g, cx, cy, r, r); fs(g, col, C.out, 2); } } g.restore(); } rr(g, -26, -46, 52, 10, 4); fs(g, '#F4F4F2', C.out, 2); g.beginPath(); g.moveTo(6, -46); g.lineTo(10, -78); g.strokeStyle = C.out; g.lineWidth = 7; g.stroke(); g.strokeStyle = '#D7322A'; g.lineWidth = 4; g.stroke(); g.restore(); }
+function drawKid(g, who, x, y, s, run) { // Nic (blue cap, backpack) / Giulia (pigtails + bows, pink)
+  g.save(); g.translate(x, y); g.scale(s, s); const t = run || 0;
+  const legs = (c) => { for (const k of [-1, 1]) { g.beginPath(); g.moveTo(k * 7, 20); g.lineTo(k * 7 + Math.sin(t * 10 + (k > 0 ? 0 : Math.PI)) * 8 * (run ? 1 : 0), 44); g.strokeStyle = C.out; g.lineWidth = 11; g.lineCap = 'round'; g.stroke(); g.strokeStyle = c; g.lineWidth = 7; g.stroke(); } };
+  if (who === 'nic') { legs('#2F4A7A'); rr(g, -18, -6, 36, 30, 8); fs(g, '#2F6FD8', C.out, 2.5); rr(g, -22, -2, 10, 24, 5); fs(g, '#4CAF50', C.out, 2); ell(g, 0, -22, 17, 17); fs(g, '#D9A77A', C.out, 2.5); g.beginPath(); g.moveTo(-17, -24); g.bezierCurveTo(-15, -42, 15, -42, 17, -24); g.lineTo(17, -20); g.lineTo(-17, -20); g.closePath(); fs(g, '#2F6FD8', C.out, 2); rr(g, 10, -24, 16, 6, 3); fs(g, '#2F6FD8', C.out, 1.8); ell(g, -5, -20, 2.4, 2.6); fs(g, C.eye, null); ell(g, 6, -20, 2.4, 2.6); fs(g, C.eye, null); g.beginPath(); g.moveTo(-5, -11); g.quadraticCurveTo(0, -5, 5, -11); g.strokeStyle = C.out; g.lineWidth = 2; g.stroke(); }
+  else { legs('#E6B892'); rr(g, -18, -6, 36, 30, 8); fs(g, '#FF7FB1', C.out, 2.5); rr(g, 12, -2, 10, 24, 5); fs(g, '#B98CFF', C.out, 2); for (const k of [-1, 1]) { g.beginPath(); g.moveTo(k * 14, -26); g.quadraticCurveTo(k * 26, -14 + Math.sin(t * 8) * 4, k * 22, 2); g.strokeStyle = C.out; g.lineWidth = 9; g.stroke(); g.strokeStyle = '#3B2314'; g.lineWidth = 6; g.stroke(); ell(g, k * 15, -28, 5, 3.5); fs(g, '#FF4FB0', C.out, 1.5); } ell(g, 0, -22, 17, 17); fs(g, '#E6B892', C.out, 2.5); g.beginPath(); g.moveTo(-17, -22); g.bezierCurveTo(-15, -42, 15, -42, 17, -22); g.bezierCurveTo(10, -28, -10, -28, -17, -22); g.closePath(); fs(g, '#3B2314', null); ell(g, -5, -20, 2.6, 2.8); fs(g, C.eye, null); ell(g, 6, -20, 2.6, 2.8); fs(g, C.eye, null); ell(g, -5.8, -21, 0.9, 0.9); fs(g, '#fff', null); ell(g, 5.2, -21, 0.9, 0.9); fs(g, '#fff', null); g.beginPath(); g.moveTo(-5, -11); g.quadraticCurveTo(0, -4, 5, -11); g.strokeStyle = C.out; g.lineWidth = 2; g.stroke(); }
+  g.restore();
+}
 const SPR = {}; // roadside sprite library: key -> {sprite, collide}
 function buildSprites() {
   SPR.oak = sprite('oak', 200, 220, 1300, treeOak);
@@ -738,6 +900,30 @@ function buildSprites() {
   SPR.shopMIA = sprite('shopMIA', 300, 230, 2600, g => coffeeShop(g, 'cao', 'CAO Coffee'));
   SPR.pupsignMIA = sprite('pupsignMIA', 200, 240, 760, g => pupSign(g, 'CAO Coffee'));
   SPR.billMIA = sprite('billMIA', 240, 240, 1300, g => billboard(g, 'CAO COFFEE', 'cafecito & pup cups'));
+  // Story mode: Little Elm school run
+  SPR.house1 = sprite('house1', 280, 240, 2100, g => suburbHouse(g, '#9E5A46', '#4A4A52', '#D9CBB4', '#C9B48E', true));
+  SPR.house2 = sprite('house2', 280, 240, 2100, g => suburbHouse(g, '#D8C4A6', '#4F5B6B', '#C9BFAE', '#7C7F58', true));
+  SPR.house3 = sprite('house3', 280, 240, 2100, g => suburbHouse(g, '#8E5240', '#3E3E46', '#E2D6C0', '#B9A07A', false));
+  SPR.house4 = sprite('house4', 280, 240, 2100, g => suburbHouse(g, '#C9A27E', '#5A4A40', '#D9CBB4', '#8A8A72', true));
+  SPR.sapling = sprite('sapling', 100, 160, 360, sapling);
+  SPR.bus = sprite('bus', 250, 100, 1100, schoolBus);
+  SPR.lamp2 = sprite('lamp2', 120, 300, 520, g => { g.beginPath(); g.moveTo(60, 300); g.lineTo(60, 30); g.strokeStyle = C.out; g.lineWidth = 11; g.stroke(); g.strokeStyle = '#1E1E22'; g.lineWidth = 7; g.stroke(); g.beginPath(); g.moveTo(24, 36); g.lineTo(96, 36); g.strokeStyle = C.out; g.lineWidth = 8; g.stroke(); g.strokeStyle = '#1E1E22'; g.lineWidth = 4; g.stroke(); for (const lx of [24, 96]) { g.beginPath(); g.moveTo(lx, 38); g.lineTo(lx, 50); g.strokeStyle = '#1E1E22'; g.lineWidth = 3; g.stroke(); g.beginPath(); g.moveTo(lx - 12, 50); g.lineTo(lx + 12, 50); g.lineTo(lx + 7, 66); g.lineTo(lx - 7, 66); g.closePath(); fs(g, '#1E1E22', C.out, 2); rr(g, lx - 6, 62, 12, 6, 2); fs(g, '#FFE9A8', null); } rr(g, 66, 90, 28, 70, 3); fs(g, '#2B4A9A', C.out, 2); textO(g, 'THE', 80, 106, 8, '#FFFFFF', null, 'center', 0); textO(g, 'LAKE', 80, 118, 8, '#FFFFFF', null, 'center', 0); textO(g, 'FRONT', 80, 130, 8, '#FFFFFF', null, 'center', 0); rr(g, 50, 280, 20, 20, 4); fs(g, '#6E757D', C.out, 2.5); });
+  SPR.home = sprite('home', 280, 240, 2300, homeHouse);
+  SPR.school = sprite('school', 480, 240, 4200, schoolBuilding);
+  SPR.tinman = sprite('tinman', 400, 240, 3200, tinmanBuilding);
+  SPR.cove = sprite('cove', 340, 240, 2600, coveSlides);
+  SPR.shack = sprite('shack', 250, 215, 1500, surfShack);
+  SPR.lawn = sprite('lawn', 250, 240, 1600, lawnStage);
+  SPR.schoolzone = sprite('schoolzone', 80, 240, 300, schoolZone);
+  SPR.sign380 = sprite('sign380', 120, 240, 420, g => streetSign(g, ['US 380', 'UNIVERSITY DR'], '#2E7D32'));
+  SPR.sign423 = sprite('sign423', 120, 240, 420, g => streetSign(g, ['FM 423', 'NORTH'], '#2E7D32'));
+  SPR.signShahan = sprite('signShahan', 120, 240, 420, g => streetSign(g, ['SHAHAN', 'PRAIRIE RD'], '#2E7D32'));
+  SPR.signLobo = sprite('signLobo', 120, 240, 420, g => streetSign(g, ['LOBO LN'], '#2B4A9A'));
+  SPR.signEldorado = sprite('signEldorado', 120, 240, 420, g => streetSign(g, ['ELDORADO', 'PKWY'], '#2E7D32'));
+  SPR.signLakefront = sprite('signLakefront', 260, 200, 1300, g => welcomeSign(g, 'THE LAKEFRONT', 'LITTLE ELM', '#1FA39A', '#FFE066'));
+  SPR.signJewel = sprite('signJewel', 120, 240, 420, g => streetSign(g, ['JEWELBERRY', 'ST'], '#2E7D32'));
+  SPR.signTaphouse = sprite('signTaphouse', 240, 240, 1300, g => billboard(g, 'TOWERS TAP HOUSE', 'lakeside patio · live music'));
+  SPR.signOffroad = sprite('signOffroad', 120, 240, 420, g => streetSign(g, ['OFF-ROAD', 'TRAIL'], '#8A5A2B'));
 }
 
 /* =====================================================================
@@ -791,7 +977,7 @@ function buildBackdrops() {
       g.fillStyle = '#15132C'; g.fillRect(0, 250, 1920, 10);
     })
   ];
-  backdropSets = [texas, miami]; backdrops = backdropSets[route.id];
+  backdropSets = [texas, miami, [texas[0], texas[0], texas[0]]]; backdrops = backdropSets[route.id];
 }
 
 /* =====================================================================
@@ -799,14 +985,16 @@ function buildBackdrops() {
    ===================================================================== */
 let segments = [], trackLength = 0, cars = [], stageStarts = [0, 0, 0];
 const lastY = () => segments.length ? segments[segments.length - 1].p2.world.y : 0;
+let forceStartY = null;
+const curY = () => forceStartY !== null ? forceStartY : lastY();
 function addSegment(curve, y, stage) {
-  const n = segments.length;
-  segments.push({ index: n, stage, p1: { world: { y: lastY(), z: n * TUNE.segLen }, camera: {}, screen: {} }, p2: { world: { y, z: (n + 1) * TUNE.segLen }, camera: {}, screen: {} }, curve, sprites: [], cars: [], alt: Math.floor(n / TUNE.rumble) % 2 === 0 });
+  const n = segments.length, y0 = curY(); forceStartY = null;
+  segments.push({ index: n, stage, p1: { world: { y: y0, z: n * TUNE.segLen }, camera: {}, screen: {} }, p2: { world: { y, z: (n + 1) * TUNE.segLen }, camera: {}, screen: {} }, curve, sprites: [], cars: [], alt: Math.floor(n / TUNE.rumble) % 2 === 0, fork: 0 });
 }
 const easeIn = (a, b, p) => a + (b - a) * p * p, easeOut = (a, b, p) => a + (b - a) * (1 - (1 - p) * (1 - p)), easeInOut = (a, b, p) => a + (b - a) * ((-Math.cos(p * Math.PI) / 2) + 0.5);
 let curStage = 0;
 function addRoad(enter, hold, leave, curve, y) {
-  const startY = lastY(), endY = startY + (y | 0) * TUNE.segLen, total = enter + hold + leave;
+  const startY = curY(), endY = startY + (y | 0) * TUNE.segLen, total = enter + hold + leave;
   for (let n = 0; n < enter; n++) addSegment(easeIn(0, curve, n / enter), easeInOut(startY, endY, n / total), curStage);
   for (let n = 0; n < hold; n++) addSegment(curve, easeInOut(startY, endY, (enter + n) / total), curStage);
   for (let n = 0; n < leave; n++) addSegment(easeInOut(curve, 0, n / leave), easeInOut(startY, endY, (enter + hold + n) / total), curStage);
@@ -820,19 +1008,42 @@ const bumps = () => { for (const h of [5, -2, -5, 8, 5, -7, 5, -2]) addRoad(10, 
 const lowRolling = (n, h) => { n = n || 15; h = h || HILL.low; addRoad(n, n, n, 0, h / 2); addRoad(n, n, n, 0, -h); addRoad(n, n, n, CURVE.easy, h); addRoad(n, n, n, 0, 0); addRoad(n, n, n, -CURVE.easy, h / 2); addRoad(n, n, n, 0, 0); };
 const downhillToEnd = n => addRoad(n || 200, n || 200, n || 200, -CURVE.easy, -lastY() / TUNE.segLen);
 
+let forks = [], pendingShops = [];
+function levelTo(y) { const d = Math.round((y - lastY()) / TUNE.segLen); if (d !== 0) addRoad(16, 8, 16, 0, d); }
+const pendShop = () => pendingShops.push(segments.length + 70);
+function forkSign(leftName, rightName) { return sprite('forksign_' + leftName + '_' + rightName, 480, 220, 5200, g => { for (const px of [30, 450]) { rr(g, px - 8, 70, 16, 150, 4); fs(g, '#8A9098', C.out, 3); } rr(g, 6, 18, 468, 74, 10); fs(g, '#2E7D32', '#F4F4F4', 4); g.fillStyle = '#F4F4F4'; g.fillRect(238, 26, 3, 58); textO(g, '◀ ' + leftName, 122, 55, 22, '#FFFFFF', null, 'center', 0); textO(g, rightName + ' ▶', 358, 55, 22, '#FFFFFF', null, 'center', 0); }); }
+// The road splits in two; the player picks a side by steering. Both branches are laid out inline and the
+// game jumps between them at the split and at the rejoin, so the drive always feels continuous.
+function fork(leftName, rightName, leftBuild, rightBuild, offroadSide) {
+  const stage = curStage, id = forks.length;
+  for (let i = 0; i < 70; i++) { addSegment(0, lastY(), stage); const sg = segments[segments.length - 1]; sg.fork = Math.min(1, i / 38); sg.forkApproach = id; }
+  const decision = segments.length - 1, yD = lastY(); segments[decision].forkId = id;
+  const merge = (branch) => { for (let i = 0; i < 40; i++) { addSegment(0, lastY(), stage); const sg = segments[segments.length - 1]; sg.fork = 1 - i / 40; sg.branch = branch; } };
+  const L0 = segments.length; merge('L'); const Lb = segments.length; leftBuild(); levelTo(yD); const L1 = segments.length;
+  for (let k = Lb; k < L1; k++) { segments[k].branch = 'L'; if (offroadSide === 'L') segments[k].offroad = true; }
+  for (let i = 0; i < 6; i++) { addSegment(0, lastY(), stage); segments[segments.length - 1].fork = 1; segments[segments.length - 1].buffer = true; }
+  forceStartY = yD; const R0 = segments.length; merge('R'); const Rb = segments.length; rightBuild(); levelTo(yD); const R1 = segments.length;
+  for (let k = Rb; k < R1; k++) { segments[k].branch = 'R'; if (offroadSide === 'R') segments[k].offroad = true; }
+  segments[L1 - 1].jumpTo = R1;
+  const f = { id, decision, L0, Lb, L1, R0, Rb, R1, leftName, rightName, offroadSide, chosen: null, signAt: decision - 64 };
+  forks.push(f); return f;
+}
 function addSprite(n, key, offset, extra) { if (n >= 0 && n < segments.length) segments[n].sprites.push(Object.assign({ s: SPR[key], offset, key }, extra || {})); }
 let stops = [];
+function addSpriteObj(n, spr, offset, extra) { if (n >= 0 && n < segments.length) segments[n].sprites.push(Object.assign({ s: spr, offset, key: 'custom' }, extra || {})); }
 function addShop(n, id) {
   for (let k = n - 100; k < n + 40; k++) if (segments[k]) segments[k].lot = true;
   for (let k = n - 30; k < n + 8; k++) if (segments[k]) segments[k].stop = id;
-  addSprite(n - 110, route.id === 0 ? 'pupsignTX' : 'pupsignMIA', 1.95, { solid: 1 });
-  addSprite(n + 2, route.id === 0 ? 'shopTX' : 'shopMIA', 2.45, { solid: 1 });
+  const sheep = route.shopStyle === 'sheep';
+  addSprite(n - 110, sheep ? 'pupsignTX' : 'pupsignMIA', 1.95, { solid: 1 });
+  addSprite(n + 2, sheep ? 'shopTX' : 'shopMIA', 2.45, { solid: 1 });
   stops.push({ id, n, done: false });
 }
 function decorate(from, to, stage) {
   for (let n = from; n < to; n++) {
     const h = hash(n, stage * 11 + 1), h2 = hash(n, stage * 11 + 2); let side = h2 < 0.5 ? -1 : 1;
     const lot = !!segments[n].lot; if (lot && side > 0) side = -1; // keep the pull-off clear
+    if (segments[n].fork) continue; if (segments[n].offroad) { decorateOffroad(n, h, h2, side); continue; }
     if (route.id === 1) { decorateMiami(n, stage, h, h2, side, lot); continue; }
     if (stage === 0) {
       if (n % 6 === 0 && hash(n, 77) < 0.75 && !lot) addSprite(n, 'fence', (hash(n, 78) < 0.5 ? -1 : 1) * 1.2, { solid: 1 });
@@ -892,42 +1103,137 @@ function decorateMiami(n, stage, h, h2, side, lot) {
   if (n % 37 === 10) { const lane = pick([-0.66, 0, 0.66]), red = h < 0.3; for (let k = 0; k < 5; k++) addSprite(n + k * 3, red ? 'ballR' : 'ballG', lane, { pickup: red ? 'red' : 'green' }); }
   if (n % 97 === 50) addSprite(n, 'bone', pick([-0.66, 0, 0.66]), { pickup: 'bone' });
 }
+function decorateOffroad(n, h, h2, side) {
+  const prev = segments[n - 1]; if (prev && !prev.offroad) { addSprite(n + 4, 'signOffroad', -1.45, { solid: 1 }); }
+  if (route.id === 1) { // beach trail
+    if (n % 6 === 1) addSprite(n, 'palm', side * (1.3 + hash(n, 21) * 1.2), { solid: 1 });
+    if (n % 9 === 4) addSprite(n, h < 0.5 ? 'umb1' : 'umb2', -side * (1.4 + hash(n, 22) * 1.2));
+    if (n % 23 === 8) addSprite(n, 'flamingo', side * (1.4 + hash(n, 23) * 0.6), { moo: 1 });
+    if (n % 15 === 7) addSprite(n, 'buoy', -side * (1.6 + hash(n, 24)));
+  } else {
+    if (n % 6 === 1) addSprite(n, h < 0.5 ? 'cactus' : 'hay', side * (1.3 + hash(n, 21) * 1.5), { solid: 1 });
+    if (n % 9 === 4) addSprite(n, 'oak', -side * (1.5 + hash(n, 22) * 1.5), { solid: 1 });
+    if (n % 17 === 8) addSprite(n, 'cow', side * (1.6 + hash(n, 23)), { solid: 1, moo: 1 });
+    if (n % 7 === 3) addSprite(n, 'fence', -side * 1.25, { solid: 1 });
+    if (n % 31 === 15) addSprite(n, 'flowers', side * 1.3);
+    if (n % 80 === 40) addSprite(n, 'windmill', side * 4.5);
+  }
+  if (n % 22 === 11) addSprite(n, 'puddle', pick([-0.5, 0, 0.5]), { puddle: 1 });
+  if (n % 29 === 10) { const lane = pick([-0.6, 0, 0.6]), red = h < 0.4; for (let k = 0; k < 5; k++) addSprite(n + k * 3, red ? 'ballR' : 'ballG', lane, { pickup: red ? 'red' : 'green' }); }
+  if (n % 61 === 30) addSprite(n, 'bone', pick([-0.5, 0, 0.5]), { pickup: 'bone' });
+}
 function addCars(from, to, count) {
   for (let i = 0; i < count; i++) {
-    const lane = pick([-0.66, 0, 0.66]); const z = Math.floor(rnd(from, to)) * TUNE.segLen; const kind = Math.random() < 0.15 ? 'semi' : Math.random() < 0.4 ? 'pickup' : 'sedan';
+    const lane = pick([-0.66, 0, 0.66]); let zi = Math.floor(rnd(from, to)); for (let tries = 0; tries < 12 && (segments[zi].fork || segments[zi].offroad || segments[zi].buffer); tries++) zi = Math.floor(rnd(from, to)); if (segments[zi].fork || segments[zi].offroad || segments[zi].buffer) continue; const z = zi * TUNE.segLen; const kind = Math.random() < 0.15 ? 'semi' : Math.random() < 0.4 ? 'pickup' : 'sedan';
     const s = pick(carSprites[kind]); const sp = TUNE.maxSpeed * (kind === 'semi' ? rnd(0.26, 0.36) : rnd(TUNE.trafficSpeed[0], TUNE.trafficSpeed[1]));
     const car = { offset: lane, z, s, speed: sp, kind, w: s.ww / TUNE.roadW, dodge: 0, passed: false }; segments[findSegment(z).index].cars.push(car); cars.push(car);
   }
 }
 function findSegment(z) { return segments[Math.floor(z / TUNE.segLen) % segments.length]; }
 function buildTrack() {
-  segments = []; cars = []; stageStarts = [0, 0, 0]; stops = []; STAGES = route.stages; backdrops = backdropSets[route.id] || backdrops;
+  segments = []; cars = []; stageStarts = [0, 0, 0]; stops = []; events = []; forks = []; pendingShops = []; forceStartY = null; STAGES = route.stages; backdrops = backdropSets[route.id] || backdrops;
   if (route.id === 1) { buildMiami(); return; }
+  if (route.id === 2) { buildStory(); return; }
   /* ---------------- TRACK SCRIPT (edit me) ----------------
      Stage 0: country roads · Stage 1: lake bridge · Stage 2: city at sunset.
      straight(len), hill(len, height), curve(len, curve, height), sCurves(), bumps(), lowRolling() */
   curStage = 0; stageStarts[0] = 0;
-  straight(LEN.short); curve(LEN.short, CURVE.easy); lowRolling(); sCurves(); bumps(); hill(LEN.med, HILL.med); curve(LEN.med, -CURVE.med, -HILL.low); curve(LEN.short, CURVE.hard, HILL.low); bumps(); hill(LEN.med, -HILL.med); straight(LEN.short);
+  straight(LEN.short); curve(LEN.short, CURVE.easy); lowRolling();
+  fork('FM 423', 'RANCH ROAD', () => { sCurves(); bumps(); }, () => { bumps(); lowRolling(15, 14); bumps(); }, 'R');
+  pendShop(); hill(LEN.med, HILL.med); curve(LEN.med, -CURVE.med, -HILL.low); curve(LEN.short, CURVE.hard, HILL.low); bumps(); hill(LEN.med, -HILL.med); straight(LEN.short);
   curStage = 1; stageStarts[1] = segments.length;
   straight(LEN.med); hill(LEN.med, HILL.high); curve(LEN.long, CURVE.easy); curve(LEN.med, -CURVE.easy, -HILL.med); straight(LEN.med); curve(LEN.med, CURVE.med, HILL.low); hill(LEN.med, -HILL.low); straight(LEN.short);
   curStage = 2; stageStarts[2] = segments.length;
-  straight(LEN.med); curve(LEN.med, CURVE.med); sCurves(); curve(LEN.med, -CURVE.hard); straight(LEN.med); lowRolling(); curve(LEN.med, CURVE.med, HILL.low); downhillToEnd(60); straight(LEN.med); straight(LEN.med);
+  straight(LEN.med); curve(LEN.med, CURVE.med);
+  fork('DOWNTOWN', 'TRINITY TRAIL', () => { sCurves(); curve(LEN.med, -CURVE.hard); }, () => { bumps(); curve(LEN.med, -CURVE.easy); bumps(); }, 'R');
+  straight(LEN.med); pendShop(); lowRolling(); curve(LEN.med, CURVE.med, HILL.low); downhillToEnd(60); straight(LEN.med); straight(LEN.med);
   /* ---------------- END TRACK SCRIPT ---------------- */
   finishTrack();
 }
 function buildMiami() {
   /* ---------------- MIAMI TRACK SCRIPT ---------------- */
   curStage = 0; stageStarts[0] = 0;
-  straight(LEN.short); curve(LEN.short, CURVE.easy); straight(LEN.med); sCurves(); curve(LEN.med, -CURVE.easy); lowRolling(15, 10); straight(LEN.med); curve(LEN.short, CURVE.med); straight(LEN.short);
+  straight(LEN.short); curve(LEN.short, CURVE.easy); straight(LEN.med);
+  fork('OCEAN DRIVE', 'BEACH TRAIL', () => { sCurves(); curve(LEN.med, -CURVE.easy); }, () => { bumps(); lowRolling(15, 10); bumps(); }, 'R');
+  pendShop(); lowRolling(15, 10); straight(LEN.med); curve(LEN.short, CURVE.med); straight(LEN.short);
   curStage = 1; stageStarts[1] = segments.length;
   straight(LEN.med); hill(LEN.med, HILL.high); curve(LEN.long, -CURVE.easy); straight(LEN.med); curve(LEN.med, CURVE.easy, -HILL.med); hill(LEN.med, -HILL.low); straight(LEN.short);
   curStage = 2; stageStarts[2] = segments.length;
-  straight(LEN.med); curve(LEN.med, -CURVE.med); sCurves(); curve(LEN.med, CURVE.hard); straight(LEN.med); lowRolling(); curve(LEN.med, -CURVE.med, HILL.low); downhillToEnd(60); straight(LEN.med); straight(LEN.med);
+  straight(LEN.med); curve(LEN.med, -CURVE.med);
+  fork('BRICKELL AVE', 'BAYWALK', () => { sCurves(); curve(LEN.med, CURVE.hard); }, () => { bumps(); curve(LEN.med, CURVE.easy); bumps(); }, 'R');
+  straight(LEN.med); pendShop(); lowRolling(); curve(LEN.med, -CURVE.med, HILL.low); downhillToEnd(60); straight(LEN.med); straight(LEN.med);
   finishTrack();
 }
-function finishTrack() {
+function buildStory() {
+  /* ---------------- STORY TRACK SCRIPT: 112 Jewelberry → Oak Point Elementary → Tinman Social → home ---------------- */
+  curStage = 0; stageStarts[0] = 0;
+  straight(LEN.short); curve(LEN.short, -CURVE.easy); straight(LEN.short); curve(LEN.med, CURVE.easy); straight(LEN.med); lowRolling(15, 12);
+  fork('FM 423', 'DIRT TRAIL', () => { curve(LEN.med, -CURVE.easy); straight(LEN.med); sCurves(); }, () => { bumps(); lowRolling(15, 14); bumps(); straight(LEN.short); }, 'R');
+  pendShop(); straight(LEN.med); curve(LEN.short, -CURVE.med); straight(LEN.med); hill(LEN.short, HILL.low); straight(LEN.med); straight(LEN.short);
+  curStage = 1; stageStarts[1] = segments.length;
+  straight(LEN.short); curve(LEN.med, CURVE.easy); straight(LEN.med);
+  fork('ELDORADO PKWY', 'LAKESHORE TRAIL', () => { curve(LEN.med, -CURVE.med, -HILL.low); straight(LEN.med); curve(LEN.med, CURVE.easy); }, () => { bumps(); curve(LEN.short, -CURVE.easy); bumps(); lowRolling(15, 10); }, 'R');
+  straight(LEN.med); curve(LEN.short, CURVE.easy); straight(LEN.med); straight(LEN.med); straight(LEN.short);
+  curStage = 2; stageStarts[2] = segments.length;
+  straight(LEN.short); curve(LEN.med, -CURVE.easy);
+  fork('NEIGHBORHOOD', 'FIELD SHORTCUT', () => { lowRolling(15, 10); curve(LEN.med, CURVE.med); straight(LEN.med); }, () => { bumps(); bumps(); curve(LEN.short, CURVE.easy); }, 'R');
+  straight(LEN.med); curve(LEN.short, -CURVE.easy); downhillToEnd(50); straight(LEN.med); straight(LEN.med); straight(LEN.short);
   const N = segments.length; trackLength = N * TUNE.segLen;
-  addShop(stageStarts[0] + 900, 0); addShop(stageStarts[2] + 620, 1);
+  // pup cup stop (Black Sheep Coffee) after the first fork, then the two story events
+  pendingShops.slice(0, 1).forEach((n, i) => addShop(n, i));
+  addEvent(stageStarts[1] - 60, 'school'); addEvent(stageStarts[2] - 60, 'tinman');
+  placeForkSigns(); decorateStoryAll(N);
+  segments[N - 150].finishLine = true; for (let k = N - 118; k < N - 40; k++) segments[k].lot = true;
+  addSprite(N - 80, 'home', 2.3, { solid: 1 }); addSprite(N - 110, 'signJewel', -1.4, { solid: 1 }); for (let k = N - 160; k < N - 150; k += 3) addSprite(k, 'ballG', 0.66, { pickup: 'green' });
+  for (let k = N - 140; k < N; k += 7) { addSprite(k, pick(['house1', 'house2', 'house3', 'house4']), -2.2 - hash(k, 3) * 0.6, { solid: 1 }); if (k < N - 118 || k > N - 40) addSprite(k + 3, 'sapling', 1.4 + hash(k, 4) * 0.4, { solid: 1 }); else if (k + 3 < N - 100 || k + 3 > N - 62) addSprite(k + 3, pick(['house1', 'house2', 'house3', 'house4']), 2.3 + hash(k, 5) * 0.4, { solid: 1 }); }
+  addCars(20, stageStarts[1] - 80, 16); addCars(stageStarts[1], stageStarts[2] - 80, 16); addCars(stageStarts[2], N - 170, 18);
+}
+let events = [];
+function addEvent(n, kind) {
+  for (let k = n - 90; k < n + 40; k++) if (segments[k]) segments[k].lot = true;
+  addSprite(n + 2, kind === 'school' ? 'school' : 'tinman', 2.45, { solid: 1 });
+  addSprite(n - 120, kind === 'school' ? 'schoolzone' : 'signLakefront', kind === 'school' ? 1.4 : 1.6, { solid: 1 });
+  if (segments[n - 10]) segments[n - 10].event = kind;
+  events.push({ kind, n, done: false });
+}
+function decorateStoryAll(N) {
+  const s0 = stageStarts[0], s1 = stageStarts[1], s2 = stageStarts[2];
+  for (let n = 8; n < N - 160; n++) {
+    const seg = segments[n], lot = !!seg.lot, h = hash(n, 31), h2 = hash(n, 32); let side = h2 < 0.5 ? -1 : 1; if (lot && side > 0) side = -1;
+    const stage = n >= s2 ? 2 : n >= s1 ? 1 : 0, from = stageStarts[stage], t = (n - from) / ((stage < 2 ? stageStarts[stage + 1] : N) - from);
+    if (seg.fork) continue; if (seg.offroad) { if (stage === 1) seg.water = true; decorateOffroad(n, h, h2, side); continue; }
+    if (stage === 0) {
+      if (n === 10) addSprite(n, 'signJewel', -1.4, { solid: 1 });
+      if (t < 0.38) { if (n % 9 === 0) addSprite(n, pick(['house1', 'house2', 'house3', 'house4']), -1.9 - hash(n, 5) * 0.7, { solid: 1 }); if (n % 9 === 4 && !lot) addSprite(n, pick(['house1', 'house2', 'house3', 'house4']), 1.9 + hash(n, 6) * 0.7, { solid: 1 }); if (n % 11 === 6) addSprite(n, 'sapling', side * (1.25 + hash(n, 7) * 0.4), { solid: 1 }); if (n % 14 === 9) addSprite(n, 'lamp', -side * 1.2, { solid: 1 }); }
+      else if (t < 0.6) { if (n === Math.floor(from + 0.38 * (s1 - from))) addSprite(n, 'sign380', -1.4, { solid: 1 }); if (n % 15 === 2) addSprite(n, h < 0.5 ? 'bill1' : 'bill2', side * 2.2, { solid: 1 }); if (n % 12 === 7) addSprite(n, 'lamp', side * 1.2, { solid: 1 }); }
+      else { if (n === Math.floor(from + 0.6 * (s1 - from))) addSprite(n, 'signShahan', -1.4, { solid: 1 }); if (n % 7 === 0) addSprite(n, h < 0.6 ? 'oak' : 'cactus', side * (1.6 + hash(n, 8) * 1.6), { solid: 1 }); if (n % 6 === 3 && !lot) addSprite(n, 'fence', side * 1.2, { solid: 1 }); if (n % 23 === 7 && !lot) addSprite(n, 'cow', side * (1.8 + hash(n, 9)), { solid: 1, moo: 1 }); if (n === s1 - 200) addSprite(n, 'signLobo', -1.4, { solid: 1 }); if (n === s1 - 150) { addSprite(n, 'bus', 2.0, { solid: 1 }); addSprite(n + 16, 'bus', 2.0, { solid: 1 }); addSprite(n + 32, 'bus', 2.0, { solid: 1 }); } }
+    } else if (stage === 1) {
+      if (n === from + 40) addSprite(n, 'sign423', -1.4, { solid: 1 });
+      if (t < 0.35) { if (n % 9 === 0) addSprite(n, pick(['house1', 'house2', 'house3', 'house4']), side * (1.9 + hash(n, 5) * 0.7), { solid: 1 }); if (n % 11 === 5) addSprite(n, 'sapling', -side * (1.3 + hash(n, 7) * 0.5), { solid: 1 }); }
+      else { seg.water = true; // Lake Lewisville on the left
+        if (t > 0.55 && ((n - from) % 90 < 3)) seg.brick = true; // red brick crosswalks along the Lakefront boulevard
+        if (n === Math.floor(from + 0.36 * (s2 - from))) addSprite(n, 'signEldorado', 1.5, { solid: 1 });
+        if (n % 10 === 0 && !lot) addSprite(n, t > 0.55 ? 'lamp2' : 'lamp', 1.2, { solid: 1 });
+        if (n % 17 === 4) addSprite(n, h < 0.5 ? 'boat1' : 'yacht', -(3 + hash(n, 10) * 4));
+        if (n % 13 === 6) addSprite(n, 'buoy', -(1.8 + hash(n, 11)));
+        if (n === Math.floor(from + 0.46 * (s2 - from))) { addSprite(n, 'beachSign', -1.6, { solid: 1 }); addSprite(n + 14, 'shack', -1.9, { solid: 1 }); addSprite(n + 24, 'umb1', -1.5); addSprite(n + 30, 'umb2', -1.7); addSprite(n + 36, 'flowers', 1.3); }
+        if (n === Math.floor(from + 0.6 * (s2 - from))) { addSprite(n, 'cove', 1.9, { solid: 1 }); addSprite(n + 40, 'lawn', 1.9, { solid: 1 }); addSprite(n + 80, 'signTaphouse', 2.0, { solid: 1 }); }
+        if (n === Math.floor(from + 0.8 * (s2 - from))) addSprite(n, 'tower', -2.6, { solid: 1 });
+        if (n % 9 === 2 && t > 0.5 && !lot) addSprite(n, 'sapling', 1.45 + hash(n, 12) * 0.5, { solid: 1 });
+      }
+    } else {
+      if (n === from + 30) addSprite(n, 'signEldorado', -1.4, { solid: 1 });
+      if (t < 0.3) { seg.water = true; if (n % 17 === 4) addSprite(n, 'boat1', -(3 + hash(n, 10) * 4)); if (n % 10 === 0 && !lot) addSprite(n, 'lamp', 1.2, { solid: 1 }); if (n === from + 60) addSprite(n, 'tower', -2.8, { solid: 1 }); }
+      else { if (n % 9 === 0) addSprite(n, pick(['house1', 'house2', 'house3', 'house4']), -1.9 - hash(n, 5) * 0.7, { solid: 1 }); if (n % 9 === 4 && !lot) addSprite(n, pick(['house1', 'house2', 'house3', 'house4']), 1.9 + hash(n, 6) * 0.7, { solid: 1 }); if (n % 11 === 6) addSprite(n, 'sapling', side * (1.25 + hash(n, 7) * 0.4), { solid: 1 }); if (n % 14 === 9) addSprite(n, 'lamp', -side * 1.2, { solid: 1 }); if (n === N - 200) addSprite(n, 'signJewel', -1.4, { solid: 1 }); }
+    }
+    if (n % 37 === 10 && !seg.event) { const lane = pick([-0.66, 0, 0.66]), red = h < 0.3; for (let k = 0; k < 5; k++) addSprite(n + k * 3, red ? 'ballR' : 'ballG', lane, { pickup: red ? 'red' : 'green' }); }
+    if (n % 97 === 50) addSprite(n, 'bone', pick([-0.66, 0, 0.66]), { pickup: 'bone' });
+  }
+}
+function placeForkSigns() { for (const f of forks) addSpriteObj(f.signAt, forkSign(f.leftName, f.rightName), 0, { arch: 1 }); }
+function finishTrack() {
+  const N = segments.length; trackLength = N * TUNE.segLen; placeForkSigns();
+  pendingShops.forEach((n, i) => addShop(n, i));
   decorate(stageStarts[0] + 10, stageStarts[1], 0); decorate(stageStarts[1], stageStarts[2], 1); decorate(stageStarts[2], N - 150, 2);
   addSprite(N - 150, 'finish', 0, { finish: 1 }); for (let k = 0; k < 6; k++) { addSprite(N - 148 + k * 2, 'ballG', -0.66, { pickup: 'green' }); addSprite(N - 148 + k * 2, 'ballR', 0.66, { pickup: 'red' }); }
   for (let k = N - 140; k < N; k += 6) { addSprite(k, route.park, -2.2 - hash(k, 3), {}); addSprite(k + 3, route.park, 2.2 + hash(k, 4), {}); }
@@ -1038,11 +1344,12 @@ let state = 'title', menu = { items: [], idx: 0 }, setup = null, time = 0, frame
 let position = 0, speed = 0, playerX = 0, steer = 0, bounce = 0, skyOff = 0, hillOff = 0;
 let score = 0, balls = 0, timer = 0, timerAcc = 0, stage = 0, stageBanner = 0, boostMeter = 0, boosting = 0, hornCool = 0, dizzy = 0, bubble = null, titaBubble = null, passes = 0;
 let particles = [], texts = [], finishTimer = 0, introTimer = 0, tally = null, titleT = 0, best = 0, pup = null, pupCups = 0, routeIdx = 0;
+let storyKids = false, scene = null, slush = null, slushScore = 0;
 try { best = +localStorage.getItem('brt_best') || 0; } catch (e) { }
 
 function setMenu(items) { menu = { items, idx: 0 }; }
-function goTitle() { Music.play(route.id); Music.duck(0.7); state = 'title'; setMenu(['Start Road Trip', 'Controller Setup', 'Sound: ' + (Audio_.on ? 'On' : 'Off')]); titleT = 0; position = 0; playerX = 0; speed = 0; Audio_.engineSet(0, false); }
-function startGame() { Music.play(route.id); Music.duck(1); pupCups = 0; pup = null; buildTrack(); position = 0; speed = 0; playerX = 0; steer = 0; score = 0; balls = 0; timer = TUNE.startTime; timerAcc = 0; stage = 0; stageBanner = 150; boostMeter = 0; boosting = 0; dizzy = 0; bubble = null; titaBubble = { text: '¡Vamos, Bernard!', life: 150 }; passes = 0; particles = []; texts = []; state = 'intro'; introTimer = 0; }
+function goTitle() { Music.play(route.id === 2 ? 0 : route.id); Music.duck(0.7); state = 'title'; setMenu(['Start Road Trip', 'Controller Setup', 'Sound: ' + (Audio_.on ? 'On' : 'Off')]); titleT = 0; position = 0; playerX = 0; speed = 0; Audio_.engineSet(0, false); }
+function startGame() { Music.play(route.id === 2 ? 0 : route.id); Music.duck(1); pupCups = 0; pup = null; storyKids = false; scene = null; slush = null; slushScore = 0; buildTrack(); position = 0; speed = 0; playerX = 0; steer = 0; score = 0; balls = 0; timer = route.time || TUNE.startTime; timerAcc = 0; stage = 0; stageBanner = 150; boostMeter = 0; boosting = 0; dizzy = 0; bubble = null; titaBubble = { text: route.story ? 'School\'s out in 10 minutes. ¡Vamos!' : '¡Vamos, Bernard!', life: 180 }; passes = 0; particles = []; texts = []; state = 'intro'; introTimer = 0; }
 function quitToArcade() { if (typeof window.BRT.onQuit === 'function') { stop(); window.BRT.onQuit(); } else goTitle(); }
 function say(text, who = 'b') { if (who === 'b') bubble = { text, life: 90 }; else titaBubble = { text, life: 110 }; }
 function floatText(x, y, str, color = C.cream) { texts.push({ x, y, str, color, life: 50 }); }
@@ -1091,11 +1398,20 @@ function updatePlaying(dt) {
   else if (inp.gas) speed += (TUNE.maxSpeed / 5) * dt;
   else if (inp.brake) speed -= (TUNE.maxSpeed / 2.2) * dt;
   else speed -= (TUNE.maxSpeed / 5) * dt;
+  // forks: settle into a lane, then the chosen road becomes the road under the tires
+  settleFork(dt, playerSeg);
+  const segNow = findSegment(position + playerZ);
+  glideFork(dt, segNow);
   // off-road
-  const onLot = playerSeg.lot && playerX > 1;
-  if ((playerX < -1 || playerX > 1) && !onLot) { if (speed > TUNE.maxSpeed / 4 && boosting <= 0) speed -= (TUNE.maxSpeed / 2) * dt; if (frame % 3 === 0) dust(W / 2 + (playerX > 0 ? 120 : -120), H - 40, 2, stage === 1 ? 'rgba(180,220,255,.8)' : 'rgba(190,160,110,.8)'); bounce = rnd(-1, 1) * 2.5 * speedPct; }
+  const onLot = segNow.lot && playerX > 1, fkT = segNow.fork || 0;
+  const sepNow = fkT > 0.12 ? (fkT >= 0.98 ? 1.44 : forkSep(fkT)) : 0;
+  const roadEdge = sepNow ? Math.max(1, sepNow + 1.08) : 1;
+  const island = sepNow ? Math.max(0, sepNow - 0.92) : 0;
+  const committed = !!(segNow.branch && forks.some(f => f.chosen === segNow.branch));
+  if (segNow.offroad) { bounce = rnd(-1, 1) * 1.6 * speedPct; if (frame % 4 === 0 && speedPct > 0.2) dust(W / 2 + rnd(-90, 90), H - 40, 1, route.id === 1 ? 'rgba(235,220,170,.8)' : 'rgba(190,160,110,.8)'); }
+  if ((Math.abs(playerX) > roadEdge || (island > 0.12 && Math.abs(playerX) < island && !committed)) && !onLot) { if (speed > TUNE.maxSpeed / 4 && boosting <= 0) speed -= (TUNE.maxSpeed / 2) * dt; if (frame % 3 === 0) dust(W / 2 + (playerX > 0 ? 120 : -120), H - 40, 2, stage === 1 ? 'rgba(180,220,255,.8)' : 'rgba(190,160,110,.8)'); bounce = rnd(-1, 1) * 2.5 * speedPct; }
   else bounce *= 0.8;
-  speed = clamp(speed, 0, maxNow); playerX = clamp(playerX, -2.4, 2.4);
+  speed = clamp(speed, 0, maxNow); playerX = clamp(playerX, -2.7 - fkT * 0.4, 2.7 + fkT * 0.4);
   // roadside collisions + pickups across the segments we cross this frame
   const stepSegs = Math.max(1, Math.ceil(speed * dt / TUNE.segLen));
   for (let k = 0; k < stepSegs + 1; k++) {
@@ -1114,6 +1430,9 @@ function updatePlaying(dt) {
   }
   // pull into the coffee shop for a pup cup
   if (playerSeg.stop !== undefined && playerX > 1.05) { const st = stops.find(q => q.id === playerSeg.stop); if (st && !st.done) { st.done = true; state = 'pupcup'; pup = { t: 0 }; Music.duck(0.35); say('PUP CUP!! PUP CUP!!'); titaBubble = { text: 'Okay, okay, one pup cup.', life: 150 }; sfx.bark(); return; } }
+  if (playerSeg.finishLine && route.story) { finishRun(); return; }
+  // story events: pull into the school / Tinman Social automatically
+  if (playerSeg.event) { const ev = events.find(q => q.kind === playerSeg.event); if (ev && !ev.done) { ev.done = true; scene = { kind: ev.kind, t: 0 }; state = 'scene'; Music.duck(0.35); if (ev.kind === 'school') { say('I SMELL NIC AND GIULIA!!'); titaBubble = { text: 'There they are!', life: 150 }; } else { say('Slushies?? SLUSHIES!!'); titaBubble = { text: 'Okay, one game each.', life: 150 }; } return; } }
   // traffic collisions
   for (const car of playerSeg.cars) {
     if (speed > car.speed && overlap(playerX, playerW, car.offset, car.w, 0.8)) { speed = car.speed * (car.speed / speed); position = increase(car.z, -playerZ, trackLength); crash('car'); break; }
@@ -1129,7 +1448,7 @@ function updatePlaying(dt) {
   // timer + stage/checkpoints
   timerAcc += dt; if (timerAcc >= 1) { timerAcc -= 1; timer--; if (timer === 10) say("Hurry, Tita!"); if (timer <= 0) { timer = 0; state = 'gameover'; setMenu(['Try Again', 'Quit to Arcade']); Music.stop(); sfx.lose(); Audio_.engineSet(0, false); return; } }
   const segIdx = playerSeg.index; const newStage = segIdx >= stageStarts[2] ? 2 : segIdx >= stageStarts[1] ? 1 : 0;
-  if (newStage !== stage) { stage = newStage; timer += TUNE.checkpointTime; stageBanner = 170; sfx.check(); floatText(W / 2, 200, '+' + TUNE.checkpointTime + ' seconds', '#9CFF9C'); say(pick(['New stage!', 'Keep going!'])); }
+  if (newStage !== stage) { stage = newStage; timer += route.cpTime || TUNE.checkpointTime; stageBanner = 170; sfx.check(); floatText(W / 2, 200, '+' + (route.cpTime || TUNE.checkpointTime) + ' seconds', '#9CFF9C'); say(pick(['New stage!', 'Keep going!'])); }
   if (stageBanner > 0) stageBanner--;
   // background scroll
   skyOff = increase(skyOff, 0.001 * playerSeg.curve * speedPct, 1); hillOff = increase(hillOff, 0.002 * playerSeg.curve * speedPct, 1);
@@ -1145,7 +1464,26 @@ function collect(kind) {
 function crash(kind) {
   if (kind === 'car') { sfx.crash(); dizzy = 1.2; say(pick(['YIPE!', 'Ruff!!', 'Whoa!'])); titaBubble = { text: pick(['¡Cuidado!', 'Oops!', 'Sorry!']), life: 90 }; bounce = 6; } else { sfx.bump(); dizzy = 0.6; say(pick(['Bonk!', 'Oof!'])); }
 }
-function finishRun() { Music.stop(); state = 'finish'; finishTimer = 0; tally = { time: timer * 15, balls: balls * 10 + pupCups * 250, timeTotal: timer * 15, ballsTotal: balls * 10, cupsTotal: pupCups * 250, shown: 0 }; sfx.win(); say('WE MADE IT!!'); titaBubble = { text: '¡Llegamos!', life: 300 }; }
+function finishRun() { Music.stop(); state = 'finish'; finishTimer = 0; if (route.story) { say('HOME!! HOME!! HOME!!'); } tally = { time: timer * 15, balls: balls * 10 + pupCups * 250, timeTotal: timer * 15, ballsTotal: balls * 10, cupsTotal: pupCups * 250, shown: 0 }; sfx.win(); say('WE MADE IT!!'); titaBubble = { text: '¡Llegamos!', life: 300 }; }
+function updateSlush(dt) {
+  const S = slush; S.t += dt; time += dt; frame++; updateFx();
+  if (S.phase === 'intro') { if (S.t > 2.4 || hit.gas || hit.start) { S.phase = 'play'; S.t = 0; S.marker = 0; S.dir = 1; } return; }
+  if (S.phase === 'play') {
+    S.marker += S.dir * S.speed * dt; if (S.marker > 1) { S.marker = 1; S.dir = -1; } if (S.marker < 0) { S.marker = 0; S.dir = 1; }
+    if (hit.gas || hit.start) {
+      const m = S.marker, d = Math.abs(m - 0.74); let pts, label;
+      if (m > 0.9) { pts = 0; label = 'OVERFLOW! BRAIN FREEZE!'; sfx.crash(); } else if (d < 0.05) { pts = 300; label = 'PERFECT POUR!'; sfx.check(); sparkle(W / 2 + 60, 300, 16, '#FFE680'); } else if (d < 0.14) { pts = 150; label = 'Nice pour!'; sfx.ball(); } else { pts = 50; label = 'A little short…'; sfx.bump(); }
+      S.result = { pts, label, fill: m }; S.total += pts; S.cups.push({ who: S.who, fill: m, flavor: S.round % 6 }); S.phase = 'result'; S.t = 0; sfx.slurp();
+      if (pts === 300) say(pick(['WOOF! PERFECT!', 'Can I have one??'])); if (pts === 0) say('Brain freeze!!');
+    }
+    return;
+  }
+  if (S.phase === 'result') {
+    if (S.t > 1.6) { S.round++; if (S.round >= S.rounds) { S.phase = 'done'; S.t = 0; sfx.win(); } else { S.phase = 'play'; S.t = 0; S.marker = 0; S.dir = 1; S.speed = 1.3 + S.round * 0.28; S.who = S.round % 2 ? 'giulia' : 'nic'; S.result = null; } }
+    return;
+  }
+  if (S.phase === 'done') { if (S.t > 2.6 || (S.t > 0.8 && (hit.gas || hit.start))) { slushScore = S.total; score += S.total; state = 'playing'; Music.duck(1); timer += 20; floatText(W / 2, 250, 'SLUSH RUSH +' + S.total + ' · +20s', C.gold); say('Slushie breath!!'); titaBubble = { text: 'Home before sunset, everybody!', life: 170 }; steer = 0; } }
+}
 function updateFx() {
   for (let i = particles.length - 1; i >= 0; i--) { const q = particles[i]; q.life--; q.x += q.vx || 0; q.y += q.vy || 0; if (q.type === 'drop') q.vy += 0.4; if (q.type === 'spark') { q.vy += 0.08; q.rot += 0.15; } if (q.type === 'dust') { q.r += 0.4; } if (q.life <= 0) particles.splice(i, 1); }
   for (let i = texts.length - 1; i >= 0; i--) { const t = texts[i]; t.life--; t.y -= 0.8; if (t.life <= 0) texts.splice(i, 1); }
@@ -1163,7 +1501,27 @@ function update(dt) {
       updateMenuNav(i => { if (i === 0) { state = 'route'; routeIdx = route.id; sfx.menu(); } else if (i === 1) { state = 'setup'; setup = { step: 0, list: ['gas', 'brake', 'horn', 'boost', 'start', 'select'], labels: { gas: 'GAS (B)', brake: 'BRAKE (Y)', horn: 'HONK / BARK (A)', boost: 'ZOOMIES (X)', start: 'START', select: 'SELECT' }, temp: {}, done: 0, wait: 10 }; } else { Audio_.on = !Audio_.on; menu.items[2] = 'Sound: ' + (Audio_.on ? 'On' : 'Off'); } });
       if (hit.gas || hit.start || hit.left || hit.right) Audio_.init(); break;
     case 'setup': { const s = setup; time += dt; if (s.wait > 0) { s.wait--; break; } if (keys.Escape) { padMap = { ...DEFAULT_PAD }; savePadMap(); goTitle(); keys.Escape = false; break; } if (s.done > 0) { s.done--; if (s.done === 0) goTitle(); break; } const b = anyPadPress(); if (b >= 0) { s.temp[s.list[s.step]] = b; s.step++; s.wait = 14; sfx.menu(); if (s.step >= s.list.length) { padMap = Object.assign({ ...DEFAULT_PAD }, s.temp); savePadMap(); s.done = 90; sfx.check(); } } break; }
-    case 'route': time += dt; if (hit.left || hit.right || hit.up || hit.down) { routeIdx = 1 - routeIdx; sfx.menu(); } if (hit.gas || hit.start) { route = ROUTES[routeIdx]; STAGES = route.stages; try { localStorage.setItem('brt_route', String(route.id)); } catch (e) { } sfx.check(); startGame(); } else if (hit.select) goTitle(); break;
+    case 'route': time += dt; {
+      const order = [2, 0, 1];
+      const at = Math.max(0, order.indexOf(routeIdx));
+      if (hit.right || hit.down) { routeIdx = order[(at + 1) % order.length]; sfx.menu(); }
+      if (hit.left || hit.up) { routeIdx = order[(at - 1 + order.length) % order.length]; sfx.menu(); }
+      if (hit.gas || hit.start) { route = ROUTES[routeIdx]; STAGES = route.stages; try { localStorage.setItem('brt_route', String(route.id)); } catch (e) { } sfx.check(); startGame(); } else if (hit.select) goTitle();
+      break; }
+    case 'scene': {
+      scene.t += dt; time += dt; frame++;
+      speed = Math.max(0, speed - TUNE.maxSpeed * 0.8 * dt); position = increase(position, dt * speed, trackLength);
+      playerX += (1.75 - playerX) * Math.min(1, dt * 2.5); steer = playerX < 1.65 ? 0.7 : 0; bounce *= 0.8;
+      if (scene.kind === 'school') {
+        if (scene.t > 2.2 && !scene.b1) { scene.b1 = 1; sfx.bark(); } if (scene.t > 3.6 && !scene.b2) { scene.b2 = 1; sfx.check(); }
+        if (scene.t > 7.2) { state = 'playing'; storyKids = true; score += 500; timer += 15; Music.duck(1); floatText(W / 2, 250, 'PASSENGERS ABOARD  +500 · +15s', C.gold); say('BEST. DAY. EVER.'); titaBubble = { text: 'Seatbelts! Next stop: Tinman Social.', life: 170 }; steer = 0; }
+      } else { // tinman: stop, then start the Slush Rush minigame
+        if (scene.t > 1.6) { state = 'slush'; slush = { phase: 'intro', t: 0, round: 0, rounds: 6, marker: 0, dir: 1, speed: 1.3, result: null, total: 0, who: 'nic', cups: [] }; sfx.ding(); }
+      }
+      updateFx(); updateCars(dt, findSegment(position + playerZ)); Audio_.engineSet(speed / TUNE.maxSpeed, speed > 0);
+      break;
+    }
+    case 'slush': updateSlush(dt); break;
     case 'pupcup': {
       pup.t += dt; time += dt; frame++;
       speed = Math.max(0, speed - TUNE.maxSpeed * 0.8 * dt); position = increase(position, dt * speed, trackLength);
@@ -1180,8 +1538,8 @@ function update(dt) {
     case 'quitconfirm': updateMenuNav(i => { if (i === 1) quitToArcade(); else state = 'playing'; }, () => { state = 'playing'; }); break;
     case 'gameover': updateMenuNav(i => { if (i === 0) startGame(); else quitToArcade(); }); break;
     case 'finish': {
-      finishTimer += dt; time += dt; speed = Math.max(0, speed - TUNE.maxSpeed * 0.5 * dt); position = Math.min(position + dt * speed, (segments.length - 90) * TUNE.segLen); playerX *= 0.97; Audio_.engineSet(speed / TUNE.maxSpeed, speed > 0); updateFx();
-      if (finishTimer > 1.2 && tally.shown < 2) { if (frame++ % 3 === 0) { if (tally.shown === 0) { const st = Math.min(15, tally.time); tally.time -= st; score += st; if (tally.time <= 0) tally.shown = 1; } else { const st = Math.min(10, tally.balls); tally.balls -= st; score += st; if (tally.balls <= 0) tally.shown = 2; } if (frame % 6 === 0) sfx.ball(); } }
+      finishTimer += dt; time += dt; speed = Math.max(route.story && position < (segments.length - 104) * TUNE.segLen ? 3000 : 0, speed - TUNE.maxSpeed * 0.5 * dt); position = Math.min(position + dt * speed, (segments.length - (route.story ? 98 : 90)) * TUNE.segLen); if (route.story) { playerX += (1.7 - playerX) * Math.min(1, dt * 1.5); steer = playerX < 1.6 ? 0.6 : 0; } else playerX *= 0.97; Audio_.engineSet(speed / TUNE.maxSpeed, speed > 0); updateFx();
+      if (finishTimer > (route.story ? 4.6 : 1.2) && tally.shown < 2) { if (frame++ % 3 === 0) { if (tally.shown === 0) { const st = Math.min(15, tally.time); tally.time -= st; score += st; if (tally.time <= 0) tally.shown = 1; } else { const st = Math.min(10, tally.balls); tally.balls -= st; score += st; if (tally.balls <= 0) tally.shown = 2; } if (frame % 6 === 0) sfx.ball(); } }
       if (tally.shown === 2) { if (score > best) { best = score; try { localStorage.setItem('brt_best', String(best)); } catch (e) { } } if (!menu.items.length || menu.items[0] !== 'Drive Again') setMenu(['Drive Again', 'Quit to Arcade']); updateMenuNav(i => { if (i === 0) startGame(); else quitToArcade(); }); }
       break;
     }
@@ -1219,17 +1577,103 @@ function drawBackdrop(pal, playerY) {
   const si = STAGES.indexOf(pal.a), sj = STAGES.indexOf(pal.b);
   draw(backdrops[si], 1 - pal.t, hillOff); if (pal.t > 0) draw(backdrops[sj], pal.t, hillOff);
 }
-function drawSegment(x1, y1, w1, x2, y2, w2, fog, alt, pal, lot) {
-  const col = k => mixHex(pal.a[k], pal.b[k], pal.t);
+function forkSep(fk) {
+  const x = clamp((fk - 0.1) / 0.42, 0, 1), open = x * x * (3 - 2 * x);
+  return 1.44 * open;
+}
+function forkGeom(fk, chosen) {
+  const sep = chosen ? 1.44 * clamp(fk, 0, 1) : forkSep(fk);
+  if (!chosen) return { cL: -sep, cR: sep, aL: 1, aR: 1, single: sep < 0.78 };
+  const close = clamp(1 - fk, 0, 1), mouth = sep;
+  if (chosen > 0) return { cR: mouth, cL: -1.44 - 1.55 * close, aR: 1, aL: clamp(1 - close * 1.25, 0, 1), single: fk < 0.045 };
+  return { cL: -mouth, cR: 1.44 + 1.55 * close, aL: 1, aR: clamp(1 - close * 1.25, 0, 1), single: fk < 0.045 };
+}
+function forkChosenSign(seg) {
+  if (!seg) return 0;
+  const f = seg.branch ? forks.find(q => q.chosen === seg.branch) : seg.forkId !== undefined ? forks[seg.forkId] : seg.forkApproach !== undefined ? forks[seg.forkApproach] : null;
+  if (!f || !f.chosen) return 0;
+  return f.chosen === 'R' ? 1 : -1;
+}
+function settleFork(dt, seg) {
+  const fk = seg.fork || 0;
+  if ((seg.forkApproach !== undefined || seg.forkId !== undefined) && fk > 0.4) {
+    const f = forks[seg.forkApproach !== undefined ? seg.forkApproach : seg.forkId];
+    if (f && !f.chosen && Math.abs(playerX) > 0.2) {
+      const sign = playerX >= 0 ? 1 : -1, g = forkGeom(fk, 0), center = sign > 0 ? g.cR : g.cL;
+      playerX += (center - playerX) * Math.min(1, dt * 1.8);
+    }
+  }
+  if (seg.forkId !== undefined) {
+    const f = forks[seg.forkId];
+    if (f && !f.chosen) {
+      const side = Math.abs(playerX) < 0.1 ? (steer < -0.15 ? -1 : 1) : (playerX >= 0 ? 1 : -1);
+      f.chosen = side > 0 ? 'R' : 'L';
+      const name = side > 0 ? f.rightName : f.leftName, dirtPick = f.offroadSide === f.chosen;
+      const dest = side > 0 ? f.R0 : f.L0;
+      position += (dest - seg.index) * TUNE.segLen;
+      const mouth = forkGeom(1, side), lane = side > 0 ? mouth.cR : mouth.cL;
+      playerX += (lane - playerX) * 0.55;
+      floatText(W / 2, 230, (side > 0 ? '▶ ' : '◀ ') + name, C.gold);
+      say(dirtPick ? pick(['OFF-ROAD!! BUMPY!!', 'DIRT!! YES!!', 'ZOOM ZOOM!!']) : pick(['This way!', 'Smooth road!']));
+      titaBubble = { text: dirtPick ? 'Hold on, everybody!' : name + ', here we go.', life: 140 };
+      sfx.check();
+    }
+  }
+  if (seg.jumpTo != null) position += (seg.jumpTo - seg.index) * TUNE.segLen;
+}
+function glideFork(dt, seg) {
+  const sign = forkChosenSign(seg), fk = seg.fork || 0;
+  if (!sign || fk < 0.05) return;
+  const g = forkGeom(fk, sign), center = sign > 0 ? g.cR : g.cL;
+  playerX += (center - playerX) * Math.min(1, dt * 3.4);
+}
+function drawSplitHorizon(lastSeg, camX, camDX, playerY, camZ, n0, pal, maxy) {
+  let prev = lastSeg.p2, my = maxy, cx = camX;
+  const camY = playerY + TUNE.camH;
+  for (let i = 1; i < TUNE.drawDist - n0; i++) {
+    const p = { world: { y: prev.world.y, z: prev.world.z + TUNE.segLen }, camera: {}, screen: {} };
+    project(p, cx - camDX, camY, camZ); cx -= camDX;
+    const n = n0 + i, fog = Math.exp(-(n / TUNE.drawDist) * (n / TUNE.drawDist) * TUNE.fog * 0.6);
+    if (p.camera.z <= camDepth || p.screen.y >= prev.screen.y || p.screen.y >= my) { prev = p; continue; }
+    drawSegment(prev.screen.x, prev.screen.y, prev.screen.w, p.screen.x, p.screen.y, p.screen.w, fog, (n % 2) === 0, pal, false, false, false, 1, false, 0);
+    my = prev.screen.y; prev = p;
+  }
+}
+function drawSegment(x1, y1, w1, x2, y2, w2, fog, alt, pal, lot, water, brick, fk, dirt, chosen) {
+  const DIRT = { roadL: '#A8794A', roadD: '#9D6E42', rumbleL: '#7FAA55', rumbleD: '#6F9A48', lane: '#8F6238' };
+  const col = k => dirt && DIRT[k] ? DIRT[k] : brick && (k === 'roadL' || k === 'roadD') ? '#A2503E' : mixHex(pal.a[k], pal.b[k], pal.t);
   const r1 = w1 / 6, r2 = w2 / 6, l1 = w1 / 24, l2 = w2 / 24;
   ctx.fillStyle = col(alt ? 'grassL' : 'grassD'); ctx.fillRect(0, y2, W, y1 - y2);
+  const geom = fk > 0 ? forkGeom(fk, chosen || 0) : null;
+  if (geom && !geom.single) {
+    const lane = (c, alpha) => {
+      if (alpha < 0.04) return;
+      ctx.save(); ctx.globalAlpha = alpha;
+      const hw = 0.98, rum = 0.16;
+      const x1L = x1 + w1 * (c - hw), x1R = x1 + w1 * (c + hw), x2L = x2 + w2 * (c - hw), x2R = x2 + w2 * (c + hw);
+      poly(ctx, x1L - w1 * rum, y1, x1L, y1, x2L, y2, x2L - w2 * rum, y2, col(alt ? 'rumbleL' : 'rumbleD'));
+      poly(ctx, x1R, y1, x1R + w1 * rum, y1, x2R + w2 * rum, y2, x2R, y2, col(alt ? 'rumbleL' : 'rumbleD'));
+      poly(ctx, x1L, y1, x1R, y1, x2R, y2, x2L, y2, col(alt ? 'roadL' : 'roadD'));
+      const e = 0.05;
+      poly(ctx, x1L, y1, x1L + w1 * e, y1, x2L + w2 * e, y2, x2L, y2, col('lane'));
+      poly(ctx, x1R - w1 * e, y1, x1R, y1, x2R, y2, x2R - w2 * e, y2, col('lane'));
+      if (alt) { const m1 = x1 + w1 * c, m2 = x2 + w2 * c; poly(ctx, m1 - w1 * 0.035, y1, m1 + w1 * 0.035, y1, m2 + w2 * 0.035, y2, m2 - w2 * 0.035, y2, col('lane')); }
+      ctx.restore();
+    };
+    if ((chosen || 0) >= 0) { lane(geom.cL, geom.aL); lane(geom.cR, geom.aR); }
+    else { lane(geom.cR, geom.aR); lane(geom.cL, geom.aL); }
+    if (fog < 1) { ctx.globalAlpha = 1 - fog; ctx.fillStyle = col('fog'); ctx.fillRect(0, y1, W, y2 - y1); ctx.globalAlpha = 1; }
+    return;
+  }
+  if (water) { poly(ctx, 0, y1, x1 - w1 * 1.9, y1, x2 - w2 * 1.9, y2, 0, y2, alt ? '#3F94DE' : '#3A8CD6'); poly(ctx, x1 - w1 * 1.95, y1, x1 - w1 * 1.75, y1, x2 - w2 * 1.75, y2, x2 - w2 * 1.95, y2, '#EFD9A6'); }
   if (lot) { poly(ctx, x1 + w1, y1, x1 + w1 * 2.5, y1, x2 + w2 * 2.5, y2, x2 + w2, y2, alt ? '#9B9BA2' : '#93939B'); if (alt) poly(ctx, x1 + w1 * 2.4, y1, x1 + w1 * 2.5, y1, x2 + w2 * 2.5, y2, x2 + w2 * 2.4, y2, '#F2C14E'); }
   poly(ctx, x1 - w1 - r1, y1, x1 - w1, y1, x2 - w2, y2, x2 - w2 - r2, y2, col(alt ? 'rumbleL' : 'rumbleD'));
   poly(ctx, x1 + w1 + r1, y1, x1 + w1, y1, x2 + w2, y2, x2 + w2 + r2, y2, col(alt ? 'rumbleL' : 'rumbleD'));
   poly(ctx, x1 - w1, y1, x1 + w1, y1, x2 + w2, y2, x2 - w2, y2, col(alt ? 'roadL' : 'roadD'));
-  poly(ctx, x1 - w1 - l1 * 0.9, y1, x1 - w1 + l1 * 0.9, y1, x2 - w2 + l2 * 0.9, y2, x2 - w2 - l2 * 0.9, y2, col('lane'));
-  poly(ctx, x1 + w1 - l1 * 0.9, y1, x1 + w1 + l1 * 0.9, y1, x2 + w2 + l2 * 0.9, y2, x2 + w2 - l2 * 0.9, y2, col('lane'));
-  if (alt) { const lw1 = w1 * 2 / TUNE.lanes, lw2 = w2 * 2 / TUNE.lanes; let lx1 = x1 - w1 + lw1, lx2 = x2 - w2 + lw2; for (let l = 1; l < TUNE.lanes; l++, lx1 += lw1, lx2 += lw2) poly(ctx, lx1 - l1 / 2, y1, lx1 + l1 / 2, y1, lx2 + l2 / 2, y2, lx2 - l2 / 2, y2, col('lane')); }
+  if (dirt) { for (const sg of [-0.42, 0.42]) poly(ctx, x1 + w1 * (sg - 0.07), y1, x1 + w1 * (sg + 0.07), y1, x2 + w2 * (sg + 0.07), y2, x2 + w2 * (sg - 0.07), y2, alt ? '#8F6238' : '#875C33'); }
+  else { poly(ctx, x1 - w1 - l1 * 0.9, y1, x1 - w1 + l1 * 0.9, y1, x2 - w2 + l2 * 0.9, y2, x2 - w2 - l2 * 0.9, y2, col('lane'));
+  poly(ctx, x1 + w1 - l1 * 0.9, y1, x1 + w1 + l1 * 0.9, y1, x2 + w2 + l2 * 0.9, y2, x2 + w2 - l2 * 0.9, y2, col('lane')); }
+  if (alt && !dirt) { const lw1 = w1 * 2 / TUNE.lanes, lw2 = w2 * 2 / TUNE.lanes; let lx1 = x1 - w1 + lw1, lx2 = x2 - w2 + lw2; for (let l = 1; l < TUNE.lanes; l++, lx1 += lw1, lx2 += lw2) poly(ctx, lx1 - l1 / 2, y1, lx1 + l1 / 2, y1, lx2 + l2 / 2, y2, lx2 - l2 / 2, y2, col('lane')); }
   if (fog < 1) { ctx.globalAlpha = 1 - fog; ctx.fillStyle = col('fog'); ctx.fillRect(0, y1, W, y2 - y1); ctx.globalAlpha = 1; }
 }
 function drawRoad() {
@@ -1240,19 +1684,33 @@ function drawRoad() {
   drawSky(pal); drawBackdrop(pal, playerY);
   let maxy = H, x = 0, dx = -(base.curve * basePct);
   const N = segments.length;
+  let roadCut = Infinity;
   for (let n = 0; n < TUNE.drawDist; n++) {
-    const seg = segments[(base.index + n) % N];
-    seg.looped = seg.index < base.index; seg.fog = Math.exp(-(n / TUNE.drawDist) * (n / TUNE.drawDist) * TUNE.fog * 0.6); seg.fog = 1 / (1 + 0) * seg.fog; seg.clip = maxy;
-    project(seg.p1, playerX * TUNE.roadW - x, playerY + TUNE.camH, position - (seg.looped ? trackLength : 0));
-    project(seg.p2, playerX * TUNE.roadW - x - dx, playerY + TUNE.camH, position - (seg.looped ? trackLength : 0));
+    const idx = base.index + n;
+    if (idx >= roadCut) break;
+    const seg = segments[idx % N];
+    seg.looped = seg.index < base.index; seg.fog = Math.exp(-(n / TUNE.drawDist) * (n / TUNE.drawDist) * TUNE.fog * 0.6); seg.clip = maxy;
+    const camZ = position - (seg.looped ? trackLength : 0);
+    project(seg.p1, playerX * TUNE.roadW - x, playerY + TUNE.camH, camZ);
+    project(seg.p2, playerX * TUNE.roadW - x - dx, playerY + TUNE.camH, camZ);
     x += dx; dx += seg.curve;
-    if (seg.p1.camera.z <= camDepth || seg.p2.screen.y >= seg.p1.screen.y || seg.p2.screen.y >= maxy) continue;
-    drawSegment(seg.p1.screen.x, seg.p1.screen.y, seg.p1.screen.w, seg.p2.screen.x, seg.p2.screen.y, seg.p2.screen.w, seg.fog, seg.alt, pal, seg.lot);
-    maxy = seg.p1.screen.y;
+    const unchosen = seg.forkId !== undefined && forks[seg.forkId] && !forks[seg.forkId].chosen;
+    const hidden = seg.p1.camera.z <= camDepth || seg.p2.screen.y >= seg.p1.screen.y || seg.p2.screen.y >= maxy;
+    if (!hidden) {
+      drawSegment(seg.p1.screen.x, seg.p1.screen.y, seg.p1.screen.w, seg.p2.screen.x, seg.p2.screen.y, seg.p2.screen.w, seg.fog, seg.alt, pal, seg.lot, seg.water, seg.brick, seg.fork, seg.offroad, forkChosenSign(seg));
+      maxy = seg.p1.screen.y;
+    }
+    if (unchosen) {
+      roadCut = seg.index + 1;
+      if (!hidden) drawSplitHorizon(seg, playerX * TUNE.roadW - x, dx, playerY, camZ, n, pal, maxy);
+      break;
+    }
   }
-  // sprites + cars, back to front
+  // sprites + cars, back to front — hide the untaken branch until a side is chosen
   for (let n = TUNE.drawDist - 1; n > 0; n--) {
-    const seg = segments[(base.index + n) % N];
+    const idx = base.index + n;
+    if (idx >= roadCut) continue;
+    const seg = segments[idx % N];
     if (seg.p1.camera.z <= camDepth) continue;
     for (const car of seg.cars) { const pct = (car.z % TUNE.segLen) / TUNE.segLen; const scale = lerp(seg.p1.screen.scale, seg.p2.screen.scale, pct), sx = lerp(seg.p1.screen.x, seg.p2.screen.x, pct) + scale * car.offset * TUNE.roadW * W / 2, sy = lerp(seg.p1.screen.y, seg.p2.screen.y, pct); drawSprite(car.s, scale, sx, sy, -0.5, -1, seg.clip); }
     for (const sp of seg.sprites) {
@@ -1263,7 +1721,8 @@ function drawRoad() {
   }
   // player
   const steerIdx = steer < -0.3 ? 0 : steer > 0.3 ? 2 : 1; const earFrame = Math.floor(time * (6 + speed / TUNE.maxSpeed * 14)) % 3;
-  const js = jeepSprite(steerIdx, earFrame, inp.brake && speed > 0, boosting > 0, dizzy > 0);
+  const spd = speed / TUNE.maxSpeed, hairAmp = spd < 0.08 ? 0 : spd < 0.5 ? 1 : 2, hairFrame = Math.floor(time * (4 + spd * 14)) % 6;
+  const js = jeepSprite(steerIdx, earFrame, inp.brake && speed > 0, boosting > 0, dizzy > 0, hairAmp, hairFrame, !!(route.story && storyKids));
   const scale = camDepth / playerZ; const destW = js.ww * scale * (W / 2), destH = destW * js.h / js.w;
   const jx = W / 2 - destW / 2, jy = H - destH - 8 + bounce;
   if (boosting > 0) { const gl = ctx.createRadialGradient(W / 2, jy + destH * 0.6, 20, W / 2, jy + destH * 0.6, destW * 0.8); gl.addColorStop(0, 'rgba(255,200,80,.35)'); gl.addColorStop(1, 'rgba(255,200,80,0)'); ctx.fillStyle = gl; ctx.fillRect(jx - 150, jy - 100, destW + 300, destH + 200); }
@@ -1301,6 +1760,7 @@ function drawHUD() {
   textO(ctx, String(mph), cx, 72, 30, C.cream, null, 'center', 0); textO(ctx, 'MPH', cx, 94, 11, C.gold, null, 'center', 0, 600);
   // stage name chip
   panel(W - 14 - 170, 114, 170, 28, 10); textO(ctx, STAGES[stage].name, W - 14 - 85, 128, 11, C.cream, null, 'center', 0, 600);
+  { const ps = findSegment(position + playerZ); if (ps.forkApproach !== undefined && state === 'playing') { const f = forks[ps.forkApproach]; if (!f.chosen) { panel(W / 2 - 230, 150, 460, 46, 14); textO(ctx, '◀ ' + f.leftName + '      ·      ' + f.rightName + ' ▶', W / 2, 173, 18, '#FFE680', null, 'center', 0); textO(ctx, 'FORK AHEAD · steer to pick', W / 2, 206, 12, C.cream, C.out, 'center', 3, 600); } } }
   if (stageBanner > 0 && state === 'playing') { const a = clamp(Math.min(stageBanner, 170 - stageBanner) / 25, 0, 1); ctx.globalAlpha = a; textO(ctx, 'STAGE ' + (stage + 1), W / 2, 170, 26, C.gold, C.out, 'center', 6); textO(ctx, STAGES[stage].name, W / 2, 206, 36, C.cream, C.out, 'center', 7); ctx.globalAlpha = 1; }
   if (padToast > 0) { ctx.globalAlpha = clamp(padToast / 30, 0, 1); panel(W / 2 - 150, H - 60, 300, 36, 10); textO(ctx, 'Controller connected: ' + pad.name, W / 2, H - 42, 14, C.cream, null, 'center', 0, 600); ctx.globalAlpha = 1; }
 }
@@ -1325,7 +1785,7 @@ function drawTitle() {
   const gr = ctx.createLinearGradient(0, 20, 0, 90); gr.addColorStop(0, '#FFE89A'); gr.addColorStop(0.55, '#F6C650'); gr.addColorStop(1, '#D2951E');
   ctx.font = font(84); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round'; ctx.strokeStyle = C.out; ctx.lineWidth = 14; ctx.strokeText('ROAD TRIP', 0, 56); ctx.strokeStyle = '#7A4A14'; ctx.lineWidth = 7; ctx.strokeText('ROAD TRIP', 0, 56); ctx.fillStyle = gr; ctx.fillText('ROAD TRIP', 0, 56);
   ctx.restore();
-  textO(ctx, 'Tita drives. Bernard navigates. Beat the sunset to the dog park!', W / 2, 190, 17, C.cream, C.out, 'center', 4, 600);
+  textO(ctx, 'Dog park, Miami, or the school run — Nic & Giulia included.', W / 2, 190, 17, C.cream, C.out, 'center', 4, 600);
   drawMenu(262, 40, 24, 70, 'left');
   if (best > 0) textO(ctx, 'Best score: ' + best, 70, 392, 15, '#FFE89A', C.out, 'left', 4, 600);
   if (Math.floor(time * 2) % 2 === 0) textO(ctx, pad.connected ? 'PRESS START' : 'PRESS ENTER / START', 70, 430, 16, '#FFE89A', C.out, 'left', 4, 600);
@@ -1339,23 +1799,109 @@ function drawSetup() {
 }
 function drawRouteSelect() {
   drawRoad(); dim(0.6);
-  textO(ctx, 'PICK YOUR ROAD TRIP', W / 2, 60, 40, C.gold, C.out, 'center', 8);
-  ROUTES.forEach((r, i) => {
-    const sel = i === routeIdx, x = 80 + i * 420, y = 110, w = 380, h = 330;
-    rr(ctx, x, y, w, h, 20); fs(ctx, sel ? 'rgba(43,26,16,.92)' : 'rgba(43,26,16,.6)', sel ? C.gold : 'rgba(242,193,78,.35)', sel ? 5 : 3);
-    // icon scene
-    ctx.save(); ctx.beginPath(); rr(ctx, x + 16, y + 16, w - 32, 130, 12); ctx.clip();
-    const g = ctx.createLinearGradient(0, y + 16, 0, y + 146); if (i === 0) { g.addColorStop(0, '#3F86D8'); g.addColorStop(1, '#CBE8FF'); } else { g.addColorStop(0, '#1C7FE0'); g.addColorStop(1, '#EAF8FF'); } ctx.fillStyle = g; ctx.fillRect(x + 16, y + 16, w - 32, 130);
-    ctx.fillStyle = i === 0 ? '#6DB548' : '#F0DDAA'; ctx.fillRect(x + 16, y + 116, w - 32, 30);
-    if (i === 0) { ctx.save(); ctx.translate(x + 40, y + 36); ctx.scale(0.36, 0.36); waterTower(ctx); ctx.restore(); ctx.save(); ctx.translate(x + 150, y + 70); ctx.scale(0.42, 0.42); longhorn(ctx); ctx.restore(); ctx.save(); ctx.translate(x + 260, y + 30); ctx.scale(0.32, 0.32); windmill(ctx, time * 2); ctx.restore(); }
-    else { ctx.save(); ctx.translate(x + 30, y + 26); ctx.scale(0.4, 0.4); palm(ctx, false); ctx.restore(); ctx.save(); ctx.translate(x + 110, y + 60); ctx.scale(0.5, 0.5); lifeguard(ctx, '#FF7FB1', '#2EC4B6'); ctx.restore(); ctx.save(); ctx.translate(x + 220, y + 70); ctx.scale(0.55, 0.55); flamingo(ctx); ctx.restore(); ctx.save(); ctx.translate(x + 280, y + 26); ctx.scale(0.4, 0.4); palm(ctx, false); ctx.restore(); }
+  textO(ctx, 'PICK YOUR ROAD TRIP', W / 2, 52, 38, C.gold, C.out, 'center', 8);
+  const show = [2, 0, 1];
+  show.forEach((ri, slot) => {
+    const r = ROUTES[ri];
+    const sel = ri === routeIdx, w = 290, x = 36 + slot * (w + 9), y = 92, h = 350;
+    rr(ctx, x, y, w, h, 18); fs(ctx, sel ? 'rgba(43,26,16,.92)' : 'rgba(43,26,16,.6)', sel ? C.gold : 'rgba(242,193,78,.35)', sel ? 5 : 3);
+    ctx.save(); ctx.beginPath(); rr(ctx, x + 12, y + 12, w - 24, 116, 10); ctx.clip();
+    const g = ctx.createLinearGradient(0, y + 12, 0, y + 128); const tops = ['#3F86D8', '#1C7FE0', '#4A8FD8'], hors = ['#CBE8FF', '#EAF8FF', '#F3E6C8']; g.addColorStop(0, tops[ri]); g.addColorStop(1, hors[ri]); ctx.fillStyle = g; ctx.fillRect(x + 12, y + 12, w - 24, 116);
+    ctx.fillStyle = ri === 1 ? '#F0DDAA' : '#6DB548'; ctx.fillRect(x + 12, y + 102, w - 24, 26);
+    if (ri === 0) { ctx.save(); ctx.translate(x + 24, y + 30); ctx.scale(0.3, 0.3); waterTower(ctx); ctx.restore(); ctx.save(); ctx.translate(x + 110, y + 60); ctx.scale(0.36, 0.36); longhorn(ctx); ctx.restore(); ctx.save(); ctx.translate(x + 200, y + 24); ctx.scale(0.28, 0.28); windmill(ctx, time * 2); ctx.restore(); }
+    else if (ri === 1) { ctx.save(); ctx.translate(x + 16, y + 22); ctx.scale(0.34, 0.34); palm(ctx, false); ctx.restore(); ctx.save(); ctx.translate(x + 80, y + 50); ctx.scale(0.42, 0.42); lifeguard(ctx, '#FF7FB1', '#2EC4B6'); ctx.restore(); ctx.save(); ctx.translate(x + 170, y + 58); ctx.scale(0.46, 0.46); flamingo(ctx); ctx.restore(); ctx.save(); ctx.translate(x + 216, y + 22); ctx.scale(0.34, 0.34); palm(ctx, false); ctx.restore(); }
+    else { ctx.save(); ctx.translate(x + 8, y + 36); ctx.scale(0.38, 0.38); schoolBuilding(ctx); ctx.restore(); drawKid(ctx, 'nic', x + 215, y + 82, 0.75, 0); drawKid(ctx, 'giulia', x + 250, y + 84, 0.75, 0); slushCup(ctx, x + 236, y + 40, 0.35, 0.8, '#3C8CFF'); }
     ctx.restore();
-    textO(ctx, r.name.toUpperCase(), x + w / 2, y + 176, 26, sel ? C.gold : C.cream, C.out, 'center', 5);
-    r.stages.forEach((st, k) => textO(ctx, (k + 1) + '. ' + st.name, x + 30, y + 212 + k * 24, 15, C.cream, null, 'left', 0, 600));
-    textO(ctx, 'Pup cup stop: ' + r.shop, x + 30, y + 296, 14, '#FFE680', null, 'left', 0, 600);
-    if (sel) { ctx.save(); ctx.translate(x + w - 36, y + 176 + Math.sin(time * 6) * 2); ctx.scale(0.5, 0.5); pawPrint(ctx, C.gold); ctx.restore(); }
+    textO(ctx, r.name.toUpperCase(), x + w / 2, y + 152, ri === 2 ? 17 : 20, sel ? C.gold : C.cream, C.out, 'center', 4);
+    r.stages.forEach((st, k) => textO(ctx, (k + 1) + '. ' + st.name, x + 20, y + 186 + k * 24, 12, C.cream, null, 'left', 0, 600));
+    if (ri === 2) textO(ctx, 'Pick up Nic & Giulia · play Slush Rush', x + 20, y + 264, 11, C.cream, null, 'left', 0, 600);
+    textO(ctx, 'Pup cup stop: ' + r.shop, x + 20, y + 290, 12, '#FFE680', null, 'left', 0, 600);
+    if (sel) { ctx.save(); ctx.translate(x + w - 30, y + 152 + Math.sin(time * 6) * 2); ctx.scale(0.45, 0.45); pawPrint(ctx, C.gold); ctx.restore(); }
   });
   textO(ctx, '◀ ▶ choose  ·  B / Enter go  ·  Select back', W / 2, 475, 16, C.cream, C.out, 'center', 4, 600);
+}
+function drawSceneSchool(t) {
+  const a = clamp(t / 0.4, 0, 1); ctx.globalAlpha = a; dim(0.45);
+  panel(W / 2 - 360, 60, 720, 420, 22);
+  textO(ctx, 'SCHOOL PICKUP', W / 2, 100, 40, C.gold, C.out, 'center', 8);
+  textO(ctx, 'Oak Point Elementary · Home of the Lobos', W / 2, 136, 15, C.cream, null, 'center', 0, 600);
+  ctx.save(); ctx.beginPath(); rr(ctx, W / 2 - 330, 156, 660, 250, 14); ctx.clip();
+  const g = ctx.createLinearGradient(0, 156, 0, 406); g.addColorStop(0, '#7FB7EC'); g.addColorStop(1, '#CBE8FF'); ctx.fillStyle = g; ctx.fillRect(W / 2 - 330, 156, 660, 250);
+  ctx.fillStyle = '#6DB548'; ctx.fillRect(W / 2 - 330, 340, 660, 70); ctx.fillStyle = '#9A9AA2'; ctx.fillRect(W / 2 - 330, 356, 660, 50); ctx.fillStyle = '#F4F4F4'; for (let x = W / 2 - 320; x < W / 2 + 330; x += 40) ctx.fillRect(x, 378, 20, 4);
+  ctx.save(); ctx.translate(W / 2 - 326, 140); ctx.scale(0.86, 0.86); schoolBuilding(ctx); ctx.restore();
+  ctx.save(); ctx.translate(W / 2 - 300, 300); ctx.scale(0.5, 0.5); schoolBus(ctx); ctx.restore();
+  // kids run out of the door toward the Jeep (right side)
+  const run = clamp((t - 1.2) / 3.2, 0, 1), kx = lerp(W / 2 - 130, W / 2 + 250, run), ky = 350 + Math.abs(Math.sin(t * 12)) * -6 * (run < 1 ? 1 : 0);
+  if (t > 1.0) { drawKid(ctx, 'nic', kx, ky, 1.1, run < 1 ? t : 0); drawKid(ctx, 'giulia', kx - 50, ky + 4, 1.1, run < 1 ? t : 0); }
+  // the Jeep waiting at the curb (rear view, big)
+  const js = jeepSprite(0, Math.floor(t * 8) % 3, 0, 0, 0, 0, 0, run >= 1); ctx.drawImage(js.c, W / 2 + 170, 240, 176, 152);
+  ctx.restore();
+  const line = t < 1.2 ? 'The bell rings…' : run < 1 ? '"TITA!! BERNARD!!"' : t < 6.5 ? '"Tinman Social! Tinman Social!"' : 'Everybody buckled. Next stop, Tinman Social.';
+  textO(ctx, line, W / 2, 440, 18, t > 5.2 ? '#FFE680' : C.cream, null, 'center', 0, 600);
+  ctx.globalAlpha = 1;
+}
+const SLUSH_FLAVORS = [['BLUE RASPBERRY', '#2F7BFF'], ['CHERRY', '#E8324A'], ['LIME', '#5CD64A'], ['ORANGE', '#FF8A2A'], ['GRAPE', '#8A4FD8'], ['COLA', '#6B3A1E'], ['LEMON', '#FFE04A'], ['STRAWBERRY', '#FF5FA2'], ['WATERMELON', '#FF6A6A'], ['BLUE ICE', '#5CF2FF']];
+function slushBigCup(g, x, y, s, dome) { g.save(); g.translate(x, y); g.scale(s, s);
+  g.beginPath(); g.moveTo(-34, -10); g.lineTo(34, -10); g.lineTo(26, 70); g.lineTo(-26, 70); g.closePath(); fs(g, '#2F7BFF', C.out, 3); g.save(); g.beginPath(); g.moveTo(-33, -9); g.lineTo(33, -9); g.lineTo(25, 69); g.lineTo(-25, 69); g.closePath(); g.clip(); g.fillStyle = '#E8324A'; g.fillRect(-14, -12, 28, 90); g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(-30, -12, 10, 90); g.restore();
+  rr(g, -40, -18, 80, 12, 5); fs(g, '#F4F4F2', C.out, 2.5);
+  g.beginPath(); g.arc(0, -18, 40, Math.PI, 0); g.closePath(); fs(g, dome, C.out, 3); ell(g, -14, -40, 10, 6, -0.5); fs(g, 'rgba(255,255,255,.45)', null);
+  g.beginPath(); g.moveTo(8, -56); g.lineTo(12, -90); g.strokeStyle = C.out; g.lineWidth = 9; g.stroke(); g.strokeStyle = '#E8324A'; g.lineWidth = 5; g.stroke();
+  rr(g, -28, 20, 56, 20, 4); fs(g, 'rgba(255,255,255,.9)', C.out, 2); textO(g, 'SLUSH', 0, 30, 13, '#2F7BFF', C.out, 'center', 2.5);
+  g.restore(); }
+function drawSlush() {
+  const S = slush, F = SLUSH_FLAVORS;
+  // arcade room
+  dim(0.62); const bg = ctx.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, 'rgba(40,16,70,.9)'); bg.addColorStop(1, 'rgba(12,8,30,.95)'); ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < 14; i++) { ctx.fillStyle = ['rgba(255,90,200,.12)', 'rgba(90,220,255,.12)', 'rgba(255,230,90,.1)'][i % 3]; ctx.fillRect(hash(i, 50) * W, 0, 3 + hash(i, 51) * 6, H); }
+  const cx = W / 2, L = cx - 260, R = cx + 260;
+  // cabinet body: red left / blue right, neon rails
+  ctx.fillStyle = '#C8242E'; ctx.fillRect(L, 56, 260, 470); ctx.fillStyle = '#1F4FD8'; ctx.fillRect(cx, 56, 260, 470);
+  const rail = (x, col) => { ctx.fillStyle = col; ctx.fillRect(x - 5, 56, 10, 470); ctx.shadowColor = col; ctx.shadowBlur = 22; ctx.fillRect(x - 3, 60, 6, 462); ctx.shadowBlur = 0; };
+  rail(L, '#FF4FA3'); rail(R, '#5CF2FF');
+  // marquee: two giant cups + Bernard as the mascot + 250 BONUS
+  slushBigCup(ctx, L + 80, 118, 1.0, '#E8324A'); slushBigCup(ctx, R - 80, 118, 1.0, '#FFD23A');
+  ctx.save(); ctx.translate(cx, 92); ctx.scale(1.25, 1.25); ctx.shadowColor = '#fff'; ctx.shadowBlur = 18; ell(ctx, 0, 6, 34, 34); fs(ctx, '#FFFFFF', null); ctx.shadowBlur = 0; ctx.restore();
+  ctx.save(); ctx.translate(cx, 92); bernardHead(ctx, 0, 0, 1.45, Math.sin(time * 6) * 0.6, true, false); ctx.restore();
+  rr(ctx, cx - 70, 136, 140, 34, 6); fs(ctx, '#15121C', C.out, 3); textO(ctx, '250', cx - 18, 153, 26, '#3EF2D8', null, 'center', 0); textO(ctx, 'BONUS', cx + 34, 153, 12, '#3EF2D8', null, 'center', 0);
+  // wavy icy SLUSH RUSH banner
+  ctx.beginPath(); ctx.moveTo(L + 20, 184); for (let x = L + 20; x <= R - 20; x += 24) ctx.quadraticCurveTo(x + 12, 170, x + 24, 184); ctx.lineTo(R - 20, 214); for (let x = R - 20; x >= L + 20; x -= 24) ctx.quadraticCurveTo(x - 12, 226, x - 24, 214); ctx.closePath(); fs(ctx, '#F4F8FF', '#2F7BFF', 4);
+  ctx.save(); ctx.translate(cx, 199); ctx.rotate(-0.04); textO(ctx, 'SLUSH RUSH', 0, 0, 30, '#E8324A', '#2F7BFF', 'center', 6); ctx.restore();
+  // flavor nozzles row
+  for (let i = 0; i < 10; i++) { const nx = L + 36 + i * 54; rr(ctx, nx - 14, 232, 28, 34, 6); fs(ctx, F[i][1], C.out, 2); rr(ctx, nx - 9, 236, 18, 10, 3); fs(ctx, 'rgba(255,255,255,.45)', null); rr(ctx, nx - 6, 266, 12, 10, 2); fs(ctx, '#9AA0A6', C.out, 1.5); }
+  // screen
+  rr(ctx, L + 22, 282, 516, 82, 8); fs(ctx, '#0B2A66', '#0A1A40', 4);
+  ctx.save(); ctx.beginPath(); rr(ctx, L + 24, 284, 512, 78, 7); ctx.clip();
+  ctx.fillStyle = '#1F6FE8'; ctx.beginPath(); ctx.moveTo(L + 24, 362); for (let x = L + 24; x <= R - 24; x += 10) ctx.lineTo(x, 330 + Math.sin((x + time * 90) / 24) * 10); ctx.lineTo(R - 24, 362); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.7)'; for (let x = L + 30; x < R - 24; x += 10) ctx.fillRect(x, 328 + Math.sin((x + time * 90) / 24) * 10, 5, 3);
+  if (S.phase === 'intro') { textO(ctx, 'STOP THE POUR AT THE FILL LINE', cx, 306, 18, '#FFFFFF', '#0A1A40', 'center', 4); textO(ctx, 'Nic & Giulia · 6 pours · B to pour', cx, 336, 13, '#FFE680', '#0A1A40', 'center', 3); }
+  else if (S.phase === 'done') { textO(ctx, 'TOTAL +' + S.total, cx, 310, 30, '#FFE680', '#0A1A40', 'center', 6); textO(ctx, S.total >= 1200 ? 'SLUSH CHAMPIONS!' : S.total >= 700 ? 'NICE POURS!' : 'BRAIN FREEZE SQUAD', cx, 342, 14, '#FFFFFF', '#0A1A40', 'center', 3); }
+  else if (S.phase === 'result') { const r = S.result; textO(ctx, r.label, cx, 308, 22, r.pts === 300 ? '#FFE680' : r.pts === 0 ? '#FF8A8A' : '#FFFFFF', '#0A1A40', 'center', 5); textO(ctx, 'WIN ' + r.pts, cx, 340, 16, '#FFFFFF', '#0A1A40', 'center', 3); }
+  else { textO(ctx, 'WIN', cx - 110, 322, 28, '#FFFFFF', '#E8324A', 'center', 6); textO(ctx, '300', cx - 30, 322, 34, '#FFE680', '#E8324A', 'center', 7); textO(ctx, F[S.round % 6][0], cx + 120, 312, 13, '#FFFFFF', '#0A1A40', 'center', 3); textO(ctx, 'POUR ' + (S.round + 1) + ' / ' + S.rounds, cx + 120, 336, 12, '#FFE680', '#0A1A40', 'center', 3); }
+  ctx.restore();
+  // pull handles row (active one glows and pulls down while pouring)
+  const active = S.phase === 'intro' || S.phase === 'done' ? -1 : S.round % 6;
+  for (let i = 0; i < 10; i++) { const hx = L + 36 + i * 54, on = i === active, pull = on && S.phase === 'play' ? 0.5 : 0; ctx.save(); ctx.translate(hx, 384 + pull * 16); if (on) { ctx.shadowColor = '#FFE680'; ctx.shadowBlur = 16; } rr(ctx, -9, -4, 18, 36, 4); fs(ctx, '#F4F4F2', C.out, 2); rr(ctx, -11, -40, 22, 40, 6); fs(ctx, F[i][1], C.out, 2.5); rr(ctx, -7, -34, 14, 12, 3); fs(ctx, 'rgba(255,255,255,.5)', null); ctx.shadowBlur = 0; ctx.restore(); }
+  // counter with stars + base
+  ctx.fillStyle = '#B41E2A'; ctx.fillRect(L, 426, 260, 30); ctx.fillStyle = '#1A42B8'; ctx.fillRect(cx, 426, 260, 30);
+  for (let i = 0; i < 26; i++) { const sx = L + 12 + hash(i, 60) * 496, sy = 430 + hash(i, 61) * 22; ctx.save(); ctx.translate(sx, sy); ctx.beginPath(); for (let k = 0; k < 10; k++) { const r = k % 2 ? 2 : 5, a = -Math.PI / 2 + k * Math.PI / 5; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); } ctx.closePath(); fs(ctx, i % 3 ? '#FFE680' : '#FFFFFF', null); ctx.restore(); }
+  ctx.fillStyle = '#5CF2FF'; ctx.fillRect(L, 456, 520, 4); ctx.fillStyle = '#FF4FA3'; ctx.fillRect(L, 460, 520, 3);
+  rr(ctx, cx - 90, 470, 180, 44, 8); fs(ctx, '#F4F8FF', '#2F7BFF', 3); textO(ctx, 'TINMAN SOCIAL', cx, 492, 16, '#1F4FD8', null, 'center', 0);
+  // the cup being poured, under the active nozzle
+  if (active >= 0) { const nx = L + 36 + active * 54, fill = S.phase === 'result' ? S.result.fill : S.marker; if (S.phase === 'play') { ctx.fillStyle = F[active][1]; ctx.fillRect(nx - 3, 276, 6, 132 + Math.sin(time * 40) * 3); } slushCup(ctx, nx, 448, 0.72, fill, F[active][1]); }
+  // kids on the sides, meter on the right
+  const who = S.phase === 'done' ? null : S.who;
+  drawKid(ctx, 'nic', L - 90, 330, 1.25, 0); drawKid(ctx, 'giulia', R + 70, 330, 1.25, 0);
+  if (who) { const kx = who === 'nic' ? L - 90 : R + 70; textO(ctx, (who === 'nic' ? 'NIC' : 'GIULIA') + "'S TURN", kx, 384, 15, C.gold, C.out, 'center', 4); }
+  if (S.phase === 'done') { let cxs = cx - (S.cups.length - 1) * 30; for (const c of S.cups) { slushCup(ctx, cxs, 400, 0.42, Math.min(1, c.fill / 0.74), F[c.flavor][1]); cxs += 60; } }
+  // meter (neon tube) on the far right
+  const bx = R + 150, by = 60, bh = 190; rr(ctx, bx - 16, by, 32, bh, 12); fs(ctx, 'rgba(255,255,255,.12)', '#5CF2FF', 2.5);
+  rr(ctx, bx - 12, by + bh - 0.88 * bh, 24, 0.28 * bh, 8); fs(ctx, 'rgba(156,255,156,.35)', null); rr(ctx, bx - 12, by + bh - 0.79 * bh, 24, 0.1 * bh, 6); fs(ctx, '#9CFF9C', null); rr(ctx, bx - 12, by + 2, 24, bh * 0.1, 6); fs(ctx, 'rgba(255,100,100,.5)', null);
+  textO(ctx, 'FILL', bx, by - 14, 11, '#5CF2FF', null, 'center', 0, 800);
+  if (S.phase === 'play' || S.phase === 'result') { const fill = S.phase === 'result' ? S.result.fill : S.marker, my2 = by + bh - fill * bh; ctx.beginPath(); ctx.moveTo(bx - 24, my2); ctx.lineTo(bx + 24, my2); ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 4; ctx.stroke(); ctx.beginPath(); ctx.moveTo(bx + 24, my2); ctx.lineTo(bx + 36, my2 - 8); ctx.lineTo(bx + 36, my2 + 8); ctx.closePath(); fs(ctx, '#FFE680', C.out, 2); }
+  textO(ctx, 'TOTAL', L - 90, 60, 11, '#FF4FA3', null, 'center', 0, 800); textO(ctx, String(S.total), L - 90, 84, 26, C.cream, C.out, 'center', 5);
+  // bottom prompt
+  const prompt = S.phase === 'intro' ? 'Press B to start' : S.phase === 'done' ? 'Press B to get back in the Jeep' : S.phase === 'play' ? 'Press B to stop the pour!' : '';
+  if (prompt) textO(ctx, prompt, cx, 530, 15, C.cream, C.out, 'center', 4);
 }
 function drawPupScene(t) {
   const a = clamp(t / 0.4, 0, 1); ctx.globalAlpha = a; dim(0.45);
@@ -1387,11 +1933,13 @@ function render() {
   if (state === 'route') { drawRouteSelect(); return; }
   drawRoad(); drawFx(); drawHUD();
   if (state === 'pupcup' && pup.t > 1) drawPupScene(pup.t - 1);
-  if (state === 'intro') { dim(0.35); panel(W / 2 - 300, 150, 600, 200, 18); textO(ctx, 'THE ROAD TRIP', W / 2, 190, 30, C.gold, C.out, 'center', 6); textO(ctx, 'Tita and Bernard are heading to the dog park', W / 2, 238, 19, C.cream, null, 'center', 0, 600); textO(ctx, 'across Dallas. Get there before the sun goes down!', W / 2, 264, 19, C.cream, null, 'center', 0, 600); textO(ctx, 'Grab balls to fill the ZOOMIES meter · Honk to make Bernard bark cars away', W / 2, 300, 14, '#FFE89A', null, 'center', 0, 600); if (Math.floor(time * 2) % 2 === 0) textO(ctx, 'Hold GAS to go!', W / 2, 332, 16, C.cream, null, 'center', 0, 600); }
+  if (state === 'scene' && scene.kind === 'school' && scene.t > 1) drawSceneSchool(scene.t - 1);
+  if (state === 'slush') drawSlush();
+  if (state === 'intro') { dim(0.35); panel(W / 2 - 300, 150, 600, 200, 18); if (route.story) { textO(ctx, 'THE SCHOOL RUN', W / 2, 190, 30, C.gold, C.out, 'center', 6); textO(ctx, '3:05 PM at 112 Jewelberry. Nic and Giulia get out of', W / 2, 238, 19, C.cream, null, 'center', 0, 600); textO(ctx, 'Oak Point Elementary in 10 minutes. Then: Tinman Social!', W / 2, 264, 19, C.cream, null, 'center', 0, 600); } else { textO(ctx, 'THE ROAD TRIP', W / 2, 190, 30, C.gold, C.out, 'center', 6); textO(ctx, 'Tita and Bernard are heading to the dog park', W / 2, 238, 19, C.cream, null, 'center', 0, 600); textO(ctx, 'across Dallas. Get there before the sun goes down!', W / 2, 264, 19, C.cream, null, 'center', 0, 600); } textO(ctx, 'Grab balls to fill the ZOOMIES meter · Honk to make Bernard bark cars away', W / 2, 300, 14, '#FFE89A', null, 'center', 0, 600); if (Math.floor(time * 2) % 2 === 0) textO(ctx, 'Hold GAS to go!', W / 2, 332, 16, C.cream, null, 'center', 0, 600); }
   else if (state === 'paused') { dim(); textO(ctx, 'PAUSED', W / 2, 150, 48, C.gold, C.out, 'center', 9); drawMenu(240); }
   else if (state === 'quitconfirm') { dim(); textO(ctx, 'Quit to arcade?', W / 2, 170, 40, C.gold, C.out, 'center', 8); textO(ctx, 'Your trip will be lost.', W / 2, 220, 16, C.cream, null, 'center', 0, 600); drawMenu(280); }
   else if (state === 'gameover') { dim(0.7); textO(ctx, 'OUT OF TIME!', W / 2, 150, 56, '#FF8A8A', C.out, 'center', 9); textO(ctx, 'The sun went down on ' + STAGES[stage].name.toLowerCase() + '.', W / 2, 200, 18, C.cream, null, 'center', 0, 600); textO(ctx, 'Score ' + score, W / 2, 240, 24, C.cream, C.out, 'center', 5); drawMenu(300); }
-  else if (state === 'finish' && finishTimer > 0.8) { dim(Math.min(0.55, (finishTimer - 0.8) / 1.5)); textO(ctx, 'YOU MADE IT!', W / 2, 120, 60, C.gold, C.out, 'center', 10); textO(ctx, 'Bernard is already running for the balls.', W / 2, 168, 18, C.cream, null, 'center', 0, 600); if (finishTimer > 1.2) { textO(ctx, 'Time bonus', W / 2 - 40, 212, 22, C.cream, C.out, 'right', 4); textO(ctx, '+' + tally.timeTotal, W / 2, 212, 22, '#8ED8FF', C.out, 'left', 4); textO(ctx, 'Balls bonus', W / 2 - 40, 248, 22, C.cream, C.out, 'right', 4); textO(ctx, '+' + tally.ballsTotal, W / 2, 248, 22, '#DDFF8A', C.out, 'left', 4); textO(ctx, 'Cars passed: ' + passes + '   ·   Pup cups: ' + pupCups + ' (+' + tally.cupsTotal + ')', W / 2, 284, 16, C.cream, null, 'center', 0, 600); textO(ctx, 'SCORE  ' + score, W / 2, 326, 34, C.gold, C.out, 'center', 7); } if (tally.shown === 2) drawMenu(390); }
+  else if (state === 'finish' && finishTimer > (route.story ? 4.2 : 0.8)) { const ft = finishTimer - (route.story ? 3.4 : 0); dim(Math.min(0.55, (ft - 0.8) / 1.5)); textO(ctx, route.story ? 'HOME SWEET HOME!' : 'YOU MADE IT!', W / 2, 120, 60, C.gold, C.out, 'center', 10); textO(ctx, route.story ? 'Nic & Giulia: "Best day ever!"  Bernard: zoomies in the backyard.' : 'Bernard is already running for the balls.', W / 2, 168, 18, C.cream, null, 'center', 0, 600); if (ft > 1.2) { textO(ctx, 'Time bonus', W / 2 - 40, 212, 22, C.cream, C.out, 'right', 4); textO(ctx, '+' + tally.timeTotal, W / 2, 212, 22, '#8ED8FF', C.out, 'left', 4); textO(ctx, 'Balls bonus', W / 2 - 40, 248, 22, C.cream, C.out, 'right', 4); textO(ctx, '+' + tally.ballsTotal, W / 2, 248, 22, '#DDFF8A', C.out, 'left', 4); textO(ctx, 'Cars passed: ' + passes + '   ·   Pup cups: ' + pupCups + ' (+' + tally.cupsTotal + ')' + (route.story ? '   ·   Slush Rush: +' + slushScore : ''), W / 2, 284, 16, C.cream, null, 'center', 0, 600); textO(ctx, 'SCORE  ' + score, W / 2, 326, 34, C.gold, C.out, 'center', 7); } if (tally.shown === 2) drawMenu(390); }
 }
 
 /* =====================================================================
@@ -1406,6 +1954,7 @@ function loop(ts) {
 }
 function start() {
   if (running) return; running = true; buildSprites(); buildBackdrops(); buildTrack(); goTitle();
+  if (window.BRT_SHOW_ROUTES) { window.BRT_SHOW_ROUTES = false; state = 'route'; routeIdx = 2; }
   window.addEventListener('keydown', onKeyDown); window.addEventListener('keyup', onKeyUp); window.addEventListener('blur', onBlur);
   document.addEventListener('visibilitychange', onVis); window.addEventListener('gamepadconnected', onGpc);
   setupTouch(); last = 0; raf = requestAnimationFrame(loop);
@@ -1413,16 +1962,16 @@ function start() {
 function stop() { running = false; cancelAnimationFrame(raf); Music.stop(); Audio_.engineSet(0, false); window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp); window.removeEventListener('blur', onBlur); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('gamepadconnected', onGpc); }
 const onVis = () => { if (document.hidden && state === 'playing') { state = 'paused'; setMenu(['Resume', 'Restart Trip', 'Quit to Arcade']); Audio_.engineSet(0, false); } };
 const onGpc = () => { Audio_.init(); Audio_.engineOn(); };
-window.BRT = { start, stop, onQuit: null, get state() { return state; }, teleport(segIndex) { position = segIndex * TUNE.segLen; playerX = 0; }, cheat(v) { speed = v; }, stageStarts() { return stageStarts.concat([segments.length]); }, stops() { return stops.map(q => q.n); }, routeId() { return route.id; }, setRoute(i) { route = ROUTES[i]; STAGES = route.stages; } };
+window.BRT = { start, stop, onQuit: null, get state() { return state; }, teleport(segIndex) { position = segIndex * TUNE.segLen; playerX = 0; }, cheat(v) { speed = v; }, stageStarts() { return stageStarts.concat([segments.length]); }, stops() { return stops.map(q => q.n); }, forks() { return forks.map(f => ({ decision: f.decision, L0: f.L0, Lb: f.Lb, L1: f.L1, R0: f.R0, Rb: f.Rb, R1: f.R1, off: f.offroadSide, chosen: f.chosen })); }, routeId() { return route.id; }, setRoute(i) { route = ROUTES[i]; STAGES = route.stages; } };
 
 if (location.hash === '#sprites') {
   buildSprites(); ctx.fillStyle = '#9fd'; ctx.fillRect(0, 0, W, H);
-  const j = jeepSprite(1, 1, 0, 0, 0); ctx.drawImage(j.c, 10, 10, 220, 190); const j2 = jeepSprite(0, 0, 1, 0, 0); ctx.drawImage(j2.c, 240, 10, 220, 190); const j3 = jeepSprite(2, 2, 0, 1, 0); ctx.drawImage(j3.c, 470, 10, 220, 190);
+  const j = jeepSprite(1, 1, 0, 0, 0, 2, 1, false); ctx.drawImage(j.c, 10, 10, 220, 190); const j2 = jeepSprite(0, 0, 1, 0, 0, 2, 3, true); ctx.drawImage(j2.c, 240, 10, 220, 190); const j3 = jeepSprite(2, 2, 0, 1, 0, 1, 2, true); ctx.drawImage(j3.c, 470, 10, 220, 190);
   let x = 10; for (const k of ['oak', 'cactus', 'hay', 'cow', 'tower', 'windmill', 'barn', 'bill1']) { const s = SPR[k]; const h = 150, w = h * s.w / s.h; ctx.drawImage(s.c, x, 220, w, h); x += w + 8; }
   x = 10; for (const k of ['lamp', 'boat1', 'buoy', 'b1', 'b3', 'cone', 'finish', 'ballG', 'bone', 'puddle', 'flowers']) { const s = SPR[k]; const h = 120, w = h * s.w / s.h; ctx.drawImage(s.c, x, 390, w, h); x += w + 8; }
   x = 700; for (const s of [carSprites.sedan[0], carSprites.pickup[0], carSprites.semi[0]]) { const h = 150, w = h * s.w / s.h; ctx.drawImage(s.c, x, 220, w, h); x += w + 8; }
 } else {
-  const boot = () => { if (!window.BRT_NO_AUTOSTART) start(); };
+  const boot = () => { if (window.BRT_NO_AUTOSTART && typeof window.brtOpen === 'function') window.brtOpen(); else start(); };
   if (document.fonts && document.fonts.load) Promise.race([document.fonts.load('700 40px Fredoka'), new Promise(r => setTimeout(r, 1500))]).then(boot, boot); else boot();
 }
 })();
