@@ -382,6 +382,9 @@
    QUICK EDIT GUIDE
      • Track layout ......... buildTrack()  (search "TRACK SCRIPT")
      • Speeds / timing ...... TUNE object
+     • Fork feel ............ MERGE_LEN (how long the chosen branch takes to ease back to centre)
+     • Car flips ............ crash handling in updatePlaying(), drawCar() for the wreck look
+     • Lake Lewisville ...... buildLake() lays the water, decorateLake() places buoys/ramps/skis, drawBoat() is the boat
      • Controller mapping ... DEFAULT_PAD (SNES buttons)
      • Arcade hookup ........ window.BRT = { start, stop, onQuit }
    ===================================================================== */
@@ -400,7 +403,7 @@ const TUNE = {
   segLen: 200, rumble: 3, lanes: 3, roadW: 2000, camH: 1150, drawDist: 280, fov: 100, fog: 2.4,
   maxSpeed: 9000,      // road units per second at full throttle
   boostMul: 1.35,      // Zoomies speed multiplier
-  startTime: 90, checkpointTime: 70,
+  startTime: 115, checkpointTime: 90,
   trafficSpeed: [0.28, 0.6]  // NPC car speed as a fraction of maxSpeed
 };
 const camDepth = 1 / Math.tan((TUNE.fov / 2) * Math.PI / 180);
@@ -432,7 +435,7 @@ const STORY_STAGES = [
 const ROUTES = [
   { id: 0, name: 'Little Elm, Texas', stages: TX_STAGES, shop: 'Black Sheep Coffee', shopStyle: 'sheep', park: 'oak', welcome: ['WELCOME TO', 'LITTLE ELM'], blurb: 'Longhorns, windmills, the lake bridge, Dallas at sunset' },
   { id: 1, name: 'Miami, Florida', stages: MIA_STAGES, shop: 'CAO Coffee', shopStyle: 'cao', park: 'palm', welcome: ['BIENVENIDOS A', 'MIAMI'], blurb: 'Ocean Drive, the causeway, downtown neon at night' },
-  { id: 2, name: 'Story: The School Run', stages: STORY_STAGES, shop: 'Black Sheep Coffee', shopStyle: 'sheep', park: 'oak', welcome: ['WELCOME TO', 'LITTLE ELM'], blurb: 'Pick up Nic & Giulia, play Slush Rush at Tinman Social, get home by sunset', story: true, time: 135, cpTime: 115 }
+  { id: 2, name: 'Story: The School Run', stages: STORY_STAGES, shop: 'Black Sheep Coffee', shopStyle: 'sheep', park: 'oak', welcome: ['WELCOME TO', 'LITTLE ELM'], blurb: 'Pick up Nic & Giulia, Slush Rush at Tinman Social, maybe a boat ride on the lake', story: true, time: 170, cpTime: 145 }
 ];
 let route = ROUTES[0], STAGES = route.stages;
 try { const r = +localStorage.getItem('brt_route'); if (r === 1 || r === 2) { route = ROUTES[r]; STAGES = route.stages; } } catch (e) { }
@@ -479,6 +482,25 @@ function sprite(key, w, h, ww, draw) { // w,h = design px; ww = world width (roa
     draw(g); s = { c, w, h, ww }; cache.set(key, s);
   }
   return s;
+}
+function drawCar(car, scale, sx, sy, clipY) {
+  if (!car.wreck) { drawSprite(car.s, scale, sx, sy, -0.5, -1, clipY); return; }
+  const s = car.s, destW = s.ww * scale * (W / 2), destH = destW * s.h / s.w; if (destW < 0.5) return;
+  const w = car.wreck, T = 0.8, p = clamp(w.t / T, 0, 1), e = 1 - (1 - p) * (1 - p);
+  const hop = Math.sin(p * Math.PI) * destH * 1.1, ang = w.dir * (Math.PI * e + 0.18 * p); // roll over sideways, land on the roof, slightly tilted
+  ctx.save();
+  if (clipY && clipY < H) { ctx.beginPath(); ctx.rect(0, 0, W, clipY); ctx.clip(); }
+  ell(ctx, sx, sy - destH * 0.04, destW * 0.45, destH * 0.08); fs(ctx, `rgba(0,0,0,${0.28 * (1 - hop / (destH * 1.1) * 0.7)})`, null); // ground shadow
+  ctx.translate(sx, sy - destH / 2 - hop); ctx.rotate(ang);
+  ctx.drawImage(s.c, -destW / 2, -destH / 2, destW, destH);
+  // damage: dents, scrapes and a cracked windshield (boats just get wet)
+  const u = destW / 160; if (w.water) { ctx.restore(); if (p < 1 && frame % 2 === 0) particles.push({ x: sx + rnd(-destW * 0.4, destW * 0.4), y: sy, vx: rnd(-1, 1), vy: -rnd(0.5, 2), life: 20, max: 20, r: clamp(destW * 0.04, 1, 8), color: 'rgba(240,250,255,.8)', type: 'drop' }); return; } ctx.lineCap = 'round';
+  for (const [dx, dy, r] of [[-0.3, -0.05, 0.11], [0.22, 0.12, 0.09], [0.05, -0.3, 0.07]]) { ell(ctx, dx * destW, dy * destH, r * destW, r * destW * 0.7); fs(ctx, 'rgba(45,42,48,.5)', null); }
+  ctx.strokeStyle = 'rgba(30,28,32,.6)'; ctx.lineWidth = Math.max(1, 2 * u);
+  for (const [x1, y1, x2, y2] of [[-0.42, 0.1, -0.2, 0.25], [0.1, -0.2, 0.3, -0.05], [-0.1, 0.3, 0.15, 0.32]]) { ctx.beginPath(); ctx.moveTo(x1 * destW, y1 * destH); ctx.lineTo(x2 * destW, y2 * destH); ctx.stroke(); }
+  ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = Math.max(1, 1.5 * u); ctx.beginPath(); for (let i = 0; i < 5; i++) { const a = -0.3 + i * 0.5; ctx.moveTo(0, -destH * 0.18); ctx.lineTo(Math.cos(a) * destW * 0.18, -destH * 0.18 + Math.sin(a) * destH * 0.2); } ctx.stroke();
+  ctx.restore();
+  if (p >= 1 && (frame - w.puff) > 5) { w.puff = frame; const r = clamp(destW * 0.05, 1.5, 14); particles.push({ x: sx + rnd(-destW * 0.2, destW * 0.2), y: sy - destH * 0.9, vx: rnd(-0.3, 0.3), vy: -0.6 - r * 0.08, life: 36, max: 36, r, color: 'rgba(95,92,100,.5)', type: 'dust' }); }
 }
 // draw a world sprite projected to screen; offX/offY anchor (−1..0), clipY hides below-horizon part behind nearer hills
 function drawSprite(s, scale, destX, destY, offX, offY, clipY) {
@@ -535,27 +557,11 @@ function drawJeep(g, steer, earFrame, braking, boost, dizzy, hair, kids) {
   g.fillStyle = '#2B2B30'; g.fillRect(34 - lean * 0.5, 56, 8, 18); g.fillRect(178 - lean * 0.5, 56, 8, 18);
   // front seats / headrests
   rr(g, 52 - lean * 0.6, 58, 44, 34, 8); fs(g, '#1F1F24', C.out, 2); rr(g, 124 - lean * 0.6, 58, 44, 34, 8); fs(g, '#1F1F24', C.out, 2);
-  // Tita, from behind. Hair stays still.
-  g.save(); g.translate(74 - lean * 0.7, 46);
-  const HAIR = '#1E1A1A', HAIR_L = '#3A3236';
-  ell(g, 0, 14, 20, 20); fs(g, HAIR, C.out, 2.2);
-  ell(g, 0, 0, 15, 15); fs(g, '#E6B892', C.out, 2.2);
-  g.beginPath(); g.moveTo(-15, 2); g.bezierCurveTo(-14, -16, 14, -16, 15, 2); g.bezierCurveTo(10, -4, -10, -4, -15, 2); g.closePath(); fs(g, HAIR, null);
-  g.beginPath(); g.moveTo(-16, 0); g.bezierCurveTo(-18, 10, -12, 22, -7, 32); g.lineTo(7, 32); g.bezierCurveTo(12, 22, 18, 10, 16, 0); g.closePath(); fs(g, HAIR, C.out, 2);
-  g.beginPath(); g.moveTo(-6, -8); g.quadraticCurveTo(0, -12, 7, -8); g.strokeStyle = HAIR_L; g.lineWidth = 2.5; g.stroke();
-  ell(g, 0, 13, 4, 3); fs(g, '#E07A9C', C.out, 1.2);
-  g.beginPath(); g.arc(-14, 6, 3, 0, TAU); g.strokeStyle = C.gold; g.lineWidth = 1.5; g.stroke();
-  g.restore();
+  titaHead(g, 74 - lean * 0.7, 46);
   // Bernard (passenger) looking back at us
   bernardHead(g, 146 - lean * 0.7, 40 + Math.abs(flap) * 1.5, 1.0, flap * (boost ? 1.4 : 1), boost || earFrame !== 1, dizzy);
   // Nic and Giulia in the back seat (nearer to us, so they sit lower in the frame)
-  if (kids) {
-    const kid = (x, who) => { g.save(); g.translate(x - lean * 0.8, 56); g.scale(1.4, 1.4);
-      if (who === 'nic') { ell(g, 0, 0, 13, 13); fs(g, '#D9A77A', C.out, 2); g.beginPath(); g.moveTo(-13, 0); g.bezierCurveTo(-12, -14, 12, -14, 13, 0); g.bezierCurveTo(8, -3, -8, -3, -13, 0); g.closePath(); fs(g, '#2B1A12', null); rr(g, -14, -6, 28, 9, 4); fs(g, '#2F6FD8', C.out, 1.8); rr(g, -17, -2, 10, 5, 2); fs(g, '#2F6FD8', C.out, 1.5); /* backwards cap */ }
-      else { for (const sx of [-10, 10]) { g.beginPath(); g.moveTo(sx, 4); g.quadraticCurveTo(sx * 1.4, 16, sx * 1.6, 28); g.strokeStyle = C.out; g.lineWidth = 7; g.stroke(); g.strokeStyle = '#3B2314'; g.lineWidth = 5; g.stroke(); } ell(g, 0, 0, 13, 13); fs(g, '#E6B892', C.out, 2); g.beginPath(); g.moveTo(-13, 1); g.bezierCurveTo(-12, -14, 12, -14, 13, 1); g.bezierCurveTo(8, -3, -8, -3, -13, 1); g.closePath(); fs(g, '#3B2314', null); ell(g, -5, -9, 4, 3, -0.5); fs(g, '#FF7FB1', C.out, 1.2); ell(g, 2, -9, 4, 3, 0.5); fs(g, '#FF7FB1', C.out, 1.2); ell(g, -1.5, -9, 1.8, 1.8); fs(g, '#FF7FB1', C.out, 1); }
-      g.restore(); };
-    kid(96, 'nic'); kid(126, 'giulia');
-  }
+  if (kids) { kidHead(g, 96 - lean * 0.8, 56, 1.4, 'nic'); kidHead(g, 126 - lean * 0.8, 56, 1.4, 'giulia'); }
   // body (white Rubicon-style tailgate) — drawn after the passengers so it sits in front of them
   rr(g, 28, 72, 164, 84, 10); fs(g, '#F4F4F2', C.out, 2.6);
   g.fillStyle = 'rgba(0,0,0,.06)'; g.fillRect(30, 118, 160, 36);
@@ -577,6 +583,88 @@ function drawJeep(g, steer, earFrame, braking, boost, dizzy, hair, kids) {
   for (let i = 0; i < 8; i++) { ell(g, 40 + hash(i, 1) * 140, 128 + hash(i, 2) * 24, 2 + hash(i, 3) * 2, 1.5); fs(g, 'rgba(110,70,30,.35)', null); }
   if (boost) { for (const fx of [62, 158]) { ell(g, fx, 170, 10, 6); fs(g, 'rgba(255,170,60,.8)', null); ell(g, fx, 176, 6, 10); fs(g, 'rgba(255,230,120,.8)', null); } }
   g.restore();
+}
+// Tita's head from behind (shared by the Jeep and the boat)
+function titaHead(g, x, y) {
+  g.save(); g.translate(x, y);
+  const HAIR = '#1E1A1A', HAIR_L = '#3A3236';
+  ell(g, 0, 14, 20, 20); fs(g, HAIR, C.out, 2.2);
+  ell(g, 0, 0, 15, 15); fs(g, '#E6B892', C.out, 2.2);
+  g.beginPath(); g.moveTo(-15, 2); g.bezierCurveTo(-14, -16, 14, -16, 15, 2); g.bezierCurveTo(10, -4, -10, -4, -15, 2); g.closePath(); fs(g, HAIR, null);
+  g.beginPath(); g.moveTo(-16, 0); g.bezierCurveTo(-18, 10, -12, 22, -7, 32); g.lineTo(7, 32); g.bezierCurveTo(12, 22, 18, 10, 16, 0); g.closePath(); fs(g, HAIR, C.out, 2);
+  g.beginPath(); g.moveTo(-6, -8); g.quadraticCurveTo(0, -12, 7, -8); g.strokeStyle = HAIR_L; g.lineWidth = 2.5; g.stroke();
+  ell(g, 0, 13, 4, 3); fs(g, '#E07A9C', C.out, 1.2);
+  g.beginPath(); g.arc(-14, 6, 3, 0, TAU); g.strokeStyle = C.gold; g.lineWidth = 1.5; g.stroke();
+  g.restore();
+}
+// Nic / Giulia heads from behind (back seat of the Jeep, or the boat)
+function kidHead(g, x, y, s, who) {
+  g.save(); g.translate(x, y); g.scale(s, s);
+  if (who === 'nic') { ell(g, 0, 0, 13, 13); fs(g, '#D9A77A', C.out, 2); g.beginPath(); g.moveTo(-13, 0); g.bezierCurveTo(-12, -14, 12, -14, 13, 0); g.bezierCurveTo(8, -3, -8, -3, -13, 0); g.closePath(); fs(g, '#2B1A12', null); rr(g, -14, -6, 28, 9, 4); fs(g, '#2F6FD8', C.out, 1.8); rr(g, -17, -2, 10, 5, 2); fs(g, '#2F6FD8', C.out, 1.5); }
+  else { for (const sx of [-10, 10]) { g.beginPath(); g.moveTo(sx, 4); g.quadraticCurveTo(sx * 1.4, 16, sx * 1.6, 28); g.strokeStyle = C.out; g.lineWidth = 7; g.stroke(); g.strokeStyle = '#3B2314'; g.lineWidth = 5; g.stroke(); } ell(g, 0, 0, 13, 13); fs(g, '#E6B892', C.out, 2); g.beginPath(); g.moveTo(-13, 1); g.bezierCurveTo(-12, -14, 12, -14, 13, 1); g.bezierCurveTo(8, -3, -8, -3, -13, 1); g.closePath(); fs(g, '#3B2314', null); ell(g, -5, -9, 4, 3, -0.5); fs(g, '#FF7FB1', C.out, 1.2); ell(g, 2, -9, 4, 3, 0.5); fs(g, '#FF7FB1', C.out, 1.2); ell(g, -1.5, -9, 1.8, 1.8); fs(g, '#FF7FB1', C.out, 1); }
+  g.restore();
+}
+/* ---- LAKE LEWISVILLE: the boat, the skiers and the lake sprites ---- */
+function drawBoat(g, steer, earFrame, dizzy, kidsIn, boost) {
+  // design box 220 x 190, stern view. kidsIn: how many kids are still sitting in the boat (the rest are out on skis)
+  const sh = steer * 0.06, lean = steer * 4, flap = [-1, 0, 1][earFrame];
+  g.save(); g.translate(110, 190); g.transform(1, 0, sh, 1, 0, 0); g.translate(-110, -190);
+  // wake
+  ell(g, 110, 178, 112, 14); fs(g, 'rgba(255,255,255,.55)', null); ell(g, 110, 184, 70, 8); fs(g, 'rgba(255,255,255,.8)', null);
+  if (boost) { ell(g, 110, 182, 130, 18); fs(g, 'rgba(255,255,255,.5)', null); }
+  // windshield + wheel
+  rr(g, 44 - lean, 28, 132, 9, 4); fs(g, '#2B2B30', C.out, 2); g.fillStyle = 'rgba(160,210,255,.35)'; g.fillRect(48 - lean, 37, 124, 24);
+  rr(g, 52 - lean * 0.6, 62, 44, 30, 8); fs(g, '#1F1F24', C.out, 2); rr(g, 124 - lean * 0.6, 62, 44, 30, 8); fs(g, '#1F1F24', C.out, 2);
+  titaHead(g, 74 - lean * 0.7, 48);
+  bernardHead(g, 146 - lean * 0.7, 42 + Math.abs(flap) * 1.5, 1.0, flap * 1.4, true, dizzy);
+  // kids on the back bench in life vests
+  const vest = (x) => { rr(g, x - 17, 72, 34, 20, 7); fs(g, '#FF8A2A', C.out, 2); rr(g, x - 4, 74, 8, 16, 3); fs(g, '#FFB347', null); };
+  if (kidsIn >= 1) { vest(96 - lean * 0.8); kidHead(g, 96 - lean * 0.8, 58, 1.4, 'nic'); }
+  if (kidsIn >= 2) { vest(126 - lean * 0.8); kidHead(g, 126 - lean * 0.8, 58, 1.4, 'giulia'); }
+  // gunwale + hull (transom)
+  rr(g, 22, 80, 176, 14, 7); fs(g, '#DADAD2', C.out, 2.4);
+  rr(g, 30, 88, 160, 72, 16); fs(g, '#F4F4F2', C.out, 2.6);
+  rr(g, 30, 118, 160, 11, 3); fs(g, '#2F6FD8', null); rr(g, 30, 131, 160, 4, 2); fs(g, '#C8302A', null);
+  g.fillStyle = 'rgba(0,0,0,.07)'; g.fillRect(32, 136, 156, 22);
+  textO(g, 'BERNARD', 110, 150, 12, '#2B3A8A', null, 'center', 0);
+  // cleat for the tow rope
+  rr(g, 100, 92, 20, 7, 3); fs(g, '#8A8A90', C.out, 1.5);
+  // outboard motor
+  rr(g, 92, 104, 36, 60, 9); fs(g, '#2B2B30', C.out, 2.4); rr(g, 96, 108, 28, 18, 5); fs(g, '#F4F4F2', C.out, 1.6); rr(g, 104, 164, 12, 14, 3); fs(g, '#3A3A40', C.out, 1.5);
+  ell(g, 110, 178, 26, 7); fs(g, 'rgba(255,255,255,.85)', null);
+  // fenders hanging off the sides
+  for (const fx of [34, 186]) { rr(g, fx - 7, 96, 14, 30, 7); fs(g, '#2F6FD8', C.out, 2); }
+  g.restore();
+}
+const boatSprite = (steer, ear, dizzy, kidsIn, boost) => sprite(`boat_${steer}_${ear}_${dizzy}_${kidsIn}_${boost}`, 220, 190, 560, g => drawBoat(g, steer, ear, dizzy, kidsIn, boost));
+function drawJetski(g, col) { ell(g, 60, 92, 46, 7); fs(g, 'rgba(255,255,255,.7)', null); rr(g, 18, 52, 84, 38, 14); fs(g, col, C.out, 2.5); rr(g, 18, 70, 84, 8, 3); fs(g, '#F4F4F2', null); rr(g, 40, 44, 40, 18, 8); fs(g, '#2B2B30', C.out, 2); rr(g, 46, 16, 28, 34, 9); fs(g, '#FF8A2A', C.out, 2); ell(g, 60, 12, 11, 11); fs(g, '#D9A77A', C.out, 2); g.beginPath(); g.moveTo(49, 3); g.bezierCurveTo(50, -8, 70, -8, 71, 3); g.closePath(); fs(g, '#2B1A12', null); rr(g, 30, 30, 60, 6, 3); fs(g, '#2B2B30', C.out, 1.5); }
+function drawPontoon(g) { ell(g, 110, 142, 100, 8); fs(g, 'rgba(255,255,255,.6)', null); for (const px of [40, 180]) { rr(g, px - 18, 112, 36, 24, 12); fs(g, '#9A9AA0', C.out, 2.5); } rr(g, 12, 66, 196, 52, 8); fs(g, '#F4F4F2', C.out, 2.6); rr(g, 12, 98, 196, 8, 3); fs(g, '#2F6FD8', null); for (const px of [30, 190]) { rr(g, px - 3, 24, 6, 44, 2); fs(g, '#8A8A90', C.out, 1.5); } rr(g, 18, 14, 184, 16, 7); fs(g, '#2F6FD8', C.out, 2.4); for (const hx of [70, 110, 150]) { ell(g, hx, 52, 11, 11); fs(g, pick(['#D9A77A', '#E6B892', '#C98A5A']), C.out, 2); rr(g, hx - 13, 60, 26, 14, 5); fs(g, '#FF8A2A', C.out, 1.5); } textO(g, 'LAKE LIFE', 110, 112, 10, '#2B3A8A', null, 'center', 0); }
+function drawLog(g) { ell(g, 100, 62, 92, 7); fs(g, 'rgba(0,0,0,.2)', null); rr(g, 10, 22, 180, 38, 19); fs(g, '#7B4B2A', C.out, 2.5); for (let x = 40; x < 170; x += 26) { g.beginPath(); g.moveTo(x, 26); g.quadraticCurveTo(x + 6, 41, x, 56); g.strokeStyle = 'rgba(0,0,0,.18)'; g.lineWidth = 3; g.stroke(); } ell(g, 22, 41, 12, 18); fs(g, '#C9A070', C.out, 2.2); ell(g, 22, 41, 6, 9); fs(g, '#A67C52', null); rr(g, 120, 6, 10, 22, 4); fs(g, '#7B4B2A', C.out, 2); }
+function drawRamp(g) { // a floating jump ramp seen from behind: low edge near us, high edge away
+  for (const fx of [24, 156]) { rr(g, fx - 14, 66, 28, 20, 8); fs(g, '#F4F4F2', C.out, 2); }
+  g.beginPath(); g.moveTo(14, 86); g.lineTo(166, 86); g.lineTo(146, 14); g.lineTo(34, 14); g.closePath(); fs(g, '#F2C14E', C.out, 3);
+  g.save(); g.beginPath(); g.moveTo(14, 86); g.lineTo(166, 86); g.lineTo(146, 14); g.lineTo(34, 14); g.closePath(); g.clip(); g.fillStyle = '#2B2B30'; for (let x = -20; x < 200; x += 36) { g.beginPath(); g.moveTo(x, 86); g.lineTo(x + 18, 86); g.lineTo(x + 38, 14); g.lineTo(x + 20, 14); g.closePath(); g.fill(); } g.restore();
+  rr(g, 60, 36, 60, 30, 6); fs(g, '#F4F4F2', C.out, 2); textO(g, 'JUMP', 90, 50, 14, '#C8302A', null, 'center', 0); g.beginPath(); g.moveTo(90, 8); g.lineTo(78, 20); g.lineTo(84, 20); g.lineTo(84, 30); g.lineTo(96, 30); g.lineTo(96, 20); g.lineTo(102, 20); g.closePath(); fs(g, '#F4F4F2', C.out, 2);
+}
+function drawSkis(g) { ell(g, 45, 100, 36, 7); fs(g, 'rgba(0,0,0,.2)', null); for (const [cx, rot] of [[34, -0.18], [56, 0.18]]) { g.save(); g.translate(cx, 58); g.rotate(rot); rr(g, -8, -50, 16, 100, 8); fs(g, '#F4F4F2', C.out, 2.5); rr(g, -8, -50, 16, 16, 8); fs(g, '#C8302A', C.out, 1.5); rr(g, -6, -6, 12, 30, 4); fs(g, '#2F6FD8', C.out, 1.5); g.restore(); } rr(g, 24, 2, 42, 12, 6); fs(g, '#F2C14E', C.out, 2); g.beginPath(); g.moveTo(45, 2); g.lineTo(45, -14); g.strokeStyle = C.out; g.lineWidth = 3; g.stroke(); }
+function drawDuck(g) { ell(g, 36, 44, 24, 13); fs(g, '#F2C14E', C.out, 2.5); ell(g, 52, 26, 11, 10); fs(g, '#F2C14E', C.out, 2.5); g.beginPath(); g.moveTo(61, 26); g.lineTo(72, 30); g.lineTo(61, 33); g.closePath(); fs(g, '#FF8A2A', C.out, 1.5); ell(g, 55, 24, 2, 2); fs(g, C.eye, null); g.beginPath(); g.moveTo(14, 44); g.lineTo(2, 34); g.lineTo(16, 38); g.closePath(); fs(g, '#F2C14E', C.out, 2); ell(g, 36, 56, 30, 4); fs(g, 'rgba(255,255,255,.6)', null); }
+function drawDock(g) { for (const px of [20, 130, 240]) { rr(g, px - 6, 50, 12, 70, 3); fs(g, '#6E4A2A', C.out, 2); } rr(g, 0, 56, 260, 22, 4); fs(g, '#A87847', C.out, 2.5); for (let x = 8; x < 260; x += 16) { g.beginPath(); g.moveTo(x, 58); g.lineTo(x, 76); g.strokeStyle = 'rgba(0,0,0,.2)'; g.lineWidth = 2; g.stroke(); } rr(g, 200, 8, 8, 50, 3); fs(g, '#2B2B30', C.out, 1.5); ell(g, 204, 8, 9, 9); fs(g, '#FFE066', C.out, 2); for (const bx of [60, 110]) { ell(g, bx, 64, 10, 10); fs(g, '#F4F4F2', C.out, 2); ell(g, bx, 64, 4, 4); fs(g, '#C8302A', null); } }
+function drawMarina(g) { // the boathouse at Little Elm Marina, with its sign and a slip out front
+  ell(g, 210, 226, 200, 10); fs(g, 'rgba(0,0,0,.25)', null);
+  rr(g, 60, 70, 300, 130, 8); fs(g, '#F4F1EA', C.out, 3); g.beginPath(); g.moveTo(40, 72); g.lineTo(210, 14); g.lineTo(380, 72); g.closePath(); fs(g, '#2F6FD8', C.out, 3);
+  rr(g, 150, 120, 120, 80, 6); fs(g, '#1C2A44', C.out, 2.5); rr(g, 156, 126, 108, 20, 3); fs(g, 'rgba(160,210,255,.35)', null);
+  for (const wx of [80, 300]) { rr(g, wx, 92, 40, 30, 4); fs(g, '#9ED0F0', C.out, 2); }
+  rr(g, 100, 28, 220, 36, 8); fs(g, '#F4F4F2', C.out, 3); textO(g, 'LITTLE ELM MARINA', 210, 46, 17, '#2B3A8A', null, 'center', 0);
+  g.beginPath(); g.moveTo(210, 10); g.lineTo(210, -2); g.strokeStyle = C.out; g.lineWidth = 3; g.stroke(); rr(g, 210, -8, 26, 14, 2); fs(g, '#C8302A', C.out, 1.5);
+  rr(g, 0, 196, 420, 18, 4); fs(g, '#A87847', C.out, 2.5); for (let x = 8; x < 420; x += 18) { g.beginPath(); g.moveTo(x, 198); g.lineTo(x, 212); g.strokeStyle = 'rgba(0,0,0,.2)'; g.lineWidth = 2; g.stroke(); }
+  g.save(); g.translate(300, 150); g.scale(0.42, 0.42); sailboat(g, '#C8302A'); g.restore();
+  for (const lx of [20, 400]) { rr(g, lx - 4, 150, 8, 50, 3); fs(g, '#2B2B30', C.out, 1.5); ell(g, lx, 148, 8, 8); fs(g, '#FFE066', C.out, 2); }
+}
+function drawSignMarina(g) { // green highway sign: MARINA, next exit, with an arrow and a little boat
+  rr(g, 92, 90, 16, 130, 4); fs(g, '#8A9098', C.out, 3);
+  rr(g, 6, 10, 188, 86, 10); fs(g, '#2E7D32', '#F4F4F4', 4);
+  textO(g, 'MARINA', 100, 40, 26, '#FFFFFF', null, 'center', 0); textO(g, 'NEXT EXIT  ▶', 100, 72, 17, '#FFFFFF', null, 'center', 0);
+  g.save(); g.translate(28, 56); g.scale(0.16, 0.16); sailboat(g, '#F4F4F2'); g.restore();
 }
 const jeepSprite = (steer, ear, brake, boost, dizzy, hairAmp, hairFrame, kids) => sprite(`jeep_${steer}_${ear}_${brake}_${boost}_${dizzy}_${hairAmp}_${hairFrame}_${kids ? 1 : 0}`, 220, 190, 560, g => drawJeep(g, steer, ear, brake, boost, dizzy, { amp: hairAmp, frame: hairFrame }, kids));
 
@@ -620,7 +708,9 @@ function drawSemi(g, color, label) {
 const carSprites = {
   sedan: ['#D84A3C', '#3C6FD8', '#E8C53C', '#4FA866', '#F2F2F2', '#8A4FB8'].map((col, i) => sprite('sedan' + i, 160, 110, 560, g => drawSedan(g, col))),
   pickup: ['#2F4A7A', '#8B2E2E', '#C9C9C9'].map((col, i) => sprite('pickup' + i, 170, 132, 600, g => drawPickup(g, col))),
-  semi: [['#E9E9E9', 'TEXAS MELONS'], ['#4C86C6', 'LONE STAR ICE']].map(([col, lab], i) => sprite('semi' + i, 220, 268, 820, g => drawSemi(g, col, lab)))
+  semi: [['#E9E9E9', 'TEXAS MELONS'], ['#4C86C6', 'LONE STAR ICE']].map(([col, lab], i) => sprite('semi' + i, 220, 268, 820, g => drawSemi(g, col, lab))),
+  jetski: ['#2EC4B6', '#F2C14E', '#E8324A', '#8A4FB8'].map((col, i) => sprite('jetski' + i, 120, 100, 420, g => drawJetski(g, col))),
+  pontoon: [sprite('pontoon0', 220, 150, 900, drawPontoon)]
 };
 function treeOak(g) { g.beginPath(); g.moveTo(84, 220); g.lineTo(88, 150); g.lineTo(112, 150); g.lineTo(116, 220); g.closePath(); fs(g, '#7B4B2A', C.out, 3); const blobs = [[60, 110, 46], [100, 70, 56], [140, 110, 46], [80, 140, 40], [120, 140, 40]]; for (const [x, y, r] of blobs) { ell(g, x, y + 8, r, r); fs(g, '#3E8A4A', null); } for (const [x, y, r] of blobs) { ell(g, x, y, r, r); fs(g, '#5BB166', null); } g.beginPath(); for (const [x, y, r] of blobs) { g.moveTo(x + r, y); g.arc(x, y, r, 0, TAU); } g.strokeStyle = 'rgba(20,60,25,.5)'; g.lineWidth = 3; g.stroke(); for (const [x, y, r] of blobs) { ell(g, x - r * .3, y - r * .35, r * .45, r * .3, -.5); fs(g, '#8ED48F', null); } }
 function cactus(g) { g.lineCap = 'round'; const arm = (x1, y1, x2, y2, x3, y3, w) => { g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.lineTo(x3, y3); g.strokeStyle = C.out; g.lineWidth = w + 5; g.stroke(); g.strokeStyle = '#4F9E4B'; g.lineWidth = w; g.stroke(); g.strokeStyle = 'rgba(255,255,255,.25)'; g.lineWidth = w * .3; g.beginPath(); g.moveTo(x1 - w * .25, y1); g.lineTo(x2 - w * .25, y2); g.stroke(); }; arm(60, 200, 60, 40, 60, 40, 30); arm(30, 150, 30, 100, 48, 95, 18); arm(90, 130, 92, 70, 74, 66, 18); for (let i = 0; i < 12; i++) { g.beginPath(); g.moveTo(45 + hash(i, 1) * 30, 60 + hash(i, 2) * 120); g.lineTo(45 + hash(i, 1) * 30 + 5, 60 + hash(i, 2) * 120 - 4); g.strokeStyle = '#DDE8B0'; g.lineWidth = 1.5; g.stroke(); } ell(g, 30, 96, 7, 6); fs(g, '#F26B8A', C.out, 1.5); }
@@ -799,6 +889,8 @@ function buildSprites() {
   SPR.boat1 = sprite('boat1', 200, 195, 1400, g => sailboat(g, '#3C6FD8'));
   SPR.boat2 = sprite('boat2', 200, 195, 1100, g => sailboat(g, '#D84A3C'));
   SPR.buoy = sprite('buoy', 80, 90, 260, buoy);
+  SPR.log = sprite('log', 200, 70, 700, drawLog); SPR.ramp = sprite('ramp', 180, 90, 620, drawRamp); SPR.skis = sprite('skis', 90, 110, 300, drawSkis); SPR.duck = sprite('duck', 76, 60, 230, drawDuck);
+  SPR.dock = sprite('dock', 260, 120, 1500, drawDock); SPR.marina = sprite('marina', 420, 240, 3400, drawMarina); SPR.signMarina = sprite('signMarina', 200, 220, 700, drawSignMarina);
   SPR.b1 = sprite('b1', 160, 420, 1500, g => building(g, 160, 420, '#5A4C7A', '#FFD98A', true));
   SPR.b2 = sprite('b2', 200, 300, 1900, g => building(g, 200, 300, '#8A5A6A', '#FFE9A8', false));
   SPR.b3 = sprite('b3', 120, 520, 1100, g => building(g, 120, 520, '#3F5A86', '#FFEDB0', true));
@@ -948,6 +1040,8 @@ const lowRolling = (n, h) => { n = n || 15; h = h || HILL.low; addRoad(n, n, n, 
 const downhillToEnd = n => addRoad(n || 200, n || 200, n || 200, -CURVE.easy, -lastY() / TUNE.segLen);
 
 let forks = [], pendingShops = [];
+const MERGE_LEN = 64, SPLIT = 1.4, SPLIT_W = 0.9; // merge length in segments; branch centre / half-width (in road half-widths) at the split point
+const mergeShift = (seg, pct) => seg.merge ? (seg.merge === 'R' ? 1 : -1) * SPLIT * (1 - lerp(seg.mp1, seg.mp2, pct)) : 0;
 function levelTo(y) { const d = Math.round((y - lastY()) / TUNE.segLen); if (d !== 0) addRoad(16, 8, 16, 0, d); }
 const pendShop = () => pendingShops.push(segments.length + 70);
 function forkSign(leftName, rightName) { return sprite('forksign_' + leftName + '_' + rightName, 480, 220, 5200, g => { for (const px of [30, 450]) { rr(g, px - 8, 70, 16, 150, 4); fs(g, '#8A9098', C.out, 3); } rr(g, 6, 18, 468, 74, 10); fs(g, '#2E7D32', '#F4F4F4', 4); g.fillStyle = '#F4F4F4'; g.fillRect(238, 26, 3, 58); textO(g, '◀ ' + leftName, 122, 55, 22, '#FFFFFF', null, 'center', 0); textO(g, rightName + ' ▶', 358, 55, 22, '#FFFFFF', null, 'center', 0); }); }
@@ -957,12 +1051,13 @@ function fork(leftName, rightName, leftBuild, rightBuild, offroadSide) {
   const stage = curStage, id = forks.length;
   for (let i = 0; i < 70; i++) { addSegment(0, lastY(), stage); const sg = segments[segments.length - 1]; sg.fork = Math.min(1, i / 55); sg.forkApproach = id; }
   const decision = segments.length - 1, yD = lastY(); segments[decision].forkId = id;
-  const merge = (branch) => { for (let i = 0; i < 40; i++) { addSegment(0, lastY(), stage); const sg = segments[segments.length - 1]; sg.fork = 1 - i / 40; sg.branch = branch; } };
+  // Merge: the chosen branch is drawn as a single road that eases back to the centre line (no snap). mp1/mp2 = 0→1 progress at each end of the segment.
+  const merge = (branch) => { const M = MERGE_LEN, e = p => (-Math.cos(p * Math.PI) / 2) + 0.5; for (let i = 0; i < M; i++) { addSegment(0, lastY(), stage); const sg = segments[segments.length - 1]; sg.fork = 0; sg.merge = branch; sg.mp1 = e(i / M); sg.mp2 = e((i + 1) / M); sg.branch = branch; } };
   const L0 = segments.length; merge('L'); const Lb = segments.length; leftBuild(); levelTo(yD); const L1 = segments.length;
-  for (let k = Lb; k < L1; k++) { segments[k].branch = 'L'; if (offroadSide === 'L') segments[k].offroad = true; }
+  for (let k = L0; k < L1; k++) { segments[k].branch = 'L'; if (offroadSide === 'L') segments[k].offroad = true; if (k < Lb) segments[k].ghostDirt = offroadSide === 'R'; }
   for (let i = 0; i < 6; i++) { addSegment(0, lastY(), stage); segments[segments.length - 1].fork = 1; segments[segments.length - 1].buffer = true; }
   forceStartY = yD; const R0 = segments.length; merge('R'); const Rb = segments.length; rightBuild(); levelTo(yD); const R1 = segments.length;
-  for (let k = Rb; k < R1; k++) { segments[k].branch = 'R'; if (offroadSide === 'R') segments[k].offroad = true; }
+  for (let k = R0; k < R1; k++) { segments[k].branch = 'R'; if (offroadSide === 'R') segments[k].offroad = true; if (k < Rb) segments[k].ghostDirt = offroadSide === 'L'; }
   segments[L1 - 1].jumpDelta = R1 - L1;
   const f = { id, decision, L0, Lb, L1, R0, Rb, R1, leftName, rightName, offroadSide, chosen: null, signAt: decision - 64 };
   forks.push(f); return f;
@@ -982,7 +1077,7 @@ function decorate(from, to, stage) {
   for (let n = from; n < to; n++) {
     const h = hash(n, stage * 11 + 1), h2 = hash(n, stage * 11 + 2); let side = h2 < 0.5 ? -1 : 1;
     const lot = !!segments[n].lot; if (lot && side > 0) side = -1; // keep the pull-off clear
-    if (segments[n].fork) continue; if (segments[n].offroad) { decorateOffroad(n, h, h2, side); continue; }
+    if (segments[n].fork || segments[n].merge) continue; if (segments[n].offroad) { decorateOffroad(n, h, h2, side); continue; }
     if (route.id === 1) { decorateMiami(n, stage, h, h2, side, lot); continue; }
     if (stage === 0) {
       if (n % 6 === 0 && hash(n, 77) < 0.75 && !lot) addSprite(n, 'fence', (hash(n, 78) < 0.5 ? -1 : 1) * 1.2, { solid: 1 });
@@ -1063,14 +1158,14 @@ function decorateOffroad(n, h, h2, side) {
 }
 function addCars(from, to, count) {
   for (let i = 0; i < count; i++) {
-    const lane = pick([-0.66, 0, 0.66]); let zi = Math.floor(rnd(from, to)); for (let tries = 0; tries < 12 && (segments[zi].fork || segments[zi].offroad || segments[zi].buffer); tries++) zi = Math.floor(rnd(from, to)); if (segments[zi].fork || segments[zi].offroad || segments[zi].buffer) continue; const z = zi * TUNE.segLen; const kind = Math.random() < 0.15 ? 'semi' : Math.random() < 0.4 ? 'pickup' : 'sedan';
+    const lane = pick([-0.66, 0, 0.66]); let zi = Math.floor(rnd(from, to)); for (let tries = 0; tries < 12 && (segments[zi].fork || segments[zi].merge || segments[zi].offroad || segments[zi].buffer || segments[zi].lake); tries++) zi = Math.floor(rnd(from, to)); if (segments[zi].fork || segments[zi].merge || segments[zi].offroad || segments[zi].buffer || segments[zi].lake) continue; const z = zi * TUNE.segLen; const kind = Math.random() < 0.15 ? 'semi' : Math.random() < 0.4 ? 'pickup' : 'sedan';
     const s = pick(carSprites[kind]); const sp = TUNE.maxSpeed * (kind === 'semi' ? rnd(0.26, 0.36) : rnd(TUNE.trafficSpeed[0], TUNE.trafficSpeed[1]));
     const car = { offset: lane, z, s, speed: sp, kind, w: s.ww / TUNE.roadW, dodge: 0, passed: false }; segments[findSegment(z).index].cars.push(car); cars.push(car);
   }
 }
 function findSegment(z) { return segments[Math.floor(z / TUNE.segLen) % segments.length]; }
 function buildTrack() {
-  segments = []; cars = []; stageStarts = [0, 0, 0]; stops = []; events = []; forks = []; pendingShops = []; forceStartY = null; STAGES = route.stages; backdrops = backdropSets[route.id] || backdrops;
+  segments = []; cars = []; stageStarts = [0, 0, 0]; stops = []; events = []; forks = []; pendingShops = []; forceStartY = null; marinaFork = null; LAKE = {}; STAGES = route.stages; backdrops = backdropSets[route.id] || backdrops;
   if (route.id === 1) { buildMiami(); return; }
   if (route.id === 2) { buildStory(); return; }
   /* ---------------- TRACK SCRIPT (edit me) ----------------
@@ -1079,13 +1174,13 @@ function buildTrack() {
   curStage = 0; stageStarts[0] = 0;
   straight(LEN.short); curve(LEN.short, CURVE.easy); lowRolling();
   fork('FM 423', 'RANCH ROAD', () => { sCurves(); bumps(); }, () => { bumps(); lowRolling(15, 14); bumps(); }, 'R');
-  pendShop(); hill(LEN.med, HILL.med); curve(LEN.med, -CURVE.med, -HILL.low); curve(LEN.short, CURVE.hard, HILL.low); bumps(); hill(LEN.med, -HILL.med); straight(LEN.short);
+  pendShop(); hill(LEN.med, HILL.med); curve(LEN.med, -CURVE.med, -HILL.low); curve(LEN.short, CURVE.hard, HILL.low); bumps(); hill(LEN.med, -HILL.med); straight(LEN.med); curve(LEN.med, -CURVE.easy, HILL.low); sCurves(); straight(LEN.short);
   curStage = 1; stageStarts[1] = segments.length;
-  straight(LEN.med); hill(LEN.med, HILL.high); curve(LEN.long, CURVE.easy); curve(LEN.med, -CURVE.easy, -HILL.med); straight(LEN.med); curve(LEN.med, CURVE.med, HILL.low); hill(LEN.med, -HILL.low); straight(LEN.short);
+  straight(LEN.med); hill(LEN.med, HILL.high); curve(LEN.long, CURVE.easy); curve(LEN.med, -CURVE.easy, -HILL.med); straight(LEN.med); curve(LEN.med, CURVE.med, HILL.low); hill(LEN.med, -HILL.low); curve(LEN.med, -CURVE.med, HILL.low); straight(LEN.med); hill(LEN.med, HILL.med); curve(LEN.med, CURVE.easy, -HILL.med); straight(LEN.short);
   curStage = 2; stageStarts[2] = segments.length;
   straight(LEN.med); curve(LEN.med, CURVE.med);
   fork('DOWNTOWN', 'TRINITY TRAIL', () => { sCurves(); curve(LEN.med, -CURVE.hard); }, () => { bumps(); curve(LEN.med, -CURVE.easy); bumps(); }, 'R');
-  straight(LEN.med); pendShop(); lowRolling(); curve(LEN.med, CURVE.med, HILL.low); downhillToEnd(60); straight(LEN.med); straight(LEN.med);
+  straight(LEN.med); pendShop(); lowRolling(); curve(LEN.med, CURVE.med, HILL.low); sCurves(); straight(LEN.med); curve(LEN.med, -CURVE.easy); downhillToEnd(60); straight(LEN.med); straight(LEN.med);
   /* ---------------- END TRACK SCRIPT ---------------- */
   finishTrack();
 }
@@ -1094,13 +1189,13 @@ function buildMiami() {
   curStage = 0; stageStarts[0] = 0;
   straight(LEN.short); curve(LEN.short, CURVE.easy); straight(LEN.med);
   fork('OCEAN DRIVE', 'BEACH TRAIL', () => { sCurves(); curve(LEN.med, -CURVE.easy); }, () => { bumps(); lowRolling(15, 10); bumps(); }, 'R');
-  pendShop(); lowRolling(15, 10); straight(LEN.med); curve(LEN.short, CURVE.med); straight(LEN.short);
+  pendShop(); lowRolling(15, 10); straight(LEN.med); curve(LEN.short, CURVE.med); straight(LEN.med); curve(LEN.med, -CURVE.easy); sCurves(); straight(LEN.short);
   curStage = 1; stageStarts[1] = segments.length;
-  straight(LEN.med); hill(LEN.med, HILL.high); curve(LEN.long, -CURVE.easy); straight(LEN.med); curve(LEN.med, CURVE.easy, -HILL.med); hill(LEN.med, -HILL.low); straight(LEN.short);
+  straight(LEN.med); hill(LEN.med, HILL.high); curve(LEN.long, -CURVE.easy); straight(LEN.med); curve(LEN.med, CURVE.easy, -HILL.med); hill(LEN.med, -HILL.low); curve(LEN.med, CURVE.med, HILL.low); straight(LEN.med); hill(LEN.med, HILL.med); curve(LEN.med, -CURVE.easy, -HILL.med); straight(LEN.short);
   curStage = 2; stageStarts[2] = segments.length;
   straight(LEN.med); curve(LEN.med, -CURVE.med);
   fork('BRICKELL AVE', 'BAYWALK', () => { sCurves(); curve(LEN.med, CURVE.hard); }, () => { bumps(); curve(LEN.med, CURVE.easy); bumps(); }, 'R');
-  straight(LEN.med); pendShop(); lowRolling(); curve(LEN.med, -CURVE.med, HILL.low); downhillToEnd(60); straight(LEN.med); straight(LEN.med);
+  straight(LEN.med); pendShop(); lowRolling(); curve(LEN.med, -CURVE.med, HILL.low); sCurves(); straight(LEN.med); curve(LEN.med, CURVE.easy); downhillToEnd(60); straight(LEN.med); straight(LEN.med);
   finishTrack();
 }
 function buildStory() {
@@ -1108,26 +1203,72 @@ function buildStory() {
   curStage = 0; stageStarts[0] = 0;
   straight(LEN.short); curve(LEN.short, -CURVE.easy); straight(LEN.short); curve(LEN.med, CURVE.easy); straight(LEN.med); lowRolling(15, 12);
   fork('FM 423', 'DIRT TRAIL', () => { curve(LEN.med, -CURVE.easy); straight(LEN.med); sCurves(); }, () => { bumps(); lowRolling(15, 14); bumps(); straight(LEN.short); }, 'R');
-  pendShop(); straight(LEN.med); curve(LEN.short, -CURVE.med); straight(LEN.med); hill(LEN.short, HILL.low); straight(LEN.med); straight(LEN.short);
+  pendShop(); straight(LEN.med); curve(LEN.short, -CURVE.med); straight(LEN.med); hill(LEN.short, HILL.low); straight(LEN.med); curve(LEN.med, CURVE.easy); straight(LEN.med); curve(LEN.med, -CURVE.easy, HILL.low); straight(LEN.med); straight(LEN.short);
   curStage = 1; stageStarts[1] = segments.length;
   straight(LEN.short); curve(LEN.med, CURVE.easy); straight(LEN.med);
   fork('ELDORADO PKWY', 'LAKESHORE TRAIL', () => { curve(LEN.med, -CURVE.med, -HILL.low); straight(LEN.med); curve(LEN.med, CURVE.easy); }, () => { bumps(); curve(LEN.short, -CURVE.easy); bumps(); lowRolling(15, 10); }, 'R');
-  straight(LEN.med); curve(LEN.short, CURVE.easy); straight(LEN.med); straight(LEN.med); straight(LEN.short);
+  straight(LEN.med); curve(LEN.short, CURVE.easy); straight(LEN.med); curve(LEN.med, -CURVE.easy); straight(LEN.med); lowRolling(15, 10); straight(LEN.med); straight(LEN.short);
   curStage = 2; stageStarts[2] = segments.length;
-  straight(LEN.short); curve(LEN.med, -CURVE.easy);
+  straight(LEN.short); curve(LEN.med, -CURVE.easy); straight(LEN.short);
+  // optional detour: keep right at the MARINA exit to take the boat out on Lake Lewisville
+  marinaFork = fork('HOME', 'MARINA', () => { straight(LEN.med); curve(LEN.short, CURVE.easy); straight(LEN.short); }, buildLake, null); marinaFork.marina = true;
+  straight(LEN.med);
   fork('NEIGHBORHOOD', 'FIELD SHORTCUT', () => { lowRolling(15, 10); curve(LEN.med, CURVE.med); straight(LEN.med); }, () => { bumps(); bumps(); curve(LEN.short, CURVE.easy); }, 'R');
-  straight(LEN.med); curve(LEN.short, -CURVE.easy); downhillToEnd(50); straight(LEN.med); straight(LEN.med); straight(LEN.short);
+  straight(LEN.med); curve(LEN.short, -CURVE.easy); straight(LEN.med); curve(LEN.med, CURVE.easy); straight(LEN.med); downhillToEnd(50); straight(LEN.med); straight(LEN.med); straight(LEN.short);
   const N = segments.length; trackLength = N * TUNE.segLen;
   // pup cup stop (Black Sheep Coffee) after the first fork, then the two story events
   pendingShops.slice(0, 1).forEach((n, i) => addShop(n, i));
   addEvent(stageStarts[1] - 60, 'school'); addEvent(stageStarts[2] - 60, 'tinman');
-  placeForkSigns(); decorateStoryAll(N);
+  placeForkSigns(); decorateStoryAll(N); decorateLake();
   segments[N - 150].finishLine = true; for (let k = N - 118; k < N - 40; k++) segments[k].lot = true;
   addSprite(N - 80, 'home', 2.3, { solid: 1 }); addSprite(N - 110, 'signJewel', -1.4, { solid: 1 }); for (let k = N - 160; k < N - 150; k += 3) addSprite(k, 'ballG', 0.66, { pickup: 'green' });
   for (let k = N - 140; k < N; k += 7) { addSprite(k, pick(['house1', 'house2', 'house3', 'house4']), -2.2 - hash(k, 3) * 0.6, { solid: 1 }); if (k < N - 118 || k > N - 40) addSprite(k + 3, 'sapling', 1.4 + hash(k, 4) * 0.4, { solid: 1 }); else if (k + 3 < N - 100 || k + 3 > N - 62) addSprite(k + 3, pick(['house1', 'house2', 'house3', 'house4']), 2.3 + hash(k, 5) * 0.4, { solid: 1 }); }
-  addCars(20, stageStarts[1] - 80, 16); addCars(stageStarts[1], stageStarts[2] - 80, 16); addCars(stageStarts[2], N - 170, 18);
+  addCars(20, stageStarts[1] - 80, 20); addCars(stageStarts[1], stageStarts[2] - 80, 22); addCars(stageStarts[2], N - 170, 24);
 }
-let events = [];
+let events = [], marinaFork = null, LAKE = {};
+function buildLake() { // the MARINA branch: a lot by the water, then Lake Lewisville itself, then the dock back on shore
+  LAKE = {}; LAKE.road = segments.length;
+  straight(LEN.short); LAKE.marina = segments.length;          // the Jeep pulls in here (scene)
+  straight(LEN.short); LAKE.from = segments.length;            // boat time
+  curve(LEN.med, CURVE.easy, 6); straight(LEN.med); lowRolling(15, 6); curve(LEN.long, -CURVE.easy); straight(LEN.med); curve(LEN.med, CURVE.med, 6); lowRolling(15, 6); straight(LEN.med); curve(LEN.med, -CURVE.easy); straight(LEN.med);
+  LAKE.to = segments.length; straight(LEN.short); LAKE.dock = segments.length; straight(LEN.short); LAKE.end = segments.length;
+}
+function decorateLake() {
+  if (LAKE.from === undefined) return;
+  for (let k = LAKE.road; k < LAKE.end; k++) segments[k].lake = true;
+  for (let k = LAKE.from; k < LAKE.to; k++) segments[k].boat = true;
+  for (let k = LAKE.marina - 80; k < LAKE.from; k++) segments[k].lot = true;
+  for (let k = LAKE.to; k < LAKE.dock + 25; k++) segments[k].lot = true;
+  segments[LAKE.marina - 10].event = 'marina'; events.push({ kind: 'marina', n: LAKE.marina, done: false });
+  segments[LAKE.dock - 10].event = 'dock'; events.push({ kind: 'dock', n: LAKE.dock, done: false });
+  addSprite(LAKE.road + 6, 'signMarina', 1.5, { solid: 1 }); addSprite(LAKE.marina + 2, 'marina', 2.45, { solid: 1 }); addSprite(LAKE.dock + 2, 'dock', 2.45, { solid: 1 });
+  for (let k = LAKE.road; k < LAKE.marina - 80; k += 9) { addSprite(k, pick(['oak', 'sapling']), -1.9 - hash(k, 3) * 0.8, { solid: 1 }); if (k % 18 === 0) addSprite(k + 4, 'lamp', 1.2, { solid: 1 }); }
+  for (let k = LAKE.marina - 80; k < LAKE.from; k += 7) { addSprite(k, 'boat1', -(2.6 + hash(k, 4) * 2.5)); if (k % 21 === 7) addSprite(k + 3, 'oak', -2.0, { solid: 1 }); }
+  // the lake: buoys, logs and ducks in the channel; ramps and skis to find; docks, boats and lake houses along the shores
+  for (let n = LAKE.from + 30; n < LAKE.to - 30; n++) {
+    const h = hash(n, 41), h2 = hash(n, 42);
+    if (n % 9 === 2) addSprite(n, 'buoy', pick([-0.7, -0.35, 0.35, 0.7]), { obstacle: 1 });
+    if (n % 23 === 11) addSprite(n, 'log', pick([-0.55, 0, 0.55]), { obstacle: 1 });
+    if (n % 31 === 20) addSprite(n, 'duck', pick([-0.8, 0.8]), { obstacle: 1, moo: 1 });
+    if (n % 70 === 35) addSprite(n, 'ramp', pick([-0.66, 0, 0.66]), { ramp: 1 });
+    if (n % 150 === 75) addSprite(n, 'skis', pick([-0.66, 0, 0.66]), { pickup: 'skis' });
+    if (n % 29 === 5) { const lane = pick([-0.66, 0, 0.66]), red = h < 0.3; for (let k = 0; k < 5; k++) addSprite(n + k * 3, red ? 'ballR' : 'ballG', lane, { pickup: red ? 'red' : 'green' }); }
+    if (n % 131 === 60) addSprite(n, 'bone', pick([-0.66, 0, 0.66]), { pickup: 'bone' });
+    if (n % 41 === 0) addSprite(n, 'dock', h2 < 0.5 ? -2.7 : 2.7, {});
+    if (n % 17 === 9) addSprite(n, 'boat1', (h2 < 0.5 ? -1 : 1) * (3.2 + h * 2.5), {});
+    if (n % 47 === 23) addSprite(n, pick(['house1', 'house2', 'house3', 'house4']), (h < 0.5 ? -1 : 1) * (3.6 + h2 * 0.8), {});
+    if (n % 13 === 6) addSprite(n, pick(['oak', 'sapling']), (h2 < 0.5 ? -1 : 1) * (2.9 + h * 0.6), {});
+  }
+  for (let k = LAKE.to; k < LAKE.end; k += 8) { addSprite(k, 'oak', -2.0 - hash(k, 5) * 0.8, { solid: 1 }); if (k < LAKE.dock) addSprite(k + 4, 'boat1', 2.9 + hash(k, 6) * 2); }
+  addBoats(LAKE.from + 60, LAKE.to - 60, 16);
+}
+function addBoats(from, to, count) {
+  for (let i = 0; i < count; i++) {
+    const lane = pick([-0.66, 0, 0.66]); let zi = Math.floor(rnd(from, to)); for (let tries = 0; tries < 12 && !segments[zi].boat; tries++) zi = Math.floor(rnd(from, to)); if (!segments[zi].boat) continue;
+    const kind = Math.random() < 0.25 ? 'pontoon' : 'jetski', s = pick(carSprites[kind]), sp = TUNE.maxSpeed * (kind === 'pontoon' ? rnd(0.2, 0.28) : rnd(0.36, 0.55));
+    const car = { offset: lane, z: zi * TUNE.segLen, s, speed: sp, kind, w: s.ww / TUNE.roadW, dodge: 0, passed: false }; segments[zi].cars.push(car); cars.push(car);
+  }
+}
 function addEvent(n, kind) {
   for (let k = n - 90; k < n + 40; k++) if (segments[k]) segments[k].lot = true;
   addSprite(n + 2, kind === 'school' ? 'school' : 'tinman', 2.45, { solid: 1 });
@@ -1140,7 +1281,7 @@ function decorateStoryAll(N) {
   for (let n = 8; n < N - 160; n++) {
     const seg = segments[n], lot = !!seg.lot, h = hash(n, 31), h2 = hash(n, 32); let side = h2 < 0.5 ? -1 : 1; if (lot && side > 0) side = -1;
     const stage = n >= s2 ? 2 : n >= s1 ? 1 : 0, from = stageStarts[stage], t = (n - from) / ((stage < 2 ? stageStarts[stage + 1] : N) - from);
-    if (seg.fork) continue; if (seg.offroad) { if (stage === 1) seg.water = true; decorateOffroad(n, h, h2, side); continue; }
+    if (seg.fork || seg.merge || seg.lake) continue; if (seg.offroad) { if (stage === 1) seg.water = true; decorateOffroad(n, h, h2, side); continue; }
     if (stage === 0) {
       if (n === 10) addSprite(n, 'signJewel', -1.4, { solid: 1 });
       if (t < 0.38) { if (n % 9 === 0) addSprite(n, pick(['house1', 'house2', 'house3', 'house4']), -1.9 - hash(n, 5) * 0.7, { solid: 1 }); if (n % 9 === 4 && !lot) addSprite(n, pick(['house1', 'house2', 'house3', 'house4']), 1.9 + hash(n, 6) * 0.7, { solid: 1 }); if (n % 11 === 6) addSprite(n, 'sapling', side * (1.25 + hash(n, 7) * 0.4), { solid: 1 }); if (n % 14 === 9) addSprite(n, 'lamp', -side * 1.2, { solid: 1 }); }
@@ -1176,7 +1317,7 @@ function finishTrack() {
   decorate(stageStarts[0] + 10, stageStarts[1], 0); decorate(stageStarts[1], stageStarts[2], 1); decorate(stageStarts[2], N - 150, 2);
   addSprite(N - 150, 'finish', 0, { finish: 1 }); for (let k = 0; k < 6; k++) { addSprite(N - 148 + k * 2, 'ballG', -0.66, { pickup: 'green' }); addSprite(N - 148 + k * 2, 'ballR', 0.66, { pickup: 'red' }); }
   for (let k = N - 140; k < N; k += 6) { addSprite(k, route.park, -2.2 - hash(k, 3), {}); addSprite(k + 3, route.park, 2.2 + hash(k, 4), {}); }
-  addCars(30, stageStarts[1], 34); addCars(stageStarts[1], stageStarts[2], 26); addCars(stageStarts[2], N - 170, 40);
+  addCars(30, stageStarts[1], 44); addCars(stageStarts[1], stageStarts[2], 36); addCars(stageStarts[2], N - 170, 52);
 }
 
 /* =====================================================================
@@ -1284,11 +1425,12 @@ let position = 0, speed = 0, playerX = 0, steer = 0, bounce = 0, skyOff = 0, hil
 let score = 0, balls = 0, timer = 0, timerAcc = 0, stage = 0, stageBanner = 0, boostMeter = 0, boosting = 0, hornCool = 0, dizzy = 0, bubble = null, titaBubble = null, passes = 0;
 let particles = [], texts = [], finishTimer = 0, introTimer = 0, tally = null, titleT = 0, best = 0, pup = null, pupCups = 0, routeIdx = 0;
 let storyKids = false, scene = null, slush = null, slushScore = 0;
+let boat = false, skiers = 0, air = null, airJumps = 0, skisGot = 0, marinaNoticed = false, bannerOverride = null; // Lake Lewisville bonus stage
 try { best = +localStorage.getItem('brt_best') || 0; } catch (e) { }
 
 function setMenu(items) { menu = { items, idx: 0 }; }
 function goTitle() { Music.play(route.id === 2 ? 0 : route.id); Music.duck(0.7); state = 'title'; setMenu(['Start Road Trip', 'Controller Setup', 'Sound: ' + (Audio_.on ? 'On' : 'Off')]); titleT = 0; position = 0; playerX = 0; speed = 0; Audio_.engineSet(0, false); }
-function startGame() { Music.play(route.id === 2 ? 0 : route.id); Music.duck(1); pupCups = 0; pup = null; storyKids = false; scene = null; slush = null; slushScore = 0; buildTrack(); position = 0; speed = 0; playerX = 0; steer = 0; score = 0; balls = 0; timer = route.time || TUNE.startTime; timerAcc = 0; stage = 0; stageBanner = 150; boostMeter = 0; boosting = 0; dizzy = 0; bubble = null; titaBubble = { text: route.story ? 'School\'s out in 10 minutes. ¡Vamos!' : '¡Vamos, Bernard!', life: 180 }; passes = 0; particles = []; texts = []; state = 'intro'; introTimer = 0; }
+function startGame() { Music.play(route.id === 2 ? 0 : route.id); Music.duck(1); pupCups = 0; pup = null; storyKids = false; scene = null; slush = null; slushScore = 0; boat = false; skiers = 0; air = null; airJumps = 0; skisGot = 0; marinaNoticed = false; bannerOverride = null; buildTrack(); position = 0; speed = 0; playerX = 0; steer = 0; score = 0; balls = 0; timer = route.time || TUNE.startTime; timerAcc = 0; stage = 0; stageBanner = 150; boostMeter = 0; boosting = 0; dizzy = 0; bubble = null; titaBubble = { text: route.story ? 'School\'s out in 10 minutes. ¡Vamos!' : '¡Vamos, Bernard!', life: 180 }; passes = 0; particles = []; texts = []; state = 'intro'; introTimer = 0; }
 function quitToArcade() { if (typeof window.BRT.onQuit === 'function') { stop(); window.BRT.onQuit(); } else goTitle(); }
 function say(text, who = 'b') { if (who === 'b') bubble = { text, life: 90 }; else titaBubble = { text, life: 110 }; }
 function floatText(x, y, str, color = C.cream) { texts.push({ x, y, str, color, life: 50 }); }
@@ -1301,12 +1443,17 @@ const playerW = 560 / TUNE.roadW;
 function updateCars(dt, playerSeg) {
   for (const car of cars) {
     const oldSeg = findSegment(car.z);
-    car.offset += updateCarOffset(car, oldSeg, playerSeg, dt);
-    if (car.dodge) { car.offset += car.dodge * dt * 1.5; car.dodgeT -= dt; if (car.dodgeT <= 0) car.dodge = 0; }
-    car.offset = clamp(car.offset, -0.85, 0.85);
+    if (car.wreck) { // tumbling onto the shoulder, then sitting there smoking
+      const w = car.wreck; w.t += dt; car.speed = Math.max(0, car.speed - TUNE.maxSpeed * 1.1 * dt);
+      car.offset = clamp(car.offset + w.dir * dt * 2.4 * clamp(1 - w.t / 0.9, 0, 1), -1.5, 1.5);
+    } else {
+      car.offset += updateCarOffset(car, oldSeg, playerSeg, dt);
+      if (car.dodge) { car.offset += car.dodge * dt * 1.5; car.dodgeT -= dt; if (car.dodgeT <= 0) car.dodge = 0; }
+      car.offset = clamp(car.offset, -0.85, 0.85);
+    }
     const wasAhead = car.z > position + playerZ;
     car.z = increase(car.z, dt * car.speed, trackLength);
-    if (wasAhead && !(car.z > position + playerZ) && car.z > position - 2000 && speed > car.speed) { passes++; score += 20; sfx.pass(); floatText(W / 2 + rnd(-80, 80), 330, 'Pass!', '#CFE8FF'); }
+    if (!car.wreck && wasAhead && !(car.z > position + playerZ) && car.z > position - 2000 && speed > car.speed) { passes++; score += 20; sfx.pass(); floatText(W / 2 + rnd(-80, 80), 330, 'Pass!', '#CFE8FF'); }
     const newSeg = findSegment(car.z);
     if (oldSeg !== newSeg) { const i = oldSeg.cars.indexOf(car); if (i >= 0) oldSeg.cars.splice(i, 1); newSeg.cars.push(car); }
   }
@@ -1328,23 +1475,27 @@ function updatePlaying(dt) {
   if (hit.select) { state = 'quitconfirm'; setMenu(['No, keep driving', 'Yes, quit to arcade']); sfx.menu(); return; }
   const playerSeg = findSegment(position + playerZ);
   const speedPct = speed / TUNE.maxSpeed, maxNow = TUNE.maxSpeed * (boosting > 0 ? TUNE.boostMul : 1);
-  const dx = dt * 2 * speedPct;
+  const dx = dt * 2 * speedPct * (boat ? 1.25 : 1); // the boat steers a little looser
   // steering
   if (inp.left) { playerX -= dx; steer = Math.max(-1, steer - dt * 6); } else if (inp.right) { playerX += dx; steer = Math.min(1, steer + dt * 6); } else steer *= Math.pow(0.001, dt);
-  playerX -= dx * speedPct * playerSeg.curve * 0.32; // centrifugal
+  playerX -= dx * speedPct * playerSeg.curve * (boat ? 0.2 : 0.32); // centrifugal
   // throttle
   if (boosting > 0) speed += (TUNE.maxSpeed / 2.5) * dt;
   else if (inp.gas) speed += (TUNE.maxSpeed / 5) * dt;
   else if (inp.brake) speed -= (TUNE.maxSpeed / 2.2) * dt;
   else speed -= (TUNE.maxSpeed / 5) * dt;
   const segNow = findSegment(position + playerZ);
-  const onLot = segNow.lot && playerX > 1, fkT = segNow.fork || 0, roadEdge = 1 + 1.3 * fkT, island = 0.5 * fkT;
+  // after a fork the chosen branch eases back to the centre line; mSh is how far the road centre sits from x=0 right now
+  const mPct = ((position + playerZ) % TUNE.segLen) / TUNE.segLen, mSh = mergeShift(segNow, mPct), rx = playerX - mSh;
+  const onLot = segNow.lot && playerX > 1, fkT = segNow.fork || 0, roadEdge = segNow.merge ? lerp(SPLIT_W, 1, lerp(segNow.mp1, segNow.mp2, mPct)) : 1 + 1.3 * fkT, island = 0.5 * fkT;
   if (segNow.offroad) { bounce = rnd(-1, 1) * 1.6 * speedPct; if (frame % 4 === 0 && speedPct > 0.2) dust(W / 2 + rnd(-90, 90), H - 40, 1, route.id === 1 ? 'rgba(235,220,170,.8)' : 'rgba(190,160,110,.8)'); }
-  if ((Math.abs(playerX) > roadEdge || (fkT > 0.2 && Math.abs(playerX) < island)) && !onLot) { if (speed > TUNE.maxSpeed / 4 && boosting <= 0) speed -= (TUNE.maxSpeed / 2) * dt; if (frame % 3 === 0) dust(W / 2 + (playerX > 0 ? 120 : -120), H - 40, 2, stage === 1 ? 'rgba(180,220,255,.8)' : 'rgba(190,160,110,.8)'); bounce = rnd(-1, 1) * 2.5 * speedPct; }
+  if ((Math.abs(rx) > roadEdge || (fkT > 0.2 && Math.abs(playerX) < island)) && !onLot) { if (speed > TUNE.maxSpeed / 4 && boosting <= 0) speed -= (TUNE.maxSpeed / 2) * dt; if (frame % 3 === 0) dust(W / 2 + (rx > 0 ? 120 : -120), H - 40, 2, boat ? 'rgba(255,255,255,.85)' : stage === 1 ? 'rgba(180,220,255,.8)' : 'rgba(190,160,110,.8)'); bounce = rnd(-1, 1) * 2.5 * speedPct; }
   else bounce *= 0.8;
-  speed = clamp(speed, 0, maxNow); playerX = clamp(playerX, -2.4 - fkT, 2.4 + fkT);
+  speed = clamp(speed, 0, maxNow); playerX = clamp(playerX, -2.4 - fkT + mSh, 2.4 + fkT + mSh);
   if (segNow.forkId !== undefined) { const f = forks[segNow.forkId]; if (f && !f.chosen) { f.chosen = playerX >= 0 ? 'R' : 'L'; const name = f.chosen === 'R' ? f.rightName : f.leftName, dirtPick = f.offroadSide === f.chosen; if (f.chosen === 'R') position += (f.R0 - f.L0) * TUNE.segLen; floatText(W / 2, 230, (f.chosen === 'R' ? '▶ ' : '◀ ') + name, C.gold); say(dirtPick ? pick(['OFF-ROAD!! BUMPY!!', 'DIRT!! YES!!', 'ZOOM ZOOM!!']) : pick(['This way!', 'Smooth road!'])); titaBubble = { text: dirtPick ? 'Hold on, everybody!' : name + ', here we go.', life: 130 }; sfx.check(); } }
   if (segNow.jumpDelta) position += segNow.jumpDelta * TUNE.segLen;
+  if (air) { air.t += dt; const pAir = clamp(air.t / air.dur, 0, 1); air.h = Math.sin(pAir * Math.PI) * air.peak; if (frame % 3 === 0 && pAir < 0.4) dust(W / 2 + rnd(-40, 40), H - 30, 1, 'rgba(255,255,255,.7)');
+    if (air.t >= air.dur) { air = null; airJumps++; bounce = 6; sfx.splash(); score += 200; floatText(W / 2, 260, 'BIG AIR! +200', '#9EE8FF'); say(pick(['WHEEE!!', 'AGAIN!! AGAIN!!', 'I CAN FLY!!'])); titaBubble = { text: pick(['¡Ay, Dios!', 'Everybody okay??', 'My hair!']), life: 110 }; for (let q = 0; q < 26; q++) particles.push({ x: W / 2 + rnd(-150, 150), y: H - 30, vx: rnd(-4, 4), vy: rnd(-9, -3), life: 32, max: 32, r: 4 + rnd(0, 4), color: 'rgba(230,245,255,.85)', type: 'drop' }); } }
   // roadside collisions + pickups across the segments we cross this frame
   const stepSegs = Math.max(1, Math.ceil(speed * dt / TUNE.segLen));
   for (let k = 0; k < stepSegs + 1; k++) {
@@ -1354,7 +1505,9 @@ function updatePlaying(dt) {
       if (sp.pickup) { if (overlap(playerX, playerW, sp.offset, sw, 1)) { seg.sprites.splice(i, 1); collect(sp.pickup); } continue; }
       if (sp.puddle) { if (!sp.hitDone && overlap(playerX, playerW, sp.offset, sw, 0.8)) { sp.hitDone = true; speed *= 0.93; sfx.splash(); for (let q = 0; q < 10; q++) particles.push({ x: W / 2 + rnd(-60, 60), y: H - 60, vx: rnd(-3, 3), vy: rnd(-6, -2), life: 28, max: 28, r: 4, color: 'rgba(120,90,60,.8)', type: 'drop' }); say(pick(['Splash!', 'Muddy!'])); setTimeout(() => sp.hitDone = false, 1500); } continue; }
       if (sp.finish) { if (!sp.done) { sp.done = true; finishRun(); } continue; }
-      if (sp.moo && !sp.said && k === 0 && Math.abs(sp.offset) < 2.2) { sp.said = true; say(pick(sp.key === 'cow' ? ['WOOF! A cow!', 'Moo?? WOOF!', 'Big dog!!'] : ['WOOF! Birdie!', 'BIRD! BIRD!', 'Can I chase it??'])); sfx.bark(); }
+      if (sp.ramp) { if (boat && !air && k === 0 && overlap(rx, playerW, sp.offset, sw, 0.9)) { air = { t: 0, dur: 1.0 + speedPct * 0.8, peak: 90 + speedPct * 110, h: 0 }; speed = Math.min(maxNow, speed + TUNE.maxSpeed * 0.12); sfx.boost(); say(pick(['AIRBORNE!!', 'WHOA!!', 'ZOOM!!'])); titaBubble = { text: 'Hold on, kids!', life: 90 }; } continue; }
+      if (sp.moo && !sp.said && k === 0 && Math.abs(sp.offset) < 2.2) { sp.said = true; say(pick(sp.key === 'cow' ? ['WOOF! A cow!', 'Moo?? WOOF!', 'Big dog!!'] : sp.key === 'duck' ? ['DUCK!! DUCK!!', 'Quack?? WOOF!', 'Can I swim??'] : ['WOOF! Birdie!', 'BIRD! BIRD!', 'Can I chase it??'])); sfx.bark(); }
+      if (sp.obstacle) { if (!air && !sp.hitDone && k === 0 && overlap(rx, playerW, sp.offset, sw, 0.8)) { sp.hitDone = true; setTimeout(() => sp.hitDone = false, 1500); speed *= 0.45; crash('bump'); sfx.splash(); for (let q = 0; q < 14; q++) particles.push({ x: W / 2 + rnd(-80, 80), y: H - 50, vx: rnd(-3, 3), vy: rnd(-7, -2), life: 28, max: 28, r: 4, color: 'rgba(230,245,255,.85)', type: 'drop' }); wipeout(); } continue; }
       if (sp.solid && k === 0 && Math.abs(playerX) > 0.95 && !(onLot && sp.offset > 0 && sp.offset < 2.4)) {
         const spX = sp.offset + sw / 2 * (sp.offset > 0 ? 1 : -1);
         if (overlap(playerX, playerW, spX, sw)) { speed = TUNE.maxSpeed / 6; position = increase(seg.p1.world.z, -playerZ, trackLength); crash('bump'); break; }
@@ -1365,12 +1518,18 @@ function updatePlaying(dt) {
   if (playerSeg.stop !== undefined && playerX > 1.05) { const st = stops.find(q => q.id === playerSeg.stop); if (st && !st.done) { st.done = true; state = 'pupcup'; pup = { t: 0 }; Music.duck(0.35); say('PUP CUP!! PUP CUP!!'); titaBubble = { text: 'Okay, okay, one pup cup.', life: 150 }; sfx.bark(); return; } }
   if (playerSeg.finishLine && route.story) { finishRun(); return; }
   // story events: pull into the school / Tinman Social automatically
-  if (playerSeg.event) { const ev = events.find(q => q.kind === playerSeg.event); if (ev && !ev.done) { ev.done = true; scene = { kind: ev.kind, t: 0 }; state = 'scene'; Music.duck(0.35); if (ev.kind === 'school') { say('I SMELL NIC AND GIULIA!!'); titaBubble = { text: 'There they are!', life: 150 }; } else { say('Slushies?? SLUSHIES!!'); titaBubble = { text: 'Okay, one game each.', life: 150 }; } return; } }
+  if (playerSeg.event) { const ev = events.find(q => q.kind === playerSeg.event); if (ev && !ev.done) { ev.done = true; scene = { kind: ev.kind, t: 0 }; state = 'scene'; Music.duck(0.35); if (ev.kind === 'school') { say('I SMELL NIC AND GIULIA!!'); titaBubble = { text: 'There they are!', life: 150 }; } else if (ev.kind === 'marina') { say('WATER!! WATER!!'); titaBubble = { text: 'Little Elm Marina. Who wants to drive the boat?', life: 150 }; } else if (ev.kind === 'dock') { say('Already??'); titaBubble = { text: 'Back to the dock, crew.', life: 150 }; } else { say('Slushies?? SLUSHIES!!'); titaBubble = { text: 'Okay, one game each.', life: 150 }; } return; } }
   // traffic collisions
   for (const car of playerSeg.cars) {
-    if (speed > car.speed && overlap(playerX, playerW, car.offset, car.w, 0.8)) { speed = car.speed * (car.speed / speed); position = increase(car.z, -playerZ, trackLength); crash('car'); break; }
+    if (air || !(speed > car.speed && overlap(rx, playerW, car.offset, car.w, 0.8))) continue;
+    if (car.wreck) { if (car.wreck.t < 0.9) continue; /* still in the air */ car.wreck.dir = car.offset >= rx ? 1 : -1; car.wreck.t = 0.9; car.speed = speed * 0.4; speed *= 0.55; position = increase(car.z, -playerZ, trackLength); crash('bump'); break; }
+    // rear-end a car: it flips over onto the shoulder and stays there wrecked
+    car.wreck = { t: 0, dir: car.offset >= rx ? 1 : -1, puff: 0, water: boat }; car.dodge = 0; car.speed = Math.max(car.speed, speed * 1.05);
+    speed = Math.max(car.speed * 0.5, speed * 0.5); crash('car'); score += 50; floatText(W / 2 + rnd(-60, 60), 300, boat ? 'SPLASH! +50' : 'FLIP! +50', '#FFD27A'); if (boat) { sfx.splash(); wipeout(); } break;
   }
   position = increase(position, dt * speed, trackLength);
+  // ride the merge: as the branch eases back to centre, the Jeep moves with it (so the road never slides out from under you)
+  if (segNow.merge) { const segNext = findSegment(position + playerZ); if (segNext.merge === segNow.merge) { const d = mergeShift(segNext, ((position + playerZ) % TUNE.segLen) / TUNE.segLen) - mSh; playerX += d; steer = clamp(steer + d * 4, -1, 1); skyOff = increase(skyOff, d * 0.03, 1); hillOff = increase(hillOff, d * 0.06, 1); } }
   // horn: Bernard barks, cars ahead in our lane move over
   if (hornCool > 0) hornCool -= dt;
   if (hit.horn && hornCool <= 0) { hornCool = 1.2; sfx.horn(); sfx.bark(); say(pick(['WOOF WOOF!', 'MOVE IT!', 'BARK!'])); for (let i = 1; i < 45; i++) { const seg = segments[(playerSeg.index + i) % segments.length]; for (const car of seg.cars) if (overlap(playerX, playerW, car.offset, car.w, 1.6)) { car.dodge = car.offset >= playerX ? 1 : -1; if (Math.abs(car.offset) > 0.5) car.dodge = -Math.sign(car.offset); car.dodgeT = 0.6; } } }
@@ -1381,16 +1540,23 @@ function updatePlaying(dt) {
   // timer + stage/checkpoints
   timerAcc += dt; if (timerAcc >= 1) { timerAcc -= 1; timer--; if (timer === 10) say("Hurry, Tita!"); if (timer <= 0) { timer = 0; state = 'gameover'; setMenu(['Try Again', 'Quit to Arcade']); Music.stop(); sfx.lose(); Audio_.engineSet(0, false); return; } }
   const segIdx = playerSeg.index; const newStage = segIdx >= stageStarts[2] ? 2 : segIdx >= stageStarts[1] ? 1 : 0;
-  if (newStage !== stage) { stage = newStage; timer += route.cpTime || TUNE.checkpointTime; stageBanner = 170; sfx.check(); floatText(W / 2, 200, '+' + (route.cpTime || TUNE.checkpointTime) + ' seconds', '#9CFF9C'); say(pick(['New stage!', 'Keep going!'])); }
+  if (newStage !== stage) { stage = newStage; bannerOverride = null; timer += route.cpTime || TUNE.checkpointTime; stageBanner = 170; sfx.check(); floatText(W / 2, 200, '+' + (route.cpTime || TUNE.checkpointTime) + ' seconds', '#9CFF9C'); say(pick(['New stage!', 'Keep going!'])); }
   if (stageBanner > 0) stageBanner--;
   // background scroll
   skyOff = increase(skyOff, 0.001 * playerSeg.curve * speedPct, 1); hillOff = increase(hillOff, 0.002 * playerSeg.curve * speedPct, 1);
   updateCars(dt, playerSeg);
-  score += Math.round(speedPct * 2);
+  if (marinaFork && !marinaFork.chosen && !marinaNoticed && marinaFork.decision - playerSeg.index < 260 && marinaFork.decision - playerSeg.index > 0) { marinaNoticed = true; sfx.ding(); say('BOAT?! BOAT!! BOAT!!'); titaBubble = { text: 'Marina exit coming up. Boat ride, anyone?', life: 220 }; }
+  if (boat && speed > 0 && frame % 2 === 0) for (const sx of [-1, 1]) particles.push({ x: W / 2 + sx * (70 + rnd(0, 30)), y: H - 12, vx: sx * rnd(1, 3), vy: rnd(0.5, 2), life: 26, max: 26, r: 5 + rnd(0, 6), color: 'rgba(255,255,255,.5)', type: 'dust' });
+  if (boat && skiers > 0 && speed > TUNE.maxSpeed * 0.2 && frame % 2 === 0) for (let i = 0; i < skiers; i++) { const sx = i === 0 ? -1 : 1, kx = W / 2 + sx * 250 + Math.sin(time * 1.6 + i * 1.3) * 55; particles.push({ x: kx + sx * 20, y: H - 30, vx: sx * rnd(1, 4), vy: rnd(-1, 1), life: 22, max: 22, r: 4 + rnd(0, 5), color: 'rgba(255,255,255,.6)', type: 'dust' }); }
+  score += Math.round(speedPct * 2) + (boat ? skiers : 0);
   Audio_.engineSet(speedPct, true);
   updateFx();
 }
+function wipeout() { // a hard hit knocks the last skier off; they climb back aboard and you can find new skis
+  if (!boat || skiers <= 0) return; const who = skiers === 2 ? 'Giulia' : 'Nic'; skiers--; floatText(W / 2, 230, who.toUpperCase() + ' WIPED OUT!', '#FFB3B3'); say(pick(['Oops!! Sorry ' + who + '!!', who + '!! Are you okay??'])); titaBubble = { text: who === 'Nic' ? 'Nic! Back in the boat.' : 'Giulia! Hold the ladder.', life: 120 };
+}
 function collect(kind) {
+  if (kind === 'skis') { skisGot++; score += 300; sfx.check(); sparkle(W / 2, H - 150, 16, '#CFF4FF'); if (skiers < 2) { skiers++; const who = skiers === 1 ? 'Nic' : 'Giulia'; floatText(W / 2, 260, who.toUpperCase() + ' IS UP ON SKIS!  +300', '#9EE8FF'); say(skiers === 2 ? 'SKI TEAM!!' : who.toUpperCase() + '!! LOOK!!'); titaBubble = { text: skiers === 2 ? 'Both of them! Hold on tight!' : who + ', hold the rope!', life: 150 }; } else floatText(W / 2, 260, 'SPARE SKIS  +300', '#9EE8FF'); return; }
   if (kind === 'green' || kind === 'red') { balls++; const pts = kind === 'red' ? 25 : 10; score += pts; boostMeter = Math.min(100, boostMeter + 12); sfx.ball(); sparkle(W / 2 + rnd(-40, 40), H - 150, 6, kind === 'red' ? '#FFB3B3' : '#E8FF9A'); floatText(W / 2 + rnd(-60, 60), 300, '+' + pts, kind === 'red' ? '#FFB3B3' : '#DDFF8A'); if (balls % 10 === 0) say('Ball!! Ball!!'); }
   else { score += 200; boostMeter = 100; timer += 3; sfx.bone(); say('BONE!! Chomp!'); floatText(W / 2, 280, 'ZOOMIES READY! +3s', C.gold); sparkle(W / 2, H - 150, 14, '#FFFFFF'); }
 }
@@ -1448,6 +1614,12 @@ function update(dt) {
       if (scene.kind === 'school') {
         if (scene.t > 2.2 && !scene.b1) { scene.b1 = 1; sfx.bark(); } if (scene.t > 3.6 && !scene.b2) { scene.b2 = 1; sfx.check(); }
         if (scene.t > 7.2) { state = 'playing'; storyKids = true; score += 500; timer += 15; Music.duck(1); floatText(W / 2, 250, 'PASSENGERS ABOARD  +500 · +15s', C.gold); say('BEST. DAY. EVER.'); titaBubble = { text: 'Seatbelts! Next stop: Tinman Social.', life: 170 }; steer = 0; }
+      } else if (scene.kind === 'marina') { // pull into the marina lot, everybody onto the boat
+        if (scene.t > 1.4 && !scene.b1) { scene.b1 = 1; sfx.bark(); } if (scene.t > 3.2 && !scene.b2) { scene.b2 = 1; sfx.splash(); }
+        if (scene.t > 6.4) { state = 'playing'; boat = true; skiers = 0; air = null; position = (LAKE.from + 12) * TUNE.segLen; playerX = 0; steer = 0; speed = TUNE.maxSpeed * 0.25; timer += 75; stageBanner = 170; bannerOverride = ['BONUS STAGE', 'LAKE LEWISVILLE']; Music.duck(1); sfx.check(); floatText(W / 2, 250, 'ALL ABOARD  +75s', C.gold); say('BOAT!! BOAT!! BOAT!!'); titaBubble = { text: 'Life jackets on. Find the water skis!', life: 200 }; }
+      } else if (scene.kind === 'dock') { // tie up at the dock, back into the Jeep
+        if (scene.t > 1.2 && !scene.b1) { scene.b1 = 1; sfx.splash(); } if (scene.t > 2.6 && !scene.b2) { scene.b2 = 1; sfx.check(); }
+        if (scene.t > 4.6) { state = 'playing'; boat = false; const bonus = 100 * skiers; skiers = 0; air = null; position = (LAKE.dock + 30) * TUNE.segLen; playerX = 0; steer = 0; speed = TUNE.maxSpeed * 0.3; score += bonus; Music.duck(1); floatText(W / 2, 250, 'BACK IN THE JEEP' + (bonus ? '  +' + bonus : ''), C.gold); say('THAT WAS THE BEST!!'); titaBubble = { text: 'Home stretch. Everybody buckled?', life: 170 }; }
       } else { // tinman: stop, then start the Slush Rush minigame
         if (scene.t > 1.6) { state = 'slush'; slush = { phase: 'intro', t: 0, round: 0, rounds: 6, marker: 0, dir: 1, speed: 1.3, result: null, total: 0, who: 'nic', cups: [] }; sfx.ding(); }
       }
@@ -1510,11 +1682,23 @@ function drawBackdrop(pal, playerY) {
   const si = STAGES.indexOf(pal.a), sj = STAGES.indexOf(pal.b);
   draw(backdrops[si], 1 - pal.t, hillOff); if (pal.t > 0) draw(backdrops[sj], pal.t, hillOff);
 }
-function drawSegment(x1, y1, w1, x2, y2, w2, fog, alt, pal, lot, water, brick, fk, dirt) {
+const drawList = [];
+function drawWater(x1, y1, w1, x2, y2, w2, fog, alt, lot) { // Lake Lewisville: open water with a buoy-marked channel where the road would be
+  ctx.fillStyle = alt ? '#2E7EC6' : '#2A77BD'; ctx.fillRect(0, y2, W, y1 - y2);
+  const r1 = w1 / 10, r2 = w2 / 10;
+  poly(ctx, x1 - w1, y1, x1 + w1, y1, x2 + w2, y2, x2 - w2, y2, alt ? '#48A2E8' : '#449DE3');
+  poly(ctx, x1 - w1 - r1, y1, x1 - w1, y1, x2 - w2, y2, x2 - w2 - r2, y2, alt ? '#F4F4F4' : '#E8402F');
+  poly(ctx, x1 + w1 + r1, y1, x1 + w1, y1, x2 + w2, y2, x2 + w2 + r2, y2, alt ? '#F4F4F4' : '#E8402F');
+  if (alt) for (const sg of [-0.62, -0.1, 0.45]) { const c1 = x1 + sg * w1, c2 = x2 + sg * w2; poly(ctx, c1 - w1 * 0.05, y1, c1 + w1 * 0.11, y1, c2 + w2 * 0.11, y2, c2 - w2 * 0.05, y2, 'rgba(255,255,255,.18)'); }
+  if (lot) { poly(ctx, x1 + w1, y1, x1 + w1 * 2.5, y1, x2 + w2 * 2.5, y2, x2 + w2, y2, alt ? '#B48A5A' : '#A87847'); }
+  if (fog < 1) { ctx.globalAlpha = 1 - fog; ctx.fillStyle = '#CBE8FF'; ctx.fillRect(0, y1, W, y2 - y1); ctx.globalAlpha = 1; }
+}
+function drawSegment(x1, y1, w1, x2, y2, w2, fog, alt, pal, lot, water, brick, fk, dirt, ghost, lake) {
+  if (lake) { drawWater(x1, y1, w1, x2, y2, w2, fog, alt, lot); return; }
   const DIRT = { roadL: '#A8794A', roadD: '#9D6E42', rumbleL: '#7FAA55', rumbleD: '#6F9A48', lane: '#8F6238' };
   const col = k => dirt && DIRT[k] ? DIRT[k] : brick && (k === 'roadL' || k === 'roadD') ? '#A2503E' : mixHex(pal.a[k], pal.b[k], pal.t);
   const r1 = w1 / 6, r2 = w2 / 6, l1 = w1 / 24, l2 = w2 / 24;
-  ctx.fillStyle = col(alt ? 'grassL' : 'grassD'); ctx.fillRect(0, y2, W, y1 - y2);
+  if (!ghost) { ctx.fillStyle = col(alt ? 'grassL' : 'grassD'); ctx.fillRect(0, y2, W, y1 - y2); }
   if (fk > 0) {
     const e1 = w1 * (1 + 1.3 * fk), e2 = w2 * (1 + 1.3 * fk), i1 = w1 * 0.5 * fk, i2 = w2 * 0.5 * fk;
     poly(ctx, x1 - e1 - r1, y1, x1 - e1, y1, x2 - e2, y2, x2 - e2 - r2, y2, col(alt ? 'rumbleL' : 'rumbleD'));
@@ -1546,39 +1730,70 @@ function drawRoad() {
   drawSky(pal); drawBackdrop(pal, playerY);
   let maxy = H, x = 0, dx = -(base.curve * basePct);
   const N = segments.length;
-  for (let n = 0; n < TUNE.drawDist; n++) {
-    const seg = segments[(base.index + n) % N];
-    seg.looped = seg.index < base.index; seg.fog = Math.exp(-(n / TUNE.drawDist) * (n / TUNE.drawDist) * TUNE.fog * 0.6); seg.clip = maxy;
-    const camZ = position - (seg.looped ? trackLength : 0);
+  // Walk the track the way the player will actually drive it: at an undecided fork look down the branch they are
+  // steering toward, and hop over the other branch at a jump point. Keeps the view continuous through route choices.
+  const view = drawList; view.length = 0;
+  for (let n = 0, vi = base.index, zOff = 0; n < TUNE.drawDist; n++) {
+    const seg = segments[vi % N]; view.push(seg);
+    seg.looped = vi >= N; seg.fog = Math.exp(-(n / TUNE.drawDist) * (n / TUNE.drawDist) * TUNE.fog * 0.6); seg.clip = maxy;
+    const camZ = position - (seg.looped ? trackLength : 0) + zOff;
     project(seg.p1, playerX * TUNE.roadW - x, playerY + TUNE.camH, camZ);
     project(seg.p2, playerX * TUNE.roadW - x - dx, playerY + TUNE.camH, camZ);
     x += dx; dx += seg.curve;
+    // next index: hop across the unchosen branch so the road stays continuous
+    let next = vi + 1;
+    if (seg.forkId !== undefined) { const f = forks[seg.forkId]; if (f && !f.chosen && playerX >= 0) { next = f.R0; } }
+    else if (seg.jumpDelta) next = vi + 1 + seg.jumpDelta;
+    zOff += (next - vi - 1) * TUNE.segLen; vi = next;
     if (seg.p1.camera.z <= camDepth || seg.p2.screen.y >= seg.p1.screen.y || seg.p2.screen.y >= maxy) continue;
-    drawSegment(seg.p1.screen.x, seg.p1.screen.y, seg.p1.screen.w, seg.p2.screen.x, seg.p2.screen.y, seg.p2.screen.w, seg.fog, seg.alt, pal, seg.lot, seg.water, seg.brick, seg.fork, seg.offroad);
+    if (seg.merge) {
+      // chosen branch: a single road whose centre eases from the split point back to x=0, width 0.9 → 1
+      const side = seg.merge === 'R' ? 1 : -1, s1 = SPLIT * (1 - seg.mp1) * side, s2 = SPLIT * (1 - seg.mp2) * side, k1 = lerp(SPLIT_W, 1, seg.mp1), k2 = lerp(SPLIT_W, 1, seg.mp2);
+      const X1 = seg.p1.screen.x, Y1 = seg.p1.screen.y, W1 = seg.p1.screen.w, X2 = seg.p2.screen.x, Y2 = seg.p2.screen.y, W2 = seg.p2.screen.w;
+      drawSegment(X1 + s1 * W1, Y1, W1 * k1, X2 + s2 * W2, Y2, W2 * k2, seg.fog, seg.alt, pal, false, false, seg.brick, 0, seg.offroad);
+      // the other branch peels away and fades out
+      if (seg.mp1 < 0.7) { const g1 = -side * (SPLIT + 2.6 * seg.mp1), g2 = -side * (SPLIT + 2.6 * seg.mp2); ctx.globalAlpha = clamp((0.7 - seg.mp1) / 0.35, 0, 1); drawSegment(X1 + g1 * W1, Y1, W1 * SPLIT_W, X2 + g2 * W2, Y2, W2 * SPLIT_W, 1, seg.alt, pal, false, false, false, 0, !!seg.ghostDirt, true); ctx.globalAlpha = 1; }
+      seg.sx1 = s1; seg.sx2 = s2;
+    } else drawSegment(seg.p1.screen.x, seg.p1.screen.y, seg.p1.screen.w, seg.p2.screen.x, seg.p2.screen.y, seg.p2.screen.w, seg.fog, seg.alt, pal, seg.lot, seg.water, seg.brick, seg.fork, seg.offroad, false, seg.boat);
     maxy = seg.p1.screen.y;
   }
-  for (let n = TUNE.drawDist - 1; n > 0; n--) {
-    const seg = segments[(base.index + n) % N];
+  for (let n = view.length - 1; n > 0; n--) {
+    const seg = view[n];
     if (seg.p1.camera.z <= camDepth) continue;
-    for (const car of seg.cars) { const pct = (car.z % TUNE.segLen) / TUNE.segLen; const scale = lerp(seg.p1.screen.scale, seg.p2.screen.scale, pct), sx = lerp(seg.p1.screen.x, seg.p2.screen.x, pct) + scale * car.offset * TUNE.roadW * W / 2, sy = lerp(seg.p1.screen.y, seg.p2.screen.y, pct); drawSprite(car.s, scale, sx, sy, -0.5, -1, seg.clip); }
+    for (const car of seg.cars) { const pct = (car.z % TUNE.segLen) / TUNE.segLen; const scale = lerp(seg.p1.screen.scale, seg.p2.screen.scale, pct), sx = lerp(seg.p1.screen.x, seg.p2.screen.x, pct) + scale * (car.offset + (seg.merge ? lerp(seg.sx1 || 0, seg.sx2 || 0, pct) : 0)) * TUNE.roadW * W / 2, sy = lerp(seg.p1.screen.y, seg.p2.screen.y, pct); drawCar(car, scale, sx, sy, seg.clip); }
     for (const sp of seg.sprites) {
       const scale = seg.p1.screen.scale, sx = seg.p1.screen.x + scale * sp.offset * TUNE.roadW * W / 2, sy = seg.p1.screen.y;
       let bobY = 0; if (sp.pickup) bobY = -Math.abs(Math.sin(time * 4 + seg.index)) * 14 * scale * 1000;
-      drawSprite(sp.s, scale, sx, sy + bobY, sp.pickup || sp.puddle || sp.finish || sp.arch ? -0.5 : (sp.offset < 0 ? -1 : 0), -1, seg.clip);
+      drawSprite(sp.s, scale, sx, sy + bobY, sp.pickup || sp.puddle || sp.finish || sp.arch || sp.obstacle || sp.ramp ? -0.5 : (sp.offset < 0 ? -1 : 0), -1, seg.clip);
     }
   }
   // player
   const steerIdx = steer < -0.3 ? 0 : steer > 0.3 ? 2 : 1; const earFrame = Math.floor(time * (6 + speed / TUNE.maxSpeed * 14)) % 3;
-  const js = jeepSprite(steerIdx, earFrame, inp.brake && speed > 0, boosting > 0, dizzy > 0, 0, 0, !!(route.story && storyKids));
+  const js = boat ? boatSprite(steerIdx, earFrame, dizzy > 0 ? 1 : 0, 2 - skiers, boosting > 0 ? 1 : 0) : jeepSprite(steerIdx, earFrame, inp.brake && speed > 0, boosting > 0, dizzy > 0, 0, 0, !!(route.story && storyKids));
   const scale = camDepth / playerZ; const destW = js.ww * scale * (W / 2), destH = destW * js.h / js.w;
-  const jx = W / 2 - destW / 2, jy = H - destH - 8 + bounce;
+  const airH = air ? air.h : 0, jx = W / 2 - destW / 2, jy = H - destH - 8 + bounce - airH;
+  if (airH > 0) { ell(ctx, W / 2, H - 20, destW * 0.42 * (1 - airH / 500), 10); fs(ctx, 'rgba(0,40,80,.28)', null); }
   if (boosting > 0) { const gl = ctx.createRadialGradient(W / 2, jy + destH * 0.6, 20, W / 2, jy + destH * 0.6, destW * 0.8); gl.addColorStop(0, 'rgba(255,200,80,.35)'); gl.addColorStop(1, 'rgba(255,200,80,0)'); ctx.fillStyle = gl; ctx.fillRect(jx - 150, jy - 100, destW + 300, destH + 200); }
-  ctx.drawImage(js.c, jx, jy, destW, destH);
+  if (airH > 0) { const pAir = clamp(air.t / air.dur, 0, 1); ctx.save(); ctx.translate(W / 2, jy + destH / 2); ctx.rotate(Math.sin(pAir * Math.PI * 2) * -0.1); ctx.drawImage(js.c, -destW / 2, -destH / 2, destW, destH); ctx.restore(); }
+  else ctx.drawImage(js.c, jx, jy, destW, destH);
+  if (boat && skiers > 0) drawSkiers(jy + destH * 0.52, airH);
   // speech bubbles
   // speech bubbles sit low, beside the Jeep, so they never cover the road ahead
   if (bubble) drawBubble(bubble.text, W / 2 + destW / 2 + 16, jy + destH * 0.45, bubble.life, '#FFF', 1);
   if (titaBubble) drawBubble(titaBubble.text, W / 2 - destW / 2 - 16, jy + destH * 0.45, titaBubble.life, '#FFE9F0', -1);
   return { pal, playerY };
+}
+function drawSkiers(sternY, airH) { // Nic (left) and Giulia (right) towed behind the boat, slaloming across the wake
+  for (let i = 0; i < skiers; i++) {
+    const who = i === 0 ? 'nic' : 'giulia', sx = i === 0 ? -1 : 1, sway = Math.sin(time * 1.6 + i * 1.3) * 55, K = 1.6;
+    const lift = airH * 0.55 * clamp(1 - i * 0.15, 0, 1), x = W / 2 + sx * 250 + sway, y = H - 112 - lift + Math.sin(time * 9 + i) * 2;
+    ctx.strokeStyle = 'rgba(40,30,20,.85)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(W / 2 + sx * 10, sternY); ctx.lineTo(x - sx * 5, y - 3); ctx.stroke();
+    ell(ctx, x, H - 22 - lift * 0.3, 44, 7); fs(ctx, 'rgba(255,255,255,.55)', null);
+    for (const k of [-1, 1]) { ctx.save(); ctx.translate(x + k * 13, y + 44 * K + 10); ctx.rotate(k * 0.06 + sway * 0.002); ell(ctx, 0, 0, 10, 30); fs(ctx, '#F4F4F2', C.out, 2.5); ell(ctx, 0, -20, 7, 8); fs(ctx, '#C8302A', null); ctx.restore(); }
+    drawKid(ctx, who, x, y, K, 0);
+    rr(ctx, x - 22, y - 10, 44, 32, 8); fs(ctx, 'rgba(255,138,42,.9)', C.out, 2.5); rr(ctx, x - 5, y - 7, 10, 24, 4); fs(ctx, '#FFB347', null);
+    ctx.strokeStyle = C.out; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x - 19, y + 3); ctx.lineTo(x - sx * 5, y - 1); ctx.moveTo(x + 19, y + 3); ctx.lineTo(x - sx * 5, y - 1); ctx.stroke(); ctx.strokeStyle = who === 'nic' ? '#D9A77A' : '#E6B892'; ctx.lineWidth = 3.5; ctx.stroke();
+  }
 }
 function drawBubble(text, x, y, life, bg, side) {
   // side: 1 = bubble to the right of x (tail points left), -1 = to the left (tail points right)
@@ -1606,9 +1821,16 @@ function drawHUD() {
   ctx.beginPath(); ctx.arc(cx, cy, 60, Math.PI, Math.PI + Math.PI * clamp(mph / 95, 0, 1)); ctx.strokeStyle = boosting > 0 ? '#FFC24A' : mph > 70 ? '#FF8A6A' : '#9CFF9C'; ctx.lineWidth = 10; ctx.stroke();
   textO(ctx, String(mph), cx, 72, 30, C.cream, null, 'center', 0); textO(ctx, 'MPH', cx, 94, 11, C.gold, null, 'center', 0, 600);
   // stage name chip
-  panel(W - 14 - 170, 114, 170, 28, 10); textO(ctx, STAGES[stage].name, W - 14 - 85, 128, 11, C.cream, null, 'center', 0, 600);
+  panel(W - 14 - 170, 114, 170, 28, 10); textO(ctx, boat ? 'LAKE LEWISVILLE · BONUS' : STAGES[stage].name, W - 14 - 85, 128, 11, boat ? '#9EE8FF' : C.cream, null, 'center', 0, 600);
   { const ps = findSegment(position + playerZ); if (ps.forkApproach !== undefined && state === 'playing') { const f = forks[ps.forkApproach]; if (!f.chosen) { panel(W / 2 - 230, 150, 460, 46, 14); textO(ctx, '◀ ' + f.leftName + '      ·      ' + f.rightName + ' ▶', W / 2, 173, 18, '#FFE680', null, 'center', 0); textO(ctx, 'FORK AHEAD · steer to pick', W / 2, 206, 12, C.cream, C.out, 'center', 3, 600); } } }
-  if (stageBanner > 0 && state === 'playing') { const a = clamp(Math.min(stageBanner, 170 - stageBanner) / 25, 0, 1); ctx.globalAlpha = a; textO(ctx, 'STAGE ' + (stage + 1), W / 2, 170, 26, C.gold, C.out, 'center', 6); textO(ctx, STAGES[stage].name, W / 2, 206, 36, C.cream, C.out, 'center', 7); ctx.globalAlpha = 1; }
+  if (stageBanner > 0 && state === 'playing') { const a = clamp(Math.min(stageBanner, 170 - stageBanner) / 25, 0, 1); ctx.globalAlpha = a; textO(ctx, bannerOverride ? bannerOverride[0] : 'STAGE ' + (stage + 1), W / 2, 170, 26, C.gold, C.out, 'center', 6); textO(ctx, bannerOverride ? bannerOverride[1] : STAGES[stage].name, W / 2, 206, 36, bannerOverride ? '#9EE8FF' : C.cream, C.out, 'center', 7); ctx.globalAlpha = 1; }
+  // MARINA EXIT heads-up: a bouncing arrow on the right while the exit is coming up (it's optional)
+  if (marinaFork && !marinaFork.chosen && state === 'playing') { const d = marinaFork.decision - findSegment(position + playerZ).index; if (d > 0 && d < 260) {
+    const bob = Math.sin(time * 6) * 6, blink = Math.sin(time * 8) > -0.3; panel(W - 14 - 170, 150, 170, 62, 12);
+    textO(ctx, 'MARINA EXIT', W - 14 - 105, 170, 15, '#9EE8FF', null, 'center', 0); textO(ctx, d < 70 ? 'NOW!' : 'coming up', W - 14 - 105, 192, 12, blink ? C.cream : 'rgba(255,244,214,.4)', null, 'center', 0, 600);
+    textO(ctx, '➜', W - 14 - 30 + bob, 182, 34, blink ? '#FFE680' : '#9EE8FF', C.out, 'center', 4);
+    textO(ctx, 'keep RIGHT for the boat', W - 14 - 85, 226, 11, C.cream, C.out, 'center', 3, 600); } }
+  if (boat) { panel(14, 150, 190, 30, 10); textO(ctx, 'SKIS   Nic ' + (skiers >= 1 ? '✓' : '·') + '    Giulia ' + (skiers >= 2 ? '✓' : '·'), 24, 165, 13, skiers ? '#9EE8FF' : C.cream, null, 'left', 0, 600); }
   if (padToast > 0) { ctx.globalAlpha = clamp(padToast / 30, 0, 1); panel(W / 2 - 150, H - 60, 300, 36, 10); textO(ctx, 'Controller connected: ' + pad.name, W / 2, H - 42, 14, C.cream, null, 'center', 0, 600); ctx.globalAlpha = 1; }
 }
 function drawFx() {
@@ -1666,6 +1888,40 @@ function drawRouteSelect() {
     if (sel) { ctx.save(); ctx.translate(x + w - 30, y + 152 + Math.sin(time * 6) * 2); ctx.scale(0.45, 0.45); pawPrint(ctx, C.gold); ctx.restore(); }
   });
   textO(ctx, '◀ ▶ choose  ·  B / Enter go  ·  Select back', W / 2, 475, 16, C.cream, C.out, 'center', 4, 600);
+}
+function lakeBackdrop(x, y, w, h) { const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, '#7FB7EC'); g.addColorStop(0.45, '#CBE8FF'); g.addColorStop(0.46, '#3F94DE'); g.addColorStop(1, '#2A77BD'); ctx.fillStyle = g; ctx.fillRect(x, y, w, h); for (let i = 0; i < 14; i++) { ell(ctx, x + 40 + i * 48 + Math.sin(time * 2 + i) * 6, y + h * 0.55 + (i % 3) * 30, 14, 2.5); fs(ctx, 'rgba(255,255,255,.35)', null); } }
+function drawSceneMarina(t) {
+  const a = clamp(t / 0.4, 0, 1); ctx.globalAlpha = a; dim(0.45);
+  panel(W / 2 - 360, 60, 720, 420, 22);
+  textO(ctx, 'LITTLE ELM MARINA', W / 2, 100, 40, C.gold, C.out, 'center', 8);
+  textO(ctx, 'Lake Lewisville · boat slips, bait, and the best sunsets in town', W / 2, 136, 15, C.cream, null, 'center', 0, 600);
+  ctx.save(); ctx.beginPath(); rr(ctx, W / 2 - 330, 156, 660, 250, 14); ctx.clip();
+  lakeBackdrop(W / 2 - 330, 156, 660, 250);
+  ctx.save(); ctx.translate(W / 2 - 330, 150); ctx.scale(0.62, 0.62); drawMarina(ctx); ctx.restore();
+  ctx.fillStyle = '#A87847'; ctx.fillRect(W / 2 - 330, 300, 660, 26); ctx.fillStyle = 'rgba(0,0,0,.18)'; for (let x = W / 2 - 322; x < W / 2 + 330; x += 18) ctx.fillRect(x, 302, 2, 22);
+  // the boat waits at the dock; the kids run down the planks and hop in, Bernard first
+  const run = clamp((t - 1.0) / 2.8, 0, 1), kx = lerp(W / 2 - 250, W / 2 + 120, run), ky = 300 + Math.abs(Math.sin(t * 12)) * -6 * (run < 1 ? 1 : 0);
+  const bs = boatSprite(0, Math.floor(t * 8) % 3, 0, run >= 1 ? 2 : 0, 0); ctx.drawImage(bs.c, W / 2 + 120, 236, 200, 172);
+  if (run < 1) { drawKid(ctx, 'nic', kx, ky, 1.1, t); drawKid(ctx, 'giulia', kx - 50, ky + 4, 1.1, t); }
+  if (t < 1.0) bernardHead(ctx, W / 2 - 190 + t * 200, 270 - Math.abs(Math.sin(t * 10)) * 30, 1.2, 1, true, 0);
+  ctx.restore();
+  const line = t < 1.0 ? 'Bernard is already on the dock…' : run < 1 ? '"CAN WE TAKE THE BOAT?! PLEASE?!"' : t < 5.2 ? 'Life jackets on. Tita takes the wheel.' : 'Watch for buoys and logs. Hit the ramps. Grab the skis!';
+  textO(ctx, line, W / 2, 440, 18, t > 4.6 ? '#FFE680' : C.cream, null, 'center', 0, 600);
+  ctx.globalAlpha = 1;
+}
+function drawSceneDock(t) {
+  const a = clamp(t / 0.4, 0, 1); ctx.globalAlpha = a; dim(0.45);
+  panel(W / 2 - 360, 100, 720, 330, 22);
+  textO(ctx, 'BACK AT THE DOCK', W / 2, 140, 36, C.gold, C.out, 'center', 7);
+  ctx.save(); ctx.beginPath(); rr(ctx, W / 2 - 330, 166, 660, 190, 14); ctx.clip();
+  lakeBackdrop(W / 2 - 330, 166, 660, 190);
+  ctx.fillStyle = '#A87847'; ctx.fillRect(W / 2 - 330, 290, 660, 30);
+  const slide = clamp(t / 2.4, 0, 1); const bs = boatSprite(0, 1, 0, 2 - skiers, 0); ctx.drawImage(bs.c, lerp(W / 2 - 300, W / 2 - 110, slide), 190, 180, 156);
+  const js = jeepSprite(0, Math.floor(t * 6) % 3, 0, 0, 0, 0, 0, slide >= 1); ctx.drawImage(js.c, W / 2 + 110, 200, 176, 152);
+  ctx.restore();
+  const line = t < 1.4 ? 'Tita backs the trailer down the ramp like a pro.' : t < 3 ? 'Boat\'s on the trailer. Everybody\'s soaked and happy.' : 'Home stretch!';
+  textO(ctx, line, W / 2, 392, 18, t > 2.8 ? '#FFE680' : C.cream, null, 'center', 0, 600);
+  ctx.globalAlpha = 1;
 }
 function drawSceneSchool(t) {
   const a = clamp(t / 0.4, 0, 1); ctx.globalAlpha = a; dim(0.45);
@@ -1781,12 +2037,14 @@ function render() {
   drawRoad(); drawFx(); drawHUD();
   if (state === 'pupcup' && pup.t > 1) drawPupScene(pup.t - 1);
   if (state === 'scene' && scene.kind === 'school' && scene.t > 1) drawSceneSchool(scene.t - 1);
+  if (state === 'scene' && scene.kind === 'marina' && scene.t > 0.8) drawSceneMarina(scene.t - 0.8);
+  if (state === 'scene' && scene.kind === 'dock' && scene.t > 0.6) drawSceneDock(scene.t - 0.6);
   if (state === 'slush') drawSlush();
   if (state === 'intro') { dim(0.35); panel(W / 2 - 300, 150, 600, 200, 18); if (route.story) { textO(ctx, 'THE SCHOOL RUN', W / 2, 190, 30, C.gold, C.out, 'center', 6); textO(ctx, '3:05 PM at 112 Jewelberry. Nic and Giulia get out of', W / 2, 238, 19, C.cream, null, 'center', 0, 600); textO(ctx, 'Oak Point Elementary in 10 minutes. Then: Tinman Social!', W / 2, 264, 19, C.cream, null, 'center', 0, 600); } else { textO(ctx, 'THE ROAD TRIP', W / 2, 190, 30, C.gold, C.out, 'center', 6); textO(ctx, 'Tita and Bernard are heading to the dog park', W / 2, 238, 19, C.cream, null, 'center', 0, 600); textO(ctx, 'across Dallas. Get there before the sun goes down!', W / 2, 264, 19, C.cream, null, 'center', 0, 600); } textO(ctx, 'Grab balls to fill the ZOOMIES meter · Honk to make Bernard bark cars away', W / 2, 300, 14, '#FFE89A', null, 'center', 0, 600); if (Math.floor(time * 2) % 2 === 0) textO(ctx, 'Hold GAS to go!', W / 2, 332, 16, C.cream, null, 'center', 0, 600); }
   else if (state === 'paused') { dim(); textO(ctx, 'PAUSED', W / 2, 150, 48, C.gold, C.out, 'center', 9); drawMenu(240); }
   else if (state === 'quitconfirm') { dim(); textO(ctx, 'Quit to arcade?', W / 2, 170, 40, C.gold, C.out, 'center', 8); textO(ctx, 'Your trip will be lost.', W / 2, 220, 16, C.cream, null, 'center', 0, 600); drawMenu(280); }
   else if (state === 'gameover') { dim(0.7); textO(ctx, 'OUT OF TIME!', W / 2, 150, 56, '#FF8A8A', C.out, 'center', 9); textO(ctx, 'The sun went down on ' + STAGES[stage].name.toLowerCase() + '.', W / 2, 200, 18, C.cream, null, 'center', 0, 600); textO(ctx, 'Score ' + score, W / 2, 240, 24, C.cream, C.out, 'center', 5); drawMenu(300); }
-  else if (state === 'finish' && finishTimer > (route.story ? 4.2 : 0.8)) { const ft = finishTimer - (route.story ? 3.4 : 0); dim(Math.min(0.55, (ft - 0.8) / 1.5)); textO(ctx, route.story ? 'HOME SWEET HOME!' : 'YOU MADE IT!', W / 2, 120, 60, C.gold, C.out, 'center', 10); textO(ctx, route.story ? 'Nic & Giulia: "Best day ever!"  Bernard: zoomies in the backyard.' : 'Bernard is already running for the balls.', W / 2, 168, 18, C.cream, null, 'center', 0, 600); if (ft > 1.2) { textO(ctx, 'Time bonus', W / 2 - 40, 212, 22, C.cream, C.out, 'right', 4); textO(ctx, '+' + tally.timeTotal, W / 2, 212, 22, '#8ED8FF', C.out, 'left', 4); textO(ctx, 'Balls bonus', W / 2 - 40, 248, 22, C.cream, C.out, 'right', 4); textO(ctx, '+' + tally.ballsTotal, W / 2, 248, 22, '#DDFF8A', C.out, 'left', 4); textO(ctx, 'Cars passed: ' + passes + '   ·   Pup cups: ' + pupCups + ' (+' + tally.cupsTotal + ')' + (route.story ? '   ·   Slush Rush: +' + slushScore : ''), W / 2, 284, 16, C.cream, null, 'center', 0, 600); textO(ctx, 'SCORE  ' + score, W / 2, 326, 34, C.gold, C.out, 'center', 7); } if (tally.shown === 2) drawMenu(390); }
+  else if (state === 'finish' && finishTimer > (route.story ? 4.2 : 0.8)) { const ft = finishTimer - (route.story ? 3.4 : 0); dim(Math.min(0.55, (ft - 0.8) / 1.5)); textO(ctx, route.story ? 'HOME SWEET HOME!' : 'YOU MADE IT!', W / 2, 120, 60, C.gold, C.out, 'center', 10); textO(ctx, route.story ? 'Nic & Giulia: "Best day ever!"  Bernard: zoomies in the backyard.' : 'Bernard is already running for the balls.', W / 2, 168, 18, C.cream, null, 'center', 0, 600); if (ft > 1.2) { textO(ctx, 'Time bonus', W / 2 - 40, 212, 22, C.cream, C.out, 'right', 4); textO(ctx, '+' + tally.timeTotal, W / 2, 212, 22, '#8ED8FF', C.out, 'left', 4); textO(ctx, 'Balls bonus', W / 2 - 40, 248, 22, C.cream, C.out, 'right', 4); textO(ctx, '+' + tally.ballsTotal, W / 2, 248, 22, '#DDFF8A', C.out, 'left', 4); textO(ctx, 'Cars passed: ' + passes + '   ·   Pup cups: ' + pupCups + ' (+' + tally.cupsTotal + ')' + (route.story ? '   ·   Slush Rush: +' + slushScore + (airJumps || skisGot ? '   ·   Boat jumps: ' + airJumps + '  Skis: ' + skisGot : '') : ''), W / 2, 284, 16, C.cream, null, 'center', 0, 600); textO(ctx, 'SCORE  ' + score, W / 2, 326, 34, C.gold, C.out, 'center', 7); } if (tally.shown === 2) drawMenu(390); }
 }
 
 /* =====================================================================
@@ -1808,7 +2066,7 @@ function start() {
 function stop() { running = false; cancelAnimationFrame(raf); Music.stop(); Audio_.engineSet(0, false); window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp); window.removeEventListener('blur', onBlur); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('gamepadconnected', onGpc); }
 const onVis = () => { if (document.hidden && state === 'playing') { state = 'paused'; setMenu(['Resume', 'Restart Trip', 'Quit to Arcade']); Audio_.engineSet(0, false); } };
 const onGpc = () => { Audio_.init(); Audio_.engineOn(); };
-window.BRT = { start, stop, onQuit: null, get state() { return state; }, teleport(segIndex) { position = segIndex * TUNE.segLen; playerX = 0; }, cheat(v) { speed = v; }, stageStarts() { return stageStarts.concat([segments.length]); }, stops() { return stops.map(q => q.n); }, forks() { return forks.map(f => ({ decision: f.decision, L0: f.L0, Lb: f.Lb, L1: f.L1, R0: f.R0, Rb: f.Rb, R1: f.R1, off: f.offroadSide, chosen: f.chosen })); }, routeId() { return route.id; }, setRoute(i) { route = ROUTES[i]; STAGES = route.stages; } };
+window.BRT = { start, stop, onQuit: null, get state() { return state; }, teleport(segIndex) { position = segIndex * TUNE.segLen; playerX = 0; }, cheat(v) { speed = v; }, stageStarts() { return stageStarts.concat([segments.length]); }, stops() { return stops.map(q => q.n); }, forks() { return forks.map(f => ({ decision: f.decision, L0: f.L0, Lb: f.Lb, L1: f.L1, R0: f.R0, Rb: f.Rb, R1: f.R1, off: f.offroadSide, chosen: f.chosen })); }, routeId() { return route.id; }, setRoute(i) { route = ROUTES[i]; STAGES = route.stages; }, setX(x) { playerX = x; }, lake() { return Object.assign({ boat, skiers, air: !!air, airJumps, skisGot, fork: marinaFork && { decision: marinaFork.decision, chosen: marinaFork.chosen } }, LAKE); }, skipScene() { if (state === 'scene') scene.t = 99; if (state === 'slush' && slush) { slush.phase = 'done'; slush.t = 99; } }, lakeItems() { const out = []; if (LAKE.from === undefined) return out; for (let n = LAKE.from; n < LAKE.to; n++) for (const sp of segments[n].sprites) if (sp.ramp || sp.pickup === 'skis' || sp.obstacle) out.push({ n, key: sp.key, offset: sp.offset }); return out; }, setBoat(v) { boat = v; }, setSkiers(v) { skiers = v; }, setSpeed(v) { speed = v; }, dbg() { const sg = findSegment(position + playerZ); return { playerX: +playerX.toFixed(3), seg: sg.index, merge: sg.merge || null, mp: sg.mp1, mergeShift: mergeShift(sg, ((position + playerZ) % TUNE.segLen) / TUNE.segLen), speed: Math.round(speed), state, dizzy: +dizzy.toFixed(2), boat, skiers, airJumps }; }, wrecks() { return cars.filter(c => c.wreck).map(c => ({ seg: Math.floor(c.z / TUNE.segLen), offset: +c.offset.toFixed(2), t: +c.wreck.t.toFixed(2), speed: Math.round(c.speed) })); }, firstCar() { let b = null; for (const c of cars) if (!b || c.z < b.z) b = c; return { seg: Math.floor(b.z / TUNE.segLen), offset: b.offset, kind: b.kind }; } };
 
 if (location.hash === '#sprites') {
   buildSprites(); ctx.fillStyle = '#9fd'; ctx.fillRect(0, 0, W, H);
