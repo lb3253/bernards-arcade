@@ -1236,19 +1236,21 @@ function buildLake() { // the MARINA branch: a lot by the water, then Lake Lewis
 function decorateLake() {
   if (LAKE.from === undefined) return;
   for (let k = LAKE.road; k < LAKE.end; k++) segments[k].lake = true;
-  for (let k = LAKE.from; k < LAKE.to; k++) segments[k].boat = true;
+  for (let k = LAKE.from; k < LAKE.to; k++) {
+    segments[k].boat = true;
+    segments[k].sprites = segments[k].sprites.filter(sp => sp.key !== 'lamp' && sp.key !== 'lamp2' && sp.key !== 'cone' && sp.key !== 'fence' && sp.key !== 'puddle' && !sp.puddle);
+  }
   for (let k = LAKE.marina - 80; k < LAKE.from; k++) segments[k].lot = true;
   for (let k = LAKE.to; k < LAKE.dock + 25; k++) segments[k].lot = true;
   segments[LAKE.marina - 10].event = 'marina'; events.push({ kind: 'marina', n: LAKE.marina, done: false });
-  segments[LAKE.dock - 10].event = 'dock'; events.push({ kind: 'dock', n: LAKE.dock, done: false });
+  segments[LAKE.to - 4].event = 'dock'; events.push({ kind: 'dock', n: LAKE.to - 4, done: false });
   addSprite(LAKE.road + 6, 'signMarina', 1.5, { solid: 1 }); addSprite(LAKE.marina + 2, 'marina', 2.45, { solid: 1 }); addSprite(LAKE.dock + 2, 'dock', 2.45, { solid: 1 });
   for (let k = LAKE.road; k < LAKE.marina - 80; k += 9) { addSprite(k, pick(['oak', 'sapling']), -1.9 - hash(k, 3) * 0.8, { solid: 1 }); if (k % 18 === 0) addSprite(k + 4, 'lamp', 1.2, { solid: 1 }); }
   for (let k = LAKE.marina - 80; k < LAKE.from; k += 7) { addSprite(k, 'boat1', -(2.6 + hash(k, 4) * 2.5)); if (k % 21 === 7) addSprite(k + 3, 'oak', -2.0, { solid: 1 }); }
-  // the lake: buoys, logs and ducks in the channel; ramps and skis to find; docks, boats and lake houses along the shores
+  // the lake: buoys and ducks in the water; ramps and skis to find; docks and houses along the shores
   for (let n = LAKE.from + 30; n < LAKE.to - 30; n++) {
     const h = hash(n, 41), h2 = hash(n, 42);
-    if (n % 9 === 2) addSprite(n, 'buoy', pick([-0.7, -0.35, 0.35, 0.7]), { obstacle: 1 });
-    if (n % 23 === 11) addSprite(n, 'log', pick([-0.55, 0, 0.55]), { obstacle: 1 });
+    if (n % 14 === 2) addSprite(n, 'buoy', pick([-0.7, -0.35, 0.35, 0.7]), { obstacle: 1 });
     if (n % 31 === 20) addSprite(n, 'duck', pick([-0.8, 0.8]), { obstacle: 1, moo: 1 });
     if (n % 70 === 35) addSprite(n, 'ramp', pick([-0.66, 0, 0.66]), { ramp: 1 });
     if (n % 150 === 75) addSprite(n, 'skis', pick([-0.66, 0, 0.66]), { pickup: 'skis' });
@@ -1260,7 +1262,6 @@ function decorateLake() {
     if (n % 13 === 6) addSprite(n, pick(['oak', 'sapling']), (h2 < 0.5 ? -1 : 1) * (2.9 + h * 0.6), {});
   }
   for (let k = LAKE.to; k < LAKE.end; k += 8) { addSprite(k, 'oak', -2.0 - hash(k, 5) * 0.8, { solid: 1 }); if (k < LAKE.dock) addSprite(k + 4, 'boat1', 2.9 + hash(k, 6) * 2); }
-  addBoats(LAKE.from + 60, LAKE.to - 60, 16);
 }
 function addBoats(from, to, count) {
   for (let i = 0; i < count; i++) {
@@ -1519,8 +1520,10 @@ function updatePlaying(dt) {
   if (playerSeg.finishLine && route.story) { finishRun(); return; }
   // story events: pull into the school / Tinman Social automatically
   if (playerSeg.event) { const ev = events.find(q => q.kind === playerSeg.event); if (ev && !ev.done) { ev.done = true; scene = { kind: ev.kind, t: 0 }; state = 'scene'; Music.duck(0.35); if (ev.kind === 'school') { say('I SMELL NIC AND GIULIA!!'); titaBubble = { text: 'There they are!', life: 150 }; } else if (ev.kind === 'marina') { say('WATER!! WATER!!'); titaBubble = { text: 'Little Elm Marina. Who wants to drive the boat?', life: 150 }; } else if (ev.kind === 'dock') { say('Already??'); titaBubble = { text: 'Back to the dock, crew.', life: 150 }; } else { say('Slushies?? SLUSHIES!!'); titaBubble = { text: 'Okay, one game each.', life: 150 }; } return; } }
+  // the water ends here: tie up before the boat can roll onto the road home
+  if (boat && LAKE.to && playerSeg.index >= LAKE.to - 6) { const ev = events.find(q => q.kind === 'dock'); if (ev && !ev.done) { ev.done = true; scene = { kind: 'dock', t: 0 }; state = 'scene'; Music.duck(0.35); say('Already??'); titaBubble = { text: 'Back to the dock, crew.', life: 150 }; return; } }
   // traffic collisions
-  for (const car of playerSeg.cars) {
+  if (!boat) for (const car of playerSeg.cars) {
     if (air || !(speed > car.speed && overlap(rx, playerW, car.offset, car.w, 0.8))) continue;
     if (car.wreck) { if (car.wreck.t < 0.9) continue; /* still in the air */ car.wreck.dir = car.offset >= rx ? 1 : -1; car.wreck.t = 0.9; car.speed = speed * 0.4; speed *= 0.55; position = increase(car.z, -playerZ, trackLength); crash('bump'); break; }
     // rear-end a car: it flips over onto the shoulder and stays there wrecked
@@ -1683,18 +1686,17 @@ function drawBackdrop(pal, playerY) {
   draw(backdrops[si], 1 - pal.t, hillOff); if (pal.t > 0) draw(backdrops[sj], pal.t, hillOff);
 }
 const drawList = [];
-function drawWater(x1, y1, w1, x2, y2, w2, fog, alt, lot) { // Lake Lewisville: open water with a buoy-marked channel where the road would be
-  ctx.fillStyle = alt ? '#2E7EC6' : '#2A77BD'; ctx.fillRect(0, y2, W, y1 - y2);
-  const r1 = w1 / 10, r2 = w2 / 10;
-  poly(ctx, x1 - w1, y1, x1 + w1, y1, x2 + w2, y2, x2 - w2, y2, alt ? '#48A2E8' : '#449DE3');
-  poly(ctx, x1 - w1 - r1, y1, x1 - w1, y1, x2 - w2, y2, x2 - w2 - r2, y2, alt ? '#F4F4F4' : '#E8402F');
-  poly(ctx, x1 + w1 + r1, y1, x1 + w1, y1, x2 + w2, y2, x2 + w2 + r2, y2, alt ? '#F4F4F4' : '#E8402F');
-  if (alt) for (const sg of [-0.62, -0.1, 0.45]) { const c1 = x1 + sg * w1, c2 = x2 + sg * w2; poly(ctx, c1 - w1 * 0.05, y1, c1 + w1 * 0.11, y1, c2 + w2 * 0.11, y2, c2 - w2 * 0.05, y2, 'rgba(255,255,255,.18)'); }
-  if (lot) { poly(ctx, x1 + w1, y1, x1 + w1 * 2.5, y1, x2 + w2 * 2.5, y2, x2 + w2, y2, alt ? '#B48A5A' : '#A87847'); }
-  if (fog < 1) { ctx.globalAlpha = 1 - fog; ctx.fillStyle = '#CBE8FF'; ctx.fillRect(0, y1, W, y2 - y1); ctx.globalAlpha = 1; }
+function drawWater(x1, y1, w1, x2, y2, w2, fog, alt) { // open lake with grassy shores, no lane paint
+  ctx.fillStyle = alt ? '#6EAE4E' : '#63A348'; ctx.fillRect(0, y2, W, y1 - y2);
+  const e = 1.7;
+  poly(ctx, x1 - w1 * e, y1, x1 + w1 * e, y1, x2 + w2 * e, y2, x2 - w2 * e, y2, '#2C8BCB');
+  const s = 0.1;
+  poly(ctx, x1 - w1 * (e + s), y1, x1 - w1 * e, y1, x2 - w2 * e, y2, x2 - w2 * (e + s), y2, '#E4D0A0');
+  poly(ctx, x1 + w1 * e, y1, x1 + w1 * (e + s), y1, x2 + w2 * (e + s), y2, x2 + w2 * e, y2, '#E4D0A0');
+  if (fog < 1) { ctx.globalAlpha = 1 - fog; ctx.fillStyle = '#B7DFFF'; ctx.fillRect(0, y1, W, y2 - y1); ctx.globalAlpha = 1; }
 }
 function drawSegment(x1, y1, w1, x2, y2, w2, fog, alt, pal, lot, water, brick, fk, dirt, ghost, lake) {
-  if (lake) { drawWater(x1, y1, w1, x2, y2, w2, fog, alt, lot); return; }
+  if (lake) { drawWater(x1, y1, w1, x2, y2, w2, fog, alt); return; }
   const DIRT = { roadL: '#A8794A', roadD: '#9D6E42', rumbleL: '#7FAA55', rumbleD: '#6F9A48', lane: '#8F6238' };
   const col = k => dirt && DIRT[k] ? DIRT[k] : brick && (k === 'roadL' || k === 'roadD') ? '#A2503E' : mixHex(pal.a[k], pal.b[k], pal.t);
   const r1 = w1 / 6, r2 = w2 / 6, l1 = w1 / 24, l2 = w2 / 24;
@@ -1760,7 +1762,7 @@ function drawRoad() {
   for (let n = view.length - 1; n > 0; n--) {
     const seg = view[n];
     if (seg.p1.camera.z <= camDepth) continue;
-    for (const car of seg.cars) { const pct = (car.z % TUNE.segLen) / TUNE.segLen; const scale = lerp(seg.p1.screen.scale, seg.p2.screen.scale, pct), sx = lerp(seg.p1.screen.x, seg.p2.screen.x, pct) + scale * (car.offset + (seg.merge ? lerp(seg.sx1 || 0, seg.sx2 || 0, pct) : 0)) * TUNE.roadW * W / 2, sy = lerp(seg.p1.screen.y, seg.p2.screen.y, pct); drawCar(car, scale, sx, sy, seg.clip); }
+    if (!boat) for (const car of seg.cars) { const pct = (car.z % TUNE.segLen) / TUNE.segLen; const scale = lerp(seg.p1.screen.scale, seg.p2.screen.scale, pct), sx = lerp(seg.p1.screen.x, seg.p2.screen.x, pct) + scale * (car.offset + (seg.merge ? lerp(seg.sx1 || 0, seg.sx2 || 0, pct) : 0)) * TUNE.roadW * W / 2, sy = lerp(seg.p1.screen.y, seg.p2.screen.y, pct); drawCar(car, scale, sx, sy, seg.clip); }
     for (const sp of seg.sprites) {
       const scale = seg.p1.screen.scale, sx = seg.p1.screen.x + scale * sp.offset * TUNE.roadW * W / 2, sy = seg.p1.screen.y;
       let bobY = 0; if (sp.pickup) bobY = -Math.abs(Math.sin(time * 4 + seg.index)) * 14 * scale * 1000;
@@ -1905,7 +1907,7 @@ function drawSceneMarina(t) {
   if (run < 1) { drawKid(ctx, 'nic', kx, ky, 1.1, t); drawKid(ctx, 'giulia', kx - 50, ky + 4, 1.1, t); }
   if (t < 1.0) bernardHead(ctx, W / 2 - 190 + t * 200, 270 - Math.abs(Math.sin(t * 10)) * 30, 1.2, 1, true, 0);
   ctx.restore();
-  const line = t < 1.0 ? 'Bernard is already on the dock…' : run < 1 ? '"CAN WE TAKE THE BOAT?! PLEASE?!"' : t < 5.2 ? 'Life jackets on. Tita takes the wheel.' : 'Watch for buoys and logs. Hit the ramps. Grab the skis!';
+  const line = t < 1.0 ? 'Bernard is already on the dock…' : run < 1 ? '"CAN WE TAKE THE BOAT?! PLEASE?!"' : t < 5.2 ? 'Life jackets on. Tita takes the wheel.' : 'Watch the buoys. Hit the ramps. Grab the skis!';
   textO(ctx, line, W / 2, 440, 18, t > 4.6 ? '#FFE680' : C.cream, null, 'center', 0, 600);
   ctx.globalAlpha = 1;
 }
