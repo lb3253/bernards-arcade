@@ -580,10 +580,12 @@ function drawJeep(g, steer, earFrame, braking, boost, dizzy, hair, kids) {
   // mud spatter
   for (let i = 0; i < 8; i++) { ell(g, 40 + hash(i, 1) * 140, 128 + hash(i, 2) * 24, 2 + hash(i, 3) * 2, 1.5); fs(g, 'rgba(110,70,30,.35)', null); }
   if (boost) { for (const fx of [62, 158]) { ell(g, fx, 170, 10, 6); fs(g, 'rgba(255,170,60,.8)', null); ell(g, fx, 176, 6, 10); fs(g, 'rgba(255,230,120,.8)', null); } }
-  // Nic and Giulia in the back, peeking up on either side of the spare so the tailgate doesn't hide them
+  // back seat: heads sit in the open bed, inside the rails, just over the tailgate
   if (kids) {
-    const backKid = (x, who, shirt) => { rr(g, x - 16 - lean * 0.3, 86, 32, 24, 8); fs(g, shirt, C.out, 2); kidHead(g, x - lean * 0.4, 70, 1.45, who); };
-    backKid(52, 'nic', '#3C7FE0'); backKid(168, 'giulia', '#FF7FB1');
+    rr(g, 46 - lean * 0.2, 64, 24, 14, 6); fs(g, '#3C7FE0', C.out, 2);
+    rr(g, 150 - lean * 0.2, 64, 24, 14, 6); fs(g, '#FF7FB1', C.out, 2);
+    kidHead(g, 58 - lean * 0.25, 50, 1.1, 'nic');
+    kidHead(g, 162 - lean * 0.25, 50, 1.1, 'giulia');
   }
   g.restore();
 }
@@ -622,8 +624,8 @@ function drawBoat(g, steer, earFrame, dizzy, kidsIn, boost) {
   bernardHead(g, 146 - lean * 0.7, 42 + Math.abs(flap) * 1.5, 1.0, flap * 1.4, true, dizzy);
   // kids on the back bench in life vests
   const vest = (x) => { rr(g, x - 17, 72, 34, 20, 7); fs(g, '#FF8A2A', C.out, 2); rr(g, x - 4, 74, 8, 16, 3); fs(g, '#FFB347', null); };
-  if (kidsIn >= 1) { vest(96 - lean * 0.8); kidHead(g, 96 - lean * 0.8, 58, 1.4, 'nic'); }
-  if (kidsIn >= 2) { vest(126 - lean * 0.8); kidHead(g, 126 - lean * 0.8, 58, 1.4, 'giulia'); }
+  if (kidsIn >= 2) { vest(96 - lean * 0.8); kidHead(g, 96 - lean * 0.8, 58, 1.4, 'nic'); }
+  if (kidsIn >= 1) { vest(126 - lean * 0.8); kidHead(g, 126 - lean * 0.8, 58, 1.4, 'giulia'); }
   // gunwale + hull (transom)
   rr(g, 22, 80, 176, 14, 7); fs(g, '#DADAD2', C.out, 2.4);
   rr(g, 30, 88, 160, 72, 16); fs(g, '#F4F4F2', C.out, 2.6);
@@ -1772,21 +1774,22 @@ function drawRoad() {
   }
   // player
   const steerIdx = steer < -0.3 ? 0 : steer > 0.3 ? 2 : 1; const earFrame = Math.floor(time * (6 + speed / TUNE.maxSpeed * 14)) % 3;
-  const js = boat ? boatSprite(steerIdx, earFrame, dizzy > 0 ? 1 : 0, 2, boosting > 0 ? 1 : 0) : jeepSprite(steerIdx, earFrame, inp.brake && speed > 0, boosting > 0, dizzy > 0, 0, 0, !!(route.story && storyKids));
+  const docking = state === 'scene' && scene && scene.kind === 'dock';
+  const js = boat ? boatSprite(steerIdx, earFrame, dizzy > 0 ? 1 : 0, docking ? 0 : Math.max(0, 2 - skiers), boosting > 0 ? 1 : 0) : jeepSprite(steerIdx, earFrame, inp.brake && speed > 0, boosting > 0, dizzy > 0, 0, 0, !!(route.story && storyKids) && !docking);
   const scale = camDepth / playerZ; const destW = js.ww * scale * (W / 2), destH = destW * js.h / js.w;
   const airH = air ? air.h : 0, jx = W / 2 - destW / 2, jy = H - destH - 8 + bounce - airH;
   if (airH > 0) { ell(ctx, W / 2, H - 20, destW * 0.42 * (1 - airH / 500), 10); fs(ctx, 'rgba(0,40,80,.28)', null); }
   if (boosting > 0) { const gl = ctx.createRadialGradient(W / 2, jy + destH * 0.6, 20, W / 2, jy + destH * 0.6, destW * 0.8); gl.addColorStop(0, 'rgba(255,200,80,.35)'); gl.addColorStop(1, 'rgba(255,200,80,0)'); ctx.fillStyle = gl; ctx.fillRect(jx - 150, jy - 100, destW + 300, destH + 200); }
   if (airH > 0) { const pAir = clamp(air.t / air.dur, 0, 1); ctx.save(); ctx.translate(W / 2, jy + destH / 2); ctx.rotate(Math.sin(pAir * Math.PI * 2) * -0.1); ctx.drawImage(js.c, -destW / 2, -destH / 2, destW, destH); ctx.restore(); }
   else ctx.drawImage(js.c, jx, jy, destW, destH);
-  if (boat && skiers > 0) drawSkiers(jy + destH * 0.9, airH);
+  if (boat && skiers > 0 && !(state === 'scene' && scene && scene.kind === 'dock')) drawSkiers(jy + destH * 0.9, airH);
   // speech bubbles
   // speech bubbles sit low, beside the Jeep, so they never cover the road ahead
   if (bubble) drawBubble(bubble.text, W / 2 + destW / 2 + 16, jy + destH * 0.45, bubble.life, '#FFF', 1);
   if (titaBubble) drawBubble(titaBubble.text, W / 2 - destW / 2 - 16, jy + destH * 0.45, titaBubble.life, '#FFE9F0', -1);
   return { pal, playerY };
 }
-function drawSkiers(sternY, airH) { // Nic then Giulia, towed on water skis. They stay in the boat too.
+function drawSkiers(sternY, airH) { // Nic then Giulia, towed behind the boat. They are not still sitting in it.
   for (let i = 0; i < skiers; i++) {
     const who = i === 0 ? 'nic' : 'giulia', sx = i === 0 ? -1 : 1, sway = Math.sin(time * 1.7 + i * 1.4) * 42;
     const lift = airH * 0.35, x = W / 2 + sx * 248 + sway * 0.45, y = H - 168 - lift + Math.sin(time * 8 + i) * 2;
@@ -1920,8 +1923,10 @@ function drawSceneDock(t) {
   ctx.save(); ctx.beginPath(); rr(ctx, W / 2 - 330, 166, 660, 190, 14); ctx.clip();
   lakeBackdrop(W / 2 - 330, 166, 660, 190);
   ctx.fillStyle = '#A87847'; ctx.fillRect(W / 2 - 330, 290, 660, 30);
-  const slide = clamp(t / 2.4, 0, 1); const bs = boatSprite(0, 1, 0, 2, 0); ctx.drawImage(bs.c, lerp(W / 2 - 300, W / 2 - 110, slide), 190, 180, 156);
-  const js = jeepSprite(0, Math.floor(t * 6) % 3, 0, 0, 0, 0, 0, slide >= 1); ctx.drawImage(js.c, W / 2 + 110, 200, 176, 152);
+  const slide = clamp(t / 1.6, 0, 1), walk = clamp((t - 0.9) / 1.7, 0, 1);
+  const bs = boatSprite(0, 1, 0, walk > 0 ? 0 : 2, 0); ctx.drawImage(bs.c, lerp(W / 2 - 300, W / 2 - 110, slide), 190, 180, 156);
+  const js = jeepSprite(0, Math.floor(t * 6) % 3, 0, 0, 0, 0, 0, walk >= 1); ctx.drawImage(js.c, W / 2 + 110, 200, 176, 152);
+  if (walk > 0 && walk < 1) { const kx = lerp(W / 2 - 20, W / 2 + 145, walk), ky = 312 + Math.abs(Math.sin(t * 12)) * -6; drawKid(ctx, 'nic', kx, ky, 1.0, t); drawKid(ctx, 'giulia', kx - 40, ky + 3, 1.0, t); }
   ctx.restore();
   const line = t < 1.4 ? 'Tita backs the trailer down the ramp like a pro.' : t < 3 ? 'Boat\'s on the trailer. Everybody\'s soaked and happy.' : 'Home stretch!';
   textO(ctx, line, W / 2, 392, 18, t > 2.8 ? '#FFE680' : C.cream, null, 'center', 0, 600);
@@ -1939,7 +1944,7 @@ function drawSceneSchool(t) {
   ctx.save(); ctx.translate(W / 2 - 300, 300); ctx.scale(0.5, 0.5); schoolBus(ctx); ctx.restore();
   // kids run out of the door toward the Jeep (right side)
   const run = clamp((t - 1.2) / 3.2, 0, 1), kx = lerp(W / 2 - 130, W / 2 + 250, run), ky = 350 + Math.abs(Math.sin(t * 12)) * -6 * (run < 1 ? 1 : 0);
-  if (t > 1.0) { drawKid(ctx, 'nic', kx, ky, 1.1, run < 1 ? t : 0); drawKid(ctx, 'giulia', kx - 50, ky + 4, 1.1, run < 1 ? t : 0); }
+  if (t > 1.0 && run < 1) { drawKid(ctx, 'nic', kx, ky, 1.1, t); drawKid(ctx, 'giulia', kx - 50, ky + 4, 1.1, t); }
   // the Jeep waiting at the curb (rear view, big)
   const js = jeepSprite(0, Math.floor(t * 8) % 3, 0, 0, 0, 0, 0, run >= 1); ctx.drawImage(js.c, W / 2 + 170, 240, 176, 152);
   ctx.restore();
