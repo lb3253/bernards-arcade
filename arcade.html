@@ -1786,7 +1786,7 @@ function drawRoad() {
 function drawSkiers(sternY, airH) { // Nic (left) then Giulia (right) on jet skis beside the boat
   for (let i = 0; i < skiers; i++) {
     const who = i === 0 ? 'nic' : 'giulia', sx = i === 0 ? -1 : 1, sway = Math.sin(time * 2.2 + i * 1.4) * 34;
-    const lift = airH * 0.4, x = W / 2 + sx * 175 + sway, y = H - 86 - lift + Math.sin(time * 8 + i) * 2;
+    const lift = airH * 0.4, x = W / 2 + sx * 175 + sway, y = H - 128 - lift + Math.sin(time * 8 + i) * 2;
     const col = who === 'nic' ? '#2EC4B6' : '#F2C14E';
     ell(ctx, x, H - 18 - lift * 0.25, 40, 8); fs(ctx, 'rgba(255,255,255,.5)', null);
     ell(ctx, x, y + 52, 34, 7); fs(ctx, 'rgba(255,255,255,.75)', null);
