@@ -1557,7 +1557,7 @@ function updatePlaying(dt) {
 function wipeout() { // a bump splashes the boat; Nic and Giulia stay on their jet skis
 }
 function collect(kind) {
-  if (kind === 'skis') { skisGot++; score += 300; sfx.check(); sparkle(W / 2, H - 150, 16, '#CFF4FF'); if (skiers < 2) { skiers++; const who = skiers === 1 ? 'Nic' : 'Giulia'; floatText(W / 2, 260, who.toUpperCase() + ' JUMPED ON A JET SKI!  +300', '#9EE8FF'); say(skiers === 2 ? 'JET SKI TEAM!!' : who.toUpperCase() + '!! ZOOM!!'); titaBubble = { text: skiers === 2 ? 'Both of them! Stay beside the boat!' : who + ' is on a jet ski!', life: 150 }; } else floatText(W / 2, 260, 'SPARE JET SKI  +300', '#9EE8FF'); return; }
+  if (kind === 'skis') { skisGot++; score += 300; sfx.check(); sparkle(W / 2, H - 150, 16, '#CFF4FF'); if (skiers < 2) { skiers++; const who = skiers === 1 ? 'Nic' : 'Giulia'; floatText(W / 2, 260, who.toUpperCase() + ' IS WATERSKIING!  +300', '#9EE8FF'); say(skiers === 2 ? 'SKI TEAM!!' : who.toUpperCase() + '!! HOLD THE ROPE!!'); titaBubble = { text: skiers === 2 ? 'Both of them! Hold the rope!' : who + ', hold the rope!', life: 150 }; } else floatText(W / 2, 260, 'SPARE SKIS  +300', '#9EE8FF'); return; }
   if (kind === 'green' || kind === 'red') { balls++; const pts = kind === 'red' ? 25 : 10; score += pts; boostMeter = Math.min(100, boostMeter + 12); sfx.ball(); sparkle(W / 2 + rnd(-40, 40), H - 150, 6, kind === 'red' ? '#FFB3B3' : '#E8FF9A'); floatText(W / 2 + rnd(-60, 60), 300, '+' + pts, kind === 'red' ? '#FFB3B3' : '#DDFF8A'); if (balls % 10 === 0) say('Ball!! Ball!!'); }
   else { score += 200; boostMeter = 100; timer += 3; sfx.bone(); say('BONE!! Chomp!'); floatText(W / 2, 280, 'ZOOMIES READY! +3s', C.gold); sparkle(W / 2, H - 150, 14, '#FFFFFF'); }
 }
@@ -1769,33 +1769,31 @@ function drawRoad() {
   }
   // player
   const steerIdx = steer < -0.3 ? 0 : steer > 0.3 ? 2 : 1; const earFrame = Math.floor(time * (6 + speed / TUNE.maxSpeed * 14)) % 3;
-  const js = boat ? boatSprite(steerIdx, earFrame, dizzy > 0 ? 1 : 0, 2 - skiers, boosting > 0 ? 1 : 0) : jeepSprite(steerIdx, earFrame, inp.brake && speed > 0, boosting > 0, dizzy > 0, 0, 0, !!(route.story && storyKids));
+  const js = boat ? boatSprite(steerIdx, earFrame, dizzy > 0 ? 1 : 0, 2, boosting > 0 ? 1 : 0) : jeepSprite(steerIdx, earFrame, inp.brake && speed > 0, boosting > 0, dizzy > 0, 0, 0, !!(route.story && storyKids));
   const scale = camDepth / playerZ; const destW = js.ww * scale * (W / 2), destH = destW * js.h / js.w;
   const airH = air ? air.h : 0, jx = W / 2 - destW / 2, jy = H - destH - 8 + bounce - airH;
   if (airH > 0) { ell(ctx, W / 2, H - 20, destW * 0.42 * (1 - airH / 500), 10); fs(ctx, 'rgba(0,40,80,.28)', null); }
   if (boosting > 0) { const gl = ctx.createRadialGradient(W / 2, jy + destH * 0.6, 20, W / 2, jy + destH * 0.6, destW * 0.8); gl.addColorStop(0, 'rgba(255,200,80,.35)'); gl.addColorStop(1, 'rgba(255,200,80,0)'); ctx.fillStyle = gl; ctx.fillRect(jx - 150, jy - 100, destW + 300, destH + 200); }
   if (airH > 0) { const pAir = clamp(air.t / air.dur, 0, 1); ctx.save(); ctx.translate(W / 2, jy + destH / 2); ctx.rotate(Math.sin(pAir * Math.PI * 2) * -0.1); ctx.drawImage(js.c, -destW / 2, -destH / 2, destW, destH); ctx.restore(); }
   else ctx.drawImage(js.c, jx, jy, destW, destH);
-  if (boat && skiers > 0) drawSkiers(jy + destH * 0.52, airH);
+  if (boat && skiers > 0) drawSkiers(jy + destH * 0.9, airH);
   // speech bubbles
   // speech bubbles sit low, beside the Jeep, so they never cover the road ahead
   if (bubble) drawBubble(bubble.text, W / 2 + destW / 2 + 16, jy + destH * 0.45, bubble.life, '#FFF', 1);
   if (titaBubble) drawBubble(titaBubble.text, W / 2 - destW / 2 - 16, jy + destH * 0.45, titaBubble.life, '#FFE9F0', -1);
   return { pal, playerY };
 }
-function drawSkiers(sternY, airH) { // Nic (left) then Giulia (right) on jet skis beside the boat
+function drawSkiers(sternY, airH) { // Nic then Giulia, towed on water skis. They stay in the boat too.
   for (let i = 0; i < skiers; i++) {
-    const who = i === 0 ? 'nic' : 'giulia', sx = i === 0 ? -1 : 1, sway = Math.sin(time * 2.2 + i * 1.4) * 34;
-    const lift = airH * 0.4, x = W / 2 + sx * 175 + sway, y = H - 128 - lift + Math.sin(time * 8 + i) * 2;
-    const col = who === 'nic' ? '#2EC4B6' : '#F2C14E';
-    ell(ctx, x, H - 18 - lift * 0.25, 40, 8); fs(ctx, 'rgba(255,255,255,.5)', null);
-    ell(ctx, x, y + 52, 34, 7); fs(ctx, 'rgba(255,255,255,.75)', null);
-    rr(ctx, x - 28, y + 10, 56, 40, 16); fs(ctx, col, C.out, 2.5);
-    rr(ctx, x - 28, y + 34, 56, 8, 4); fs(ctx, '#F4F4F2', null);
-    rr(ctx, x - 14, y + 16, 28, 16, 6); fs(ctx, '#2B2B30', C.out, 2);
-    ctx.strokeStyle = '#2B2B30'; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x - 18, y + 14); ctx.lineTo(x + 18, y + 14); ctx.stroke();
-    rr(ctx, x - 15, y + 4, 30, 16, 6); fs(ctx, '#FF8A2A', C.out, 2);
-    kidHead(ctx, x, y - 22, 1.45, who);
+    const who = i === 0 ? 'nic' : 'giulia', sx = i === 0 ? -1 : 1, sway = Math.sin(time * 1.7 + i * 1.4) * 42;
+    const lift = airH * 0.35, x = W / 2 + sx * 248 + sway * 0.45, y = H - 168 - lift + Math.sin(time * 8 + i) * 2;
+    ctx.strokeStyle = 'rgba(250,244,230,.95)'; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(W / 2 + sx * 18, sternY); ctx.quadraticCurveTo((W / 2 + x) / 2, y + 28, x, y + 8); ctx.stroke();
+    ell(ctx, x, y + 46, 40, 7); fs(ctx, 'rgba(255,255,255,.6)', null);
+    for (const k of [-1, 1]) { ctx.save(); ctx.translate(x + k * 13, y + 22); ctx.rotate(k * 0.12); rr(ctx, -6, 0, 12, 40, 6); fs(ctx, '#F4F4F2', C.out, 2); rr(ctx, -6, 0, 12, 10, 5); fs(ctx, '#C8302A', null); ctx.restore(); }
+    ctx.strokeStyle = '#2B2B30'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x - 12, y + 4); ctx.lineTo(x + 12, y + 4); ctx.stroke();
+    rr(ctx, x - 15, y - 6, 30, 18, 6); fs(ctx, '#FF8A2A', C.out, 2);
+    kidHead(ctx, x, y - 24, 1.3, who);
   }
 }
 function drawBubble(text, x, y, life, bg, side) {
@@ -1833,7 +1831,7 @@ function drawHUD() {
     textO(ctx, 'MARINA EXIT', W - 14 - 105, 170, 15, '#9EE8FF', null, 'center', 0); textO(ctx, d < 70 ? 'NOW!' : 'coming up', W - 14 - 105, 192, 12, blink ? C.cream : 'rgba(255,244,214,.4)', null, 'center', 0, 600);
     textO(ctx, '➜', W - 14 - 30 + bob, 182, 34, blink ? '#FFE680' : '#9EE8FF', C.out, 'center', 4);
     textO(ctx, 'keep RIGHT for the boat', W - 14 - 85, 226, 11, C.cream, C.out, 'center', 3, 600); } }
-  if (boat) { panel(14, 150, 210, 30, 10); textO(ctx, 'JETS   Nic ' + (skiers >= 1 ? '✓' : '·') + '    Giulia ' + (skiers >= 2 ? '✓' : '·'), 24, 165, 13, skiers ? '#9EE8FF' : C.cream, null, 'left', 0, 600); }
+  if (boat) { panel(14, 150, 210, 30, 10); textO(ctx, 'SKIS   Nic ' + (skiers >= 1 ? '✓' : '·') + '    Giulia ' + (skiers >= 2 ? '✓' : '·'), 24, 165, 13, skiers ? '#9EE8FF' : C.cream, null, 'left', 0, 600); }
   if (padToast > 0) { ctx.globalAlpha = clamp(padToast / 30, 0, 1); panel(W / 2 - 150, H - 60, 300, 36, 10); textO(ctx, 'Controller connected: ' + pad.name, W / 2, H - 42, 14, C.cream, null, 'center', 0, 600); ctx.globalAlpha = 1; }
 }
 function drawFx() {
@@ -1919,7 +1917,7 @@ function drawSceneDock(t) {
   ctx.save(); ctx.beginPath(); rr(ctx, W / 2 - 330, 166, 660, 190, 14); ctx.clip();
   lakeBackdrop(W / 2 - 330, 166, 660, 190);
   ctx.fillStyle = '#A87847'; ctx.fillRect(W / 2 - 330, 290, 660, 30);
-  const slide = clamp(t / 2.4, 0, 1); const bs = boatSprite(0, 1, 0, 2 - skiers, 0); ctx.drawImage(bs.c, lerp(W / 2 - 300, W / 2 - 110, slide), 190, 180, 156);
+  const slide = clamp(t / 2.4, 0, 1); const bs = boatSprite(0, 1, 0, 2, 0); ctx.drawImage(bs.c, lerp(W / 2 - 300, W / 2 - 110, slide), 190, 180, 156);
   const js = jeepSprite(0, Math.floor(t * 6) % 3, 0, 0, 0, 0, 0, slide >= 1); ctx.drawImage(js.c, W / 2 + 110, 200, 176, 152);
   ctx.restore();
   const line = t < 1.4 ? 'Tita backs the trailer down the ramp like a pro.' : t < 3 ? 'Boat\'s on the trailer. Everybody\'s soaked and happy.' : 'Home stretch!';
