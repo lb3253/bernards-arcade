@@ -560,9 +560,7 @@ function drawJeep(g, steer, earFrame, braking, boost, dizzy, hair, kids) {
   titaHead(g, 74 - lean * 0.7, 46);
   // Bernard (passenger) looking back at us
   bernardHead(g, 146 - lean * 0.7, 40 + Math.abs(flap) * 1.5, 1.0, flap * (boost ? 1.4 : 1), boost || earFrame !== 1, dizzy);
-  // Nic and Giulia in the back seat (nearer to us, so they sit lower in the frame)
-  if (kids) { kidHead(g, 96 - lean * 0.8, 56, 1.4, 'nic'); kidHead(g, 126 - lean * 0.8, 56, 1.4, 'giulia'); }
-  // body (white Rubicon-style tailgate) — drawn after the passengers so it sits in front of them
+  // body (white Rubicon-style tailgate)
   rr(g, 28, 72, 164, 84, 10); fs(g, '#F4F4F2', C.out, 2.6);
   g.fillStyle = 'rgba(0,0,0,.06)'; g.fillRect(30, 118, 160, 36);
   // bumper + tow hooks
@@ -582,6 +580,11 @@ function drawJeep(g, steer, earFrame, braking, boost, dizzy, hair, kids) {
   // mud spatter
   for (let i = 0; i < 8; i++) { ell(g, 40 + hash(i, 1) * 140, 128 + hash(i, 2) * 24, 2 + hash(i, 3) * 2, 1.5); fs(g, 'rgba(110,70,30,.35)', null); }
   if (boost) { for (const fx of [62, 158]) { ell(g, fx, 170, 10, 6); fs(g, 'rgba(255,170,60,.8)', null); ell(g, fx, 176, 6, 10); fs(g, 'rgba(255,230,120,.8)', null); } }
+  // Nic and Giulia in the back, peeking up on either side of the spare so the tailgate doesn't hide them
+  if (kids) {
+    const backKid = (x, who, shirt) => { rr(g, x - 16 - lean * 0.3, 86, 32, 24, 8); fs(g, shirt, C.out, 2); kidHead(g, x - lean * 0.4, 70, 1.45, who); };
+    backKid(52, 'nic', '#3C7FE0'); backKid(168, 'giulia', '#FF7FB1');
+  }
   g.restore();
 }
 // Tita's head from behind (shared by the Jeep and the boat)
