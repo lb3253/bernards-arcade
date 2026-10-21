@@ -506,7 +506,7 @@ function drawCar(car, scale, sx, sy, clipY) {
 function drawSprite(s, scale, destX, destY, offX, offY, clipY) {
   const destW = s.ww * scale * (W / 2), destH = destW * s.h / s.w;
   destX += destW * offX; destY += destH * offY;
-  const clipH = clipY ? Math.max(0, destY + destH - clipY) : 0;
+  const clipH = clipY && destH < H * 0.42 ? Math.max(0, destY + destH - clipY) : 0;
   if (clipH < destH && destW > 0.5) ctx.drawImage(s.c, 0, 0, s.c.width, s.c.height * (1 - clipH / destH), destX, destY, destW, destH - clipH);
 }
 
@@ -580,12 +580,12 @@ function drawJeep(g, steer, earFrame, braking, boost, dizzy, hair, kids) {
   // mud spatter
   for (let i = 0; i < 8; i++) { ell(g, 40 + hash(i, 1) * 140, 128 + hash(i, 2) * 24, 2 + hash(i, 3) * 2, 1.5); fs(g, 'rgba(110,70,30,.35)', null); }
   if (boost) { for (const fx of [62, 158]) { ell(g, fx, 170, 10, 6); fs(g, 'rgba(255,170,60,.8)', null); ell(g, fx, 176, 6, 10); fs(g, 'rgba(255,230,120,.8)', null); } }
-  // back seat: heads sit in the open bed, inside the rails, just over the tailgate
+  // back seat, below Tita and Bernard so their faces stay clear, inside the bed beside the spare
   if (kids) {
-    rr(g, 46 - lean * 0.2, 64, 24, 14, 6); fs(g, '#3C7FE0', C.out, 2);
-    rr(g, 150 - lean * 0.2, 64, 24, 14, 6); fs(g, '#FF7FB1', C.out, 2);
-    kidHead(g, 58 - lean * 0.25, 50, 1.1, 'nic');
-    kidHead(g, 162 - lean * 0.25, 50, 1.1, 'giulia');
+    rr(g, 52 - lean * 0.15, 96, 20, 12, 5); fs(g, '#3C7FE0', C.out, 2);
+    rr(g, 148 - lean * 0.15, 96, 20, 12, 5); fs(g, '#FF7FB1', C.out, 2);
+    kidHead(g, 62 - lean * 0.2, 88, 0.85, 'nic');
+    kidHead(g, 158 - lean * 0.2, 88, 0.85, 'giulia');
   }
   g.restore();
 }
@@ -1513,9 +1513,9 @@ function updatePlaying(dt) {
       if (sp.ramp) { if (boat && !air && k === 0 && overlap(rx, playerW, sp.offset, sw, 0.9)) { air = { t: 0, dur: 1.0 + speedPct * 0.8, peak: 90 + speedPct * 110, h: 0 }; speed = Math.min(maxNow, speed + TUNE.maxSpeed * 0.12); sfx.boost(); say(pick(['AIRBORNE!!', 'WHOA!!', 'ZOOM!!'])); titaBubble = { text: 'Hold on, kids!', life: 90 }; } continue; }
       if (sp.moo && !sp.said && k === 0 && Math.abs(sp.offset) < 2.2) { sp.said = true; say(pick(sp.key === 'cow' ? ['WOOF! A cow!', 'Moo?? WOOF!', 'Big dog!!'] : sp.key === 'duck' ? ['DUCK!! DUCK!!', 'Quack?? WOOF!', 'Can I swim??'] : ['WOOF! Birdie!', 'BIRD! BIRD!', 'Can I chase it??'])); sfx.bark(); }
       if (sp.obstacle) { if (!air && !sp.hitDone && k === 0 && overlap(rx, playerW, sp.offset, sw, 0.8)) { sp.hitDone = true; setTimeout(() => sp.hitDone = false, 1500); speed *= 0.45; crash('bump'); sfx.splash(); for (let q = 0; q < 14; q++) particles.push({ x: W / 2 + rnd(-80, 80), y: H - 50, vx: rnd(-3, 3), vy: rnd(-7, -2), life: 28, max: 28, r: 4, color: 'rgba(230,245,255,.85)', type: 'drop' }); wipeout(); } continue; }
-      if (sp.solid && k === 0 && Math.abs(playerX) > 0.95 && !(onLot && sp.offset > 0 && sp.offset < 2.4)) {
+      if (sp.solid && k === 0 && !sp.hitDone && Math.abs(playerX) > 1.05 && !(onLot && sp.offset > 0 && sp.offset < 2.4)) {
         const spX = sp.offset + sw / 2 * (sp.offset > 0 ? 1 : -1);
-        if (overlap(playerX, playerW, spX, sw)) { speed = TUNE.maxSpeed / 6; position = increase(seg.p1.world.z, -playerZ, trackLength); crash('bump'); break; }
+        if (overlap(playerX, playerW, spX, sw, 0.55)) { sp.hitDone = true; setTimeout(() => sp.hitDone = false, 650); speed *= 0.62; playerX += sp.offset > 0 ? -0.45 : 0.45; playerX = clamp(playerX, -2.2, 2.2); crash('bump'); break; }
       }
     }
   }
