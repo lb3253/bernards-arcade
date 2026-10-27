@@ -8845,7 +8845,7 @@ function startCatch(){
   syncHud();
 }
 
-// ---------------------------------------------------------------- Julia's Cups
+// ---------------------------------------------------------------- Bernard Hides the Ball
 // Bernard hides the red, green and gold balls. He names one. Find that cup.
 let CU=null;
 const cupsEl=document.getElementById("cupsmenu");
@@ -9983,7 +9983,7 @@ const MARKS={
   bba:   ["Bernard's","ADVENTURE"],
   brt:   ["Bernard's","ROAD TRIP"],
   memo:  ["Bernard","SAYS"],
-  cups:  ["Julia's","CUPS"],
+  cups:  ["Bernard Hides","THE BALL"],
   jeep:  ["Bernard Goes","OFF ROAD"]
 };
 function setMark(which){
@@ -10141,7 +10141,7 @@ function updateStar(){
   setTimeout(()=>{
     img.src=hop?"/art/bernard-portrait.jpg":air?(which==="jet"?"/art/bernard-jet-portrait.jpg":"/art/bernard-pilot-portrait.jpg"):"/art/bernard-portrait.jpg";
     img.setAttribute("data-which",which);
-    if (cap) cap.textContent=brtCard?"Road trip":bbaCard?"Big adventure":cat?"Catch!":cupsCard?"Julia's cups":memo?"Simon says":yard?"Ball thief":hop?"The hoppers":air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
+    if (cap) cap.textContent=brtCard?"Road trip":bbaCard?"Big adventure":cat?"Catch!":cupsCard?"Hides the ball":memo?"Simon says":yard?"Ball thief":hop?"The hoppers":air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
     img.style.opacity="1";
   },90);
 }
