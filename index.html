@@ -1812,8 +1812,10 @@ function update(dt) {
     case 'gameover': updateMenuNav(i => { if (i === 0) startGame(); else quitToArcade(); }); break;
     case 'finish': {
       finishTimer += dt; time += dt; speed = Math.max(route.story && position < (segments.length - 104) * TUNE.segLen ? 3000 : 0, speed - TUNE.maxSpeed * 0.5 * dt); position = Math.min(position + dt * speed, (segments.length - (route.story ? 98 : 90)) * TUNE.segLen); if (route.story) { playerX += (1.7 - playerX) * Math.min(1, dt * 1.5); steer = playerX < 1.6 ? 0.6 : 0; } else playerX *= 0.97; Audio_.engineSet(speed / TUNE.maxSpeed, speed > 0); updateFx();
+      // any button while the bonus is counting up: skip straight to the final score (menu waits a moment so the same press can't pick "Drive Again")
+      if (tally.shown < 2 && finishTimer > (route.story ? 4.2 : 0.8) && slushPress()) { score += tally.time + tally.balls; tally.time = 0; tally.balls = 0; tally.shown = 2; finishTimer = Math.max(finishTimer, (route.story ? 4.6 : 1.2) + 1.5); tally.skipT = finishTimer; sfx.ball(); }
       if (finishTimer > (route.story ? 4.6 : 1.2) && tally.shown < 2) { if (frame++ % 3 === 0) { if (tally.shown === 0) { const st = Math.min(15, tally.time); tally.time -= st; score += st; if (tally.time <= 0) tally.shown = 1; } else { const st = Math.min(10, tally.balls); tally.balls -= st; score += st; if (tally.balls <= 0) tally.shown = 2; } if (frame % 6 === 0) sfx.ball(); } }
-      if (tally.shown === 2) { if (score > best) { best = score; try { localStorage.setItem('brt_best', String(best)); } catch (e) { } } if (!menu.items.length || menu.items[0] !== 'Drive Again') setMenu(['Drive Again', 'Quit to Arcade']); updateMenuNav(i => { if (i === 0) startGame(); else quitToArcade(); }); }
+      if (tally.shown === 2) { if (score > best) { best = score; try { localStorage.setItem('brt_best', String(best)); } catch (e) { } } if (!menu.items.length || menu.items[0] !== 'Drive Again') setMenu(['Drive Again', 'Quit to Arcade']); if (!(tally.skipT !== undefined && finishTimer - tally.skipT < 0.35)) updateMenuNav(i => { if (i === 0) startGame(); else quitToArcade(); }); }
       break;
     }
   }
