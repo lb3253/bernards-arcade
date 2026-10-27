@@ -986,6 +986,7 @@ body{
 .snesbar .k{ font:400 7px/1 var(--ar-label) !important; letter-spacing:.06em !important; }
 .snesbar .k.dpad, .snesbar .k.start, .snesbar .k.sel{ background:#161c2c !important; color:#dfe6f7 !important; border:1px solid #2a3350 !important; border-radius:6px !important; }
 .snesbar .k.b{ background:#e0453a !important; border:0 !important; }
+.snesbar .k.lr{ background:#161c2c; color:#dfe6f7; border:1px solid #2a3350; border-radius:6px; min-width:56px; }
 .snesbar .k.a{ background:#8a5ad0 !important; border:0 !important; }
 .phonebar{ color:#a9b6d4 !important; text-shadow:none !important; }
 

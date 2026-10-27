@@ -10359,6 +10359,21 @@ function toggleFullscreen(){
 }
 const fsBtn=document.getElementById("fsBtn");
 if (fsBtn) fsBtn.addEventListener("click", toggleFullscreen);
+// Full screen from the controller or keyboard, anywhere in the arcade (games included):
+//  - L + R shoulder buttons pressed together (some pads report them as 6/7 instead of 4/5)
+//  - the F key
+// Browsers often refuse true full screen from a controller press; toggleFullscreen() then
+// falls back to filling the whole browser window, which looks the same on the TV.
+let fsComboWas=false;
+setInterval(()=>{
+  let pads=[]; try{ pads=navigator.getGamepads?navigator.getGamepads():[]; }catch(e){}
+  let combo=false;
+  for (const gp of pads){ if (!gp||!gp.buttons) continue; const p=i=>!!(gp.buttons[i]&&gp.buttons[i].pressed);
+    if ((p(4)||p(6)) && (p(5)||p(7))) combo=true; }
+  if (combo && !fsComboWas) toggleFullscreen();
+  fsComboWas=combo;
+}, 50);
+window.addEventListener("keydown", e=>{ if (e.code==="KeyF" && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey){ toggleFullscreen(); } });
 document.addEventListener("fullscreenchange", syncFs);
 document.addEventListener("webkitfullscreenchange", syncFs);
 
