@@ -1531,7 +1531,9 @@ const onKeyDown = e => { if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'Arr
 const onKeyUp = e => { keys[e.code] = false; };
 const onBlur = () => { for (const k in keys) keys[k] = false; for (const k in touch) touch[k] = false; };
 function setupTouch() {
-  const box = document.getElementById('brt-touch'); const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0; if (isTouch) box.classList.add('on');
+  const box = document.getElementById('brt-touch');
+  // TV browsers often claim touch support with no touchscreen, so the on-screen buttons wait for an actual touch
+  window.addEventListener('touchstart', () => box.classList.add('on'), { passive: true, once: true });
   box.querySelectorAll('.rb').forEach(el => { const k = el.dataset.k; const dn = ev => { ev.preventDefault(); touch[k] = true; el.classList.add('held'); Audio_.init(); Audio_.engineOn(); }; const upf = ev => { ev.preventDefault(); touch[k] = false; el.classList.remove('held'); }; el.addEventListener('pointerdown', dn); el.addEventListener('pointerup', upf); el.addEventListener('pointercancel', upf); el.addEventListener('pointerleave', upf); });
 }
 
@@ -1819,7 +1821,7 @@ function update(dt) {
       updateFx(); updateCars(dt, findSegment(position + playerZ)); Audio_.engineSet(speed / TUNE.maxSpeed, speed > 0);
       break;
     }
-    case 'intro': introTimer += dt; time += dt; updateFx(); if (introTimer > 3.2 || hit.gas || hit.start) { state = 'playing'; Audio_.init(); Audio_.engineOn(); } break;
+    case 'intro': introTimer += dt; time += dt; updateFx(); if (introTimer > 0.6 && (hit.gas || hit.start)) { state = 'playing'; Audio_.init(); Audio_.engineOn(); } break;
     case 'playing': updatePlaying(dt); break;
     case 'paused': updateMenuNav(i => { if (i === 0) { state = 'playing'; Music.duck(1); } else if (i === 1) startGame(); else { state = 'quitconfirm'; setMenu(['No, keep driving', 'Yes, quit to arcade']); } }, () => { state = 'playing'; Music.duck(1); }); break;
     case 'quitconfirm': updateMenuNav(i => { if (i === 1) quitToArcade(); else state = 'playing'; }, () => { state = 'playing'; }); break;
@@ -2048,6 +2050,45 @@ function drawFx() {
 function drawMenu(y, gap = 40, size = 26, x = W / 2, align = 'center') { menu.items.forEach((it, i) => { const sel = i === menu.idx; const yy = y + i * gap; if (sel) { ctx.save(); ctx.translate(align === 'left' ? x - 34 : W / 2 - 170, yy + Math.sin(time * 6) * 2); ctx.scale(0.55, 0.55); pawPrint(ctx, C.gold); ctx.restore(); } textO(ctx, it, x, yy, sel ? size + 2 : size, sel ? C.gold : C.cream, C.out, align, 5); }); }
 function pawPrint(g, color) { ell(g, 0, 8, 13, 10); fs(g, color, C.out, 2); for (const [dx, dy] of [[-15, -4], [-6, -13], [6, -13], [15, -4]]) { ell(g, dx, dy, 5.5, 6.5); fs(g, color, C.out, 2); } }
 function dim(a = 0.55) { ctx.fillStyle = `rgba(20,12,8,${a})`; ctx.fillRect(0, 0, W, H); }
+// the start-of-trip card: the story in one line, then the SNES pad with every button labelled
+function drawGuide() {
+  dim(0.55); panel(W / 2 - 400, 34, 800, 472, 20);
+  const story = route.story, cx = W / 2;
+  textO(ctx, story ? 'THE SCHOOL RUN' : route.id === 1 ? 'MIAMI ROAD TRIP' : 'THE ROAD TRIP', cx, 72, 30, C.gold, C.out, 'center', 6);
+  textO(ctx, story ? 'Pick up Nick & Giulia at Oak Point Elementary, then Slush Rush at Tinman Social!' : 'Tita and Bernard are heading to the dog park. Get there before the sun goes down!', cx, 108, 16, C.cream, null, 'center', 0, 600);
+  // the controller
+  const px = cx, py = 262, g = ctx;
+  g.save(); g.translate(px, py);
+  rr(g, -190, -70, 380, 140, 70); fs(g, '#C9CCD4', C.out, 3);
+  for (const sx of [-1, 1]) { ell(g, sx * 118, 6, 82, 72); fs(g, '#D8DBE2', null); }
+  rr(g, -190, -70, 380, 140, 70); fs(g, null, C.out, 3);
+  rr(g, -56, -26, 112, 62, 20); fs(g, '#B4B8C2', null);
+  // d-pad
+  g.fillStyle = '#26282F'; rr(g, -134, -44, 30, 88, 6); g.fill(); rr(g, -163, -15, 88, 30, 6); g.fill();
+  // select / start
+  for (const [x, lab] of [[-24, 'SELECT'], [24, 'START']]) { g.save(); g.translate(x, 14); g.rotate(-.45); rr(g, -16, -6, 32, 12, 6); fs(g, '#3B3D47', null); g.restore(); textO(g, lab, x, 34, 9, '#3B3D47', null, 'center', 0, 700); }
+  // face buttons (SNES colours)
+  const FB = { x: [118, -38, '#3D7FE0'], y: [80, 0, '#3AA85A'], a: [156, 0, '#D8303A'], b: [118, 38, '#E9B31A'] };
+  for (const k in FB) { const [x, y, c] = FB[k]; ell(g, x, y, 21, 21); fs(g, c, C.out, 2.5); textO(g, k.toUpperCase(), x, y + 1, 17, '#FFFFFF', 'rgba(0,0,0,.35)', 'center', 3); }
+  g.restore();
+  // labels with leader lines
+  const label = (fx, fy, tx, ty, big, small, col, align) => {
+    ctx.strokeStyle = 'rgba(255,244,214,.55)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(tx, ty); ctx.stroke(); ell(ctx, fx, fy, 3.5, 3.5); fs(ctx, '#FFF4D6', null);
+    const ox = align === 'right' ? -8 : align === 'left' ? 8 : 0;
+    textO(ctx, big, tx + ox, ty - 9, 19, col, C.out, align, 4); textO(ctx, small, tx + ox, ty + 12, 12, 'rgba(255,244,214,.8)', null, align, 0, 600);
+  };
+  label(px - 119, py - 30, px - 260, py - 70, 'STEER', 'D-pad left / right', C.cream, 'right');
+  label(px + 118 + 21, py + 38 + 10, px + 250, py + 112, 'B  GAS', 'hold to drive', '#FFD84A', 'left');
+  label(px + 80 - 18, py + 8, px - 30, py + 116, 'Y  BRAKE', 'slow down', '#7CE08E', 'right');
+  label(px + 156 + 18, py - 6, px + 270, py + 14, 'A  HONK', 'Bernard barks cars away', '#FF8A8E', 'left');
+  label(px + 118 + 16, py - 50, px + 250, py - 92, 'X  ZOOMIES', 'when the meter is full', '#8EC4FF', 'left');
+  label(px + 24, py + 8, px + 70, py - 118, 'START', 'pause', C.cream, 'left');
+  label(px - 24, py + 8, px - 70, py - 118, 'SELECT', 'quit', C.cream, 'right');
+  // tips + go
+  textO(ctx, 'Grab balls to fill ZOOMIES  ·  bones fill it right up  ·  stay on the road!', cx, 418, 14, '#FFE89A', null, 'center', 0, 600);
+  textO(ctx, 'Keyboard: ← → steer · ↑ / Space gas · ↓ brake · C honk · Shift Zoomies · Esc quit  ·  L + R: full screen', cx, 442, 12, 'rgba(255,244,214,.6)', null, 'center', 0, 500);
+  if (Math.floor(time * 2.5) % 2 === 0) textO(ctx, 'PRESS B TO DRIVE!', cx, 478, 24, '#C9F24D', C.out, 'center', 5);
+}
 function hintBar() { ctx.fillStyle = 'rgba(20,12,8,.55)'; ctx.fillRect(0, H - 54, W, 54); textO(ctx, 'SNES: D-pad steer · B gas · Y brake · A honk (Bernard barks!) · X Zoomies · START pause · SELECT quit', W / 2, H - 36, 14, C.cream, null, 'center', 0, 600); textO(ctx, 'Keyboard: ← → steer · ↑ / Space gas · ↓ brake · C honk · Shift Zoomies · Enter start · Esc quit · M mute', W / 2, H - 17, 13, 'rgba(255,244,214,.75)', null, 'center', 0, 500); }
 function drawTitle() {
   drawRoad(); dim(0.25);
@@ -2267,7 +2308,7 @@ function render() {
   if (state === 'scene' && scene.kind === 'dock' && scene.t > 0.6) drawSceneDock(scene.t - 0.6);
   if (state === 'slush') drawSlush();
   if (state === 'swap' && swapScene.t > 0.9) drawSwapScene(swapScene.t - 0.9);
-  if (state === 'intro') { dim(0.35); panel(W / 2 - 300, 150, 600, 200, 18); if (route.story) { textO(ctx, 'THE SCHOOL RUN', W / 2, 190, 30, C.gold, C.out, 'center', 6); textO(ctx, '3:05 PM at 112 Jewelberry. Nick and Giulia get out of', W / 2, 238, 19, C.cream, null, 'center', 0, 600); textO(ctx, 'Oak Point Elementary in 10 minutes. Then: Tinman Social!', W / 2, 264, 19, C.cream, null, 'center', 0, 600); } else { textO(ctx, 'THE ROAD TRIP', W / 2, 190, 30, C.gold, C.out, 'center', 6); textO(ctx, 'Tita and Bernard are heading to the dog park', W / 2, 238, 19, C.cream, null, 'center', 0, 600); textO(ctx, 'across Dallas. Get there before the sun goes down!', W / 2, 264, 19, C.cream, null, 'center', 0, 600); } textO(ctx, 'Grab balls to fill the ZOOMIES meter · Honk to make Bernard bark cars away', W / 2, 300, 14, '#FFE89A', null, 'center', 0, 600); if (Math.floor(time * 2) % 2 === 0) textO(ctx, 'Hold GAS to go!', W / 2, 332, 16, C.cream, null, 'center', 0, 600); }
+  if (state === 'intro') drawGuide();
   else if (state === 'paused') { dim(); textO(ctx, 'PAUSED', W / 2, 150, 48, C.gold, C.out, 'center', 9); drawMenu(240); }
   else if (state === 'quitconfirm') { dim(); textO(ctx, 'Quit to arcade?', W / 2, 170, 40, C.gold, C.out, 'center', 8); textO(ctx, 'Your trip will be lost.', W / 2, 220, 16, C.cream, null, 'center', 0, 600); drawMenu(280); }
   else if (state === 'gameover') { dim(0.7); textO(ctx, 'OUT OF TIME!', W / 2, 150, 56, '#FF8A8A', C.out, 'center', 9); textO(ctx, 'The sun went down on ' + STAGES[stage].name.toLowerCase() + '.', W / 2, 200, 18, C.cream, null, 'center', 0, 600); textO(ctx, 'Score ' + score, W / 2, 240, 24, C.cream, C.out, 'center', 5); drawMenu(300); }
