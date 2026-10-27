@@ -9479,7 +9479,7 @@ function memoPress(k){
       if (M.score%MEMO_BONE_EVERY===0 && M.bones<MEMO_BONE_MAX){ M.bones++; M.boneSpin=1.2; MSFX.bone(); memoToast("+1 BONE  ·  a free do-over","#ffe9b0"); }
       if (!memoCelebrate(M.score)){
         const quick=M.seq.length>=3 && per<.42;
-        const cheer=quick?"QUICK PAWS!":M.seq.length>=10?"THE YARD GOES WILD":M.seq.length>=6?"NIC & GIULIA CHEER":memoPick(["GOOD DOG!","WOOF!","HE'S IMPRESSED","NAILED IT"]);
+        const cheer=quick?"QUICK PAWS!":M.seq.length>=10?"THE YARD GOES WILD":M.seq.length>=6?"NICK & GIULIA CHEER":memoPick(["GOOD DOG!","WOOF!","HE'S IMPRESSED","NAILED IT"]);
         memoToast(cheer,quick?"#9ec8ff":"#c9f24d");
         if (quick){ memoBurst(MEMO_PAD.x, MEMO_PAD.y-60, 18, false); memoBark(memoPick(BARKS.quick),1.1); }
         else memoBark(memoPick(BARKS.good),1);
@@ -9718,7 +9718,7 @@ function drawMemoCrowd(){
     ctx.beginPath(); ctx.arc(x,26,hot||chase?6:3.5,0,Math.PI*2); ctx.fill();
   }
   drawSign();
-  // Nic & Giulia peek up from behind the pad and jump when you nail a round
+  // Nick & Giulia peek up from behind the pad and jump when you nail a round
   drawKid("hopNic",250,MEMO_PAD.y-MEMO_PAD.h/2+12,0,"#2f6fd8");
   drawKid("hopGiulia",650,MEMO_PAD.y-MEMO_PAD.h/2+12,1.7,"#e45aa0");
   // live spotlight beams; their colour drifts with the round
