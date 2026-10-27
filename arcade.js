@@ -9350,7 +9350,7 @@ const MEMO_INFO = {
 };
 // standard gamepad mapping: 0 bottom, 1 right, 2 left, 3 top
 const MEMO_PAD_FACE = { 0:"b", 1:"a", 2:"y", 3:"x" };
-const MEMO_PAD = { x:450, y:410, w:640, h:250, dpad:{x:255,y:410,arm:44}, face:{x:650,y:410,r:34,off:54} };
+const MEMO_PAD = { x:520, y:440, w:600, h:236, dpad:{x:330,y:440,arm:42}, face:{x:712,y:440,r:33,off:52} };
 const MEMO_POS = {
   up:   ()=>({x:MEMO_PAD.dpad.x, y:MEMO_PAD.dpad.y-MEMO_PAD.dpad.arm}),
   down: ()=>({x:MEMO_PAD.dpad.x, y:MEMO_PAD.dpad.y+MEMO_PAD.dpad.arm}),
@@ -9368,25 +9368,68 @@ function memoCrowdBalls(){
   for (let i=0;i<7;i++) a.push({x:70+i*125, y:H-70-rand(0,50), vx:rand(-50,50), vy:rand(-30,30), r:11+rand(0,5), col:cols[i%cols.length]});
   return a;
 }
+function memoCrowd(){ // the front row: dog silhouettes watching the show
+  const a=[]; for (let i=0;i<9;i++) a.push({x:150+i*90+((i*37)%23)-11, kind:i%3, s:.72+((i*53)%30)/120, ph:i*1.3, jump:0, vy:0, y:0});
+  return a;
+}
+function memoHop(n,power){ if (!M||!M.crowd) return; const idx=[...M.crowd.keys()].sort(()=>Math.random()-.5).slice(0,n); for (const i of idx){ const d=M.crowd[i]; if (d.y>=0) d.vy=-(power||rand(220,320)); } }
+function memoNoise(dur,vol,hp){ // a short burst of filtered noise: crashes, firework pops
+  if (!audioOn) return; try{ ensureAC(); if (!ac) return;
+    const t0=ac.currentTime, n=ac.createBufferSource(), buf=ac.createBuffer(1,Math.max(1,ac.sampleRate*dur|0),ac.sampleRate), d=buf.getChannelData(0);
+    for (let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2.2);
+    n.buffer=buf; const f=ac.createBiquadFilter(); f.type="highpass"; f.frequency.value=hp||600;
+    const g=ac.createGain(); g.gain.value=vol||.12; n.connect(f); f.connect(g); g.connect(ac.destination); n.start(t0);
+  }catch(e){} }
+function memoDrop(big){ // bass drop: a sweeping low thump + a cymbal crash
+  if (!audioOn) return; try{ ensureAC(); if (!ac) return;
+    const t0=ac.currentTime, o=ac.createOscillator(), g=ac.createGain(); o.type="sine";
+    o.frequency.setValueAtTime(big?190:160,t0); o.frequency.exponentialRampToValueAtTime(38,t0+(big?.55:.38));
+    g.gain.setValueAtTime(big?.32:.24,t0); g.gain.exponentialRampToValueAtTime(.001,t0+(big?.7:.45));
+    o.connect(g); g.connect(ac.destination); o.start(t0); o.stop(t0+.75);
+  }catch(e){} memoNoise(big?.9:.55, big?.16:.1, 2500); }
+function memoRocket(delay,big){ M.rockets.push({x:rand(170,W-170), y:H*.72, tx:0, ty:rand(70,big?230:200), vy:-rand(640,820), wait:delay||0, hue:Math.floor(rand(0,360)), big:!!big}); }
+function memoExplode(r){
+  const n=r.big?70:44, hues=[r.hue,(r.hue+40)%360,(r.hue+200)%360];
+  for (let i=0;i<n;i++){ const a=i/n*Math.PI*2+rand(-.05,.05), sp=rand(120,r.big?380:300)*(i%3===0?.6:1);
+    M.fw.push({x:r.x,y:r.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:rand(.8,1.3),max:1.3,hue:hues[i%3],sz:rand(2,3.6)}); }
+  M.rings.push({x:r.x,y:r.y,r:6,life:.7,w:10,col:"hsl("+r.hue+",100%,75%)"});
+  memoNoise(.25,.07,1200); setTimeout(()=>memoNoise(.4,.035,4000),120);
+}
+// THE BOOM: every cleared round. Bigger on every 5th round and on a new record.
+function memoBoom(n,kind){
+  const big=kind==="record"||kind==="mile", huge=kind==="record"||n>=10&&n%5===0;
+  M.boom={t:0,n,kind,big,text: kind==="record"?"NEW RECORD!":kind==="mile"?n+" IN A ROW!":kind==="quick"?"QUICK PAWS!":"LEVEL UP!",
+          sub: kind==="record"?"You beat the high score!":"Round "+n+" cleared"};
+  M.flash={col:"#ffffff",life:big?.35:.22}; M.zoom=big?1:.6; M.shake=Math.max(M.shake,big?16:8); M.party=Math.max(M.party,big?1.8:1.1);
+  memoDrop(big); (big?MSFX.fanfare:MSFX.chord)();
+  const rockets=huge?7:big?5:Math.min(4,1+Math.floor(n/3));
+  for (let i=0;i<rockets;i++) memoRocket(i*.13,big);
+  memoBurst(MEMO_PAD.x, MEMO_PAD.y-40, big?40:22, true);
+  if (big) memoConfetti(huge?110:70);
+  memoHop(9,big?380:300);
+  for (let i=0;i<M.eq.length;i++) M.eq[i]=1;
+}
 function newMemo(best){
   return {
     running:true, started:false, over:false, overT:0, t:0, pulse:0,
     seq:[], step:0, phase:"idle", showI:0, showT:0, waitT:0,
     lit:null, litT:0, litBy:null, wrong:null, score:0, best:best||0, bestRun:0,
     toasts:[], sparks:[], bark:null, wag:0, mood:"idle", prevKey:{},
-    balls:memoCrowdBalls(), party:0, wash:null, lean:0, demoI:0, demoT:.4,
+    balls:null, party:0, wash:null, lean:0, demoI:0, demoT:.4,
     shake:0, rings:[], banner:null, record:best||0, broke:false,
     // new: feel + mechanics
     btnAnim:{}, paws:[], confetti:[], hearts:[], flash:null, roundCard:null, nope:0, padBounce:0,
     bones:0, bonesUsed:0, boneSpin:0, inputT:0, inputMax:0, hurried:false, roundStart:0, fastest:0, lastPressT:0,
-    missIdx:-1, replayI:0, replayT:.8, kidsJump:0, hue:0
+    missIdx:-1, replayI:0, replayT:.8, kidsJump:0, hue:0,
+    // concert stage: spotlights aim at lit buttons, an EQ wall, a dog crowd, fireworks + the level-up boom
+    aim:null, aimT:0, eq:new Array(28).fill(0), notes:[], rockets:[], fw:[], boom:null, zoom:0, crowd:memoCrowd()
   };
 }
 function saveMemoBest(v){ try{ const o=+localStorage.getItem("memo_best")||0; if(v>o){ ARCADE_FLASH.memo=true; localStorage.setItem("memo_best",String(v)); } }catch(e){} }
 function loadMemoBest(){ try{ const v=+localStorage.getItem("memo_best"); if(v&&M) M.best=v; }catch(e){} }
 function memoShowDur(){ return Math.max(.22, .5 - M.seq.length*.018); }
 function memoInputTime(){ return Math.max(2.6, 5 - M.seq.length*.12); } // seconds allowed per press
-function memoToast(text,col,y){ y=y||232; while (M.toasts.some(t=>Math.abs(t.y-y)<28)) y-=30; M.toasts.push({text,col:col||"#fff6c9",x:W/2,y,life:1.2,pop:0}); }
+function memoToast(text,col,y){ y=y||214; while (M.toasts.some(t=>Math.abs(t.y-y)<28)) y-=30; M.toasts.push({text,col:col||"#fff6c9",x:W/2,y,life:1.2,pop:0}); }
 function memoBark(text,life){ M.bark={text,life:life||1.2,pop:0}; }
 function memoBurst(x,y,n,big){
   const cols=["#ffcf3a","#f0472f","#fff6c9","#7CFF6B","#9ec8ff","#ff7ad9","#fff"];
@@ -9402,28 +9445,11 @@ function memoConfetti(n){
   for (let i=0;i<n;i++) M.confetti.push({x:rand(60,W-60),y:rand(-80,-10),vx:rand(-40,40),vy:rand(40,140),rot:rand(0,6.3),vr:rand(-6,6),col:memoPick(cols),w:rand(6,11),h:rand(4,7),life:rand(2.2,3.6),sway:rand(0,6.3)});
 }
 function memoHeart(){ const x=108+(M.lean||0)*50; M.hearts.push({x:x+rand(-20,40),y:H-250,vy:-rand(40,70),life:1,col:memoPick(["#ff6b8a","#ff9aa0","#ffcf3a"])}); }
-function memoCelebrate(n){
+function memoCelebrate(n){ // returns the kind of boom to throw
   const broke=!M.broke && M.record>0 && n>M.record;
-  const mile=n>0 && n%5===0;
-  if (broke){
-    M.broke=true; M.shake=16; M.party=1.5; M.kidsJump=1.4;
-    memoBurst(MEMO_PAD.x, MEMO_PAD.y, 52, true);
-    memoBurst(MEMO_PAD.x-180, MEMO_PAD.y-20, 16, true);
-    memoBurst(MEMO_PAD.x+180, MEMO_PAD.y-10, 16, true);
-    memoConfetti(90); MSFX.fanfare();
-    M.banner={text:"YOU BEAT THE HIGH SCORE!!", life:1.7};
-    memoBark(memoPick(BARKS.record),1.6);
-    return true;
-  } else if (mile){
-    const big=n>=10;
-    M.shake=big?13:9; M.party=1.25; M.kidsJump=1.2;
-    memoBurst(MEMO_PAD.x, MEMO_PAD.y, big?34:22, big);
-    memoConfetti(big?60:36); MSFX.chord();
-    memoToast(n+" STRAIGHT","#ffcf3a");
-    memoBark(memoPick(BARKS.milestone),1.5);
-    return true;
-  }
-  return false;
+  if (broke){ M.broke=true; M.kidsJump=1.4; M.banner=null; memoBark(memoPick(BARKS.record),1.6); return "record"; }
+  if (n>0 && n%5===0){ memoBark(memoPick(BARKS.milestone),1.5); return "mile"; }
+  return null;
 }
 function memoLight(k,dur,by){
   M.lit=k; M.litT=dur||memoShowDur(); M.litBy=by||"bernard";
@@ -9432,6 +9458,9 @@ function memoLight(k,dur,by){
   beep(info.note,Math.max(.12,M.litT*.9),"square",.06);
   M.wash={col:info.lit, life:.42};
   const p=MEMO_POS[k]();
+  M.aim={x:p.x,y:p.y,col:info.lit}; M.aimT=Math.max(.35,M.litT+.15);
+  { const c=Math.floor((MEMO_KEYS.indexOf(k)+.5)/MEMO_KEYS.length*M.eq.length); for (let i=0;i<M.eq.length;i++) M.eq[i]=Math.max(M.eq[i], Math.max(0,1-Math.abs(i-c)/5)*(.75+Math.random()*.25)); }
+  M.notes.push({x:p.x,y:p.y-20,vx:rand(-30,30),vy:-rand(170,230),life:1,col:info.lit,glyph:memoPick(["♪","♫","♬"])});
   for (let i=0;i<6;i++) M.sparks.push({x:p.x,y:p.y,vx:rand(-90,90),vy:rand(-120,-20),life:.5,col:info.lit});
   if (M.litBy==="bernard"){ M.paws.push({x:p.x,y:p.y,life:.75,rot:rand(-.5,.5)}); M.rings.push({x:p.x,y:p.y,r:10,life:.4,w:5,col:"#ffcf3a"}); }
   else M.rings.push({x:p.x,y:p.y,r:16,life:.3,w:4,col:"#ffffff"});
@@ -9440,7 +9469,7 @@ function memoNextRound(){
   M.seq.push(MEMO_KEYS[Math.floor(rand(0,MEMO_KEYS.length))]);
   M.phase="wait"; M.waitT=1.1; M.step=0;
   M.mood="show";
-  M.roundCard={text:"ROUND "+M.seq.length, life:1.1}; M.padBounce=1;
+  M.roundCard={text:"ROUND "+M.seq.length, life:1.0}; M.padBounce=1;
   M.hue=(M.seq.length*47)%360;
   beep(660,.08,"square",.04); setTimeout(()=>beep(880,.1,"square",.04),90);
 }
@@ -9466,7 +9495,7 @@ function memoPress(k){
   if (k===want){
     memoLight(k,.28,"you");
     M.step++; M.inputT=memoInputTime(); M.hurried=false; M.lastPressT=M.t;
-    M.wag=Math.max(M.wag,.5); if (M.step%2===0) memoHeart();
+    M.wag=Math.max(M.wag,.5); if (M.step%2===0) memoHeart(); memoHop(2);
     if (M.step>=M.seq.length){
       M.score=M.seq.length;
       M.bestRun=Math.max(M.bestRun,M.score);
@@ -9475,17 +9504,11 @@ function memoPress(k){
       if (M.seq.length>=3 && (!M.fastest || took<M.fastest)) M.fastest=took;
       M.phase="wait"; M.waitT=.85;
       M.mood="happy"; M.wag=1.2; M.party=Math.max(M.party||0,1.1); M.kidsJump=Math.max(M.kidsJump,.9);
-      if (M.balls) for (const b of M.balls){ b.vy=-rand(280,520); b.vx=rand(-90,90); }
-      if (M.score%MEMO_BONE_EVERY===0 && M.bones<MEMO_BONE_MAX){ M.bones++; M.boneSpin=1.2; MSFX.bone(); memoToast("+1 BONE  ·  a free do-over","#ffe9b0"); }
-      if (!memoCelebrate(M.score)){
-        const quick=M.seq.length>=3 && per<.42;
-        const cheer=quick?"QUICK PAWS!":M.seq.length>=10?"THE YARD GOES WILD":M.seq.length>=6?"NICK & GIULIA CHEER":memoPick(["GOOD DOG!","WOOF!","HE'S IMPRESSED","NAILED IT"]);
-        memoToast(cheer,quick?"#9ec8ff":"#c9f24d");
-        if (quick){ memoBurst(MEMO_PAD.x, MEMO_PAD.y-60, 18, false); memoBark(memoPick(BARKS.quick),1.1); }
-        else memoBark(memoPick(BARKS.good),1);
-      }
-      sfx.bank(Math.min(3,1+(M.seq.length%3)));
-      setTimeout(()=>{ if (M && M.running && M.phase==="wait") memoNextRound(); }, 750);
+      let gotBone=false; if (M.score%MEMO_BONE_EVERY===0 && M.bones<MEMO_BONE_MAX){ M.bones++; M.boneSpin=1.2; gotBone=true; setTimeout(()=>MSFX.bone(),500); }
+      let kind=memoCelebrate(M.score);
+      if (!kind){ const quick=M.seq.length>=3 && per<.42; kind=quick?"quick":"level"; memoBark(memoPick(quick?BARKS.quick:BARKS.good),1.1); }
+      memoBoom(M.score,kind); if (gotBone) M.boom.sub+="  ·  +1 BONE (a free do-over)";
+      setTimeout(()=>{ if (M && M.running && M.phase==="wait") memoNextRound(); }, M.boom&&M.boom.big?1250:950);
     }
   } else memoMistake(k, want);
 }
@@ -9564,6 +9587,15 @@ function updateMemo(dt){
   for (const r of M.rings){ r.r+=dt*(r.w>10?280:180); r.life-=dt*1.3; }
   M.rings=M.rings.filter(r=>r.life>0);
   if (M.wash){ M.wash.life-=dt; if (M.wash.life<=0) M.wash=null; }
+  M.aimT=Math.max(0,M.aimT-dt); if (M.aimT<=0) M.aim=null;
+  for (let i=0;i<M.eq.length;i++) M.eq[i]=Math.max(0,M.eq[i]-dt*1.6);
+  for (const n of M.notes){ n.x+=n.vx*dt; n.y+=n.vy*dt; n.vy+=40*dt; n.life-=dt*.9; } M.notes=M.notes.filter(n=>n.life>0);
+  for (const r of M.rockets){ if (r.wait>0){ r.wait-=dt; continue; } r.y+=r.vy*dt; r.vy+=520*dt; if (Math.random()<.8) M.fw.push({x:r.x+rand(-2,2),y:r.y+6,vx:rand(-20,20),vy:rand(20,60),life:.35,max:.35,hue:40,sz:2}); if (r.y<=r.ty||r.vy>=-40){ r.dead=true; memoExplode(r); } }
+  M.rockets=M.rockets.filter(r=>!r.dead);
+  for (const f of M.fw){ f.x+=f.vx*dt; f.y+=f.vy*dt; f.vx*=Math.pow(.25,dt); f.vy=f.vy*Math.pow(.25,dt)+120*dt; f.life-=dt; } M.fw=M.fw.filter(f=>f.life>0);
+  if (M.boom){ M.boom.t+=dt; if (M.boom.t>(M.boom.big?1.5:1.1)) M.boom=null; }
+  M.zoom=Math.max(0,M.zoom-dt*2.6);
+  for (const d of M.crowd||[]){ if (d.vy||d.y<0){ d.vy+=1400*dt; d.y+=d.vy*dt; if (d.y>=0){ d.y=0; d.vy=0; } } }
   if (M.balls){
     for (const b of M.balls){
       b.vy+=820*dt; b.x+=b.vx*dt; b.y+=b.vy*dt;
@@ -9593,7 +9625,7 @@ function updateMemo(dt){
       M.demoI=(M.demoI+1)%MEMO_KEYS.length;
       const k=MEMO_KEYS[M.demoI];
       M.lit=k; M.litT=.28; M.demoT=.48; M.btnAnim[k]=.7;
-      M.wash={col:MEMO_INFO[k].lit, life:.22};
+      M.wash={col:MEMO_INFO[k].lit, life:.22}; const q=MEMO_POS[k](); M.aim={x:q.x,y:q.y,col:MEMO_INFO[k].lit}; M.aimT=.4;
       beep(MEMO_INFO[k].note,.07,"square",.015);
     }
     return;
@@ -9624,124 +9656,157 @@ function updateMemo(dt){
 }
 // ---- drawing
 const mbg=document.createElement("canvas"); mbg.width=W; mbg.height=H;
+// stage geometry shared by the baked room and the live layer
+const MEMO_WALL={x:200,y:176,w:640,h:120};          // LED video wall behind the controller
+const MEMO_LIGHTS=[230,385,655,810];                // moving heads hanging from the truss
 function bakeMemoRoom(){
   const g=mbg.getContext("2d");
   const sky=g.createLinearGradient(0,0,0,H);
-  sky.addColorStop(0,"#070616"); sky.addColorStop(.38,"#1a1040"); sky.addColorStop(.62,"#3a1460"); sky.addColorStop(1,"#120818");
+  sky.addColorStop(0,"#05040f"); sky.addColorStop(.45,"#160b33"); sky.addColorStop(.7,"#2a0f45"); sky.addColorStop(1,"#0b0510");
   g.fillStyle=sky; g.fillRect(0,0,W,H);
+  // back wall: tall acoustic panels with soft vertical light
+  for (let x=90;x<W-90;x+=48){ const pg=g.createLinearGradient(x,0,x+48,0); pg.addColorStop(0,"rgba(255,255,255,.02)"); pg.addColorStop(.5,"rgba(255,255,255,.055)"); pg.addColorStop(1,"rgba(0,0,0,.08)"); g.fillStyle=pg; g.fillRect(x+2,70,44,H*.66-70); }
   const R=seeded(777);
-  for (let i=0;i<70;i++){
-    g.fillStyle="rgba(255,230,180,"+(.2+R()*.7)+")";
-    g.beginPath(); g.arc(R()*W, R()*H*.48, R()*1.6+.4, 0, Math.PI*2); g.fill();
-  }
-  // moon
-  const mg=g.createRadialGradient(760,92,8,760,92,90);
-  mg.addColorStop(0,"#fff6c9"); mg.addColorStop(.35,"rgba(255,207,58,.45)"); mg.addColorStop(1,"rgba(255,207,58,0)");
-  g.fillStyle=mg; g.beginPath(); g.arc(760,92,90,0,Math.PI*2); g.fill();
-  g.fillStyle="#fff1c4"; g.beginPath(); g.arc(760,92,26,0,Math.PI*2); g.fill();
-  // neon skyline of cabinets
-  g.fillStyle="#140c22";
-  const cabs=[[40,250,70,170],[120,210,54,210],[190,270,80,150],[290,190,46,230],[350,240,90,180],[860,200,60,220],[940,250,80,170]];
-  for (const c of cabs){ g.fillRect(c[0],c[1],c[2],H*.72-c[1]); }
-  const neons=["#ff4d8d","#3de0ff","#ffcf3a","#7CFF6B","#b388ff"];
-  cabs.forEach((c,i)=>{
-    g.fillStyle=neons[i%neons.length];
-    g.globalAlpha=.85;
-    g.fillRect(c[0]+8,c[1]+16,c[2]-16,8);
-    g.globalAlpha=.35;
-    g.fillRect(c[0]+10,c[1]+30,c[2]-20,36);
-    g.globalAlpha=1;
-  });
+  for (let i=0;i<46;i++){ g.fillStyle="rgba(255,230,180,"+(.15+R()*.5)+")"; g.beginPath(); g.arc(90+R()*(W-180), 70+R()*150, R()*1.3+.3, 0, Math.PI*2); g.fill(); }
+  // stage floor in perspective: boards run toward the middle of the wall
+  const fy=H*.66, fl=g.createLinearGradient(0,fy,0,H);
+  fl.addColorStop(0,"#3a2216"); fl.addColorStop(1,"#120806");
+  g.fillStyle=fl; g.fillRect(0,fy,W,H-fy);
+  g.strokeStyle="rgba(255,207,58,.14)"; g.lineWidth=1.5;
+  for (let i=-10;i<=10;i++){ g.beginPath(); g.moveTo(W/2+i*18,fy); g.lineTo(W/2+i*150,H); g.stroke(); }
+  for (let k=0;k<7;k++){ const y=fy+Math.pow(k/7,1.7)*(H-fy); g.beginPath(); g.moveTo(0,y); g.lineTo(W,y); g.stroke(); }
+  g.fillStyle="#ffcf3a"; g.globalAlpha=.55; g.fillRect(0,fy-3,W,3); g.globalAlpha=1; // stage lip
+  // LED wall frame (the live dots are drawn every frame)
+  const Wl=MEMO_WALL; g.fillStyle="#07060c"; g.beginPath(); g.roundRect(Wl.x-10,Wl.y-10,Wl.w+20,Wl.h+20,12); g.fill();
+  g.strokeStyle="#3a3350"; g.lineWidth=3; g.stroke();
+  // truss across the top with the light fixtures
+  g.fillStyle="#2b2838"; g.fillRect(150,44,W-300,10); g.fillRect(150,58,W-300,4);
+  g.strokeStyle="#3d3950"; g.lineWidth=2; for (let x=150;x<W-150;x+=16){ g.beginPath(); g.moveTo(x,46); g.lineTo(x+16,60); g.stroke(); }
+  for (const x of MEMO_LIGHTS){ g.fillStyle="#1a1824"; g.beginPath(); g.roundRect(x-13,60,26,22,6); g.fill(); g.strokeStyle="#4a4560"; g.lineWidth=2; g.stroke(); }
   // curtains
   for (const side of [-1,1]){
-    const x=side<0?0:W-78;
-    const cg=g.createLinearGradient(x,0,x+78,0);
-    cg.addColorStop(0, side<0?"#5a1020":"#2a0810");
-    cg.addColorStop(.5,"#c4374a");
-    cg.addColorStop(1, side<0?"#2a0810":"#5a1020");
-    g.fillStyle=cg; g.fillRect(x,0,78,H);
-    g.strokeStyle="rgba(255,246,201,.25)"; g.lineWidth=2;
-    for (let yy=20; yy<H; yy+=28){ g.beginPath(); g.arc(x+39,yy,16,0,Math.PI); g.stroke(); }
+    const x=side<0?0:W-84;
+    const cg=g.createLinearGradient(x,0,x+84,0);
+    cg.addColorStop(0, side<0?"#4a0c1a":"#22060d"); cg.addColorStop(.5,"#b62e44"); cg.addColorStop(1, side<0?"#22060d":"#4a0c1a");
+    g.fillStyle=cg; g.fillRect(x,0,84,H);
+    g.fillStyle="rgba(0,0,0,.18)"; for (let k=0;k<4;k++) g.fillRect(x+10+k*20,0,5,H);
+    g.strokeStyle="rgba(255,246,201,.22)"; g.lineWidth=2; for (let yy=20; yy<H; yy+=28){ g.beginPath(); g.arc(x+42,yy,16,0,Math.PI); g.stroke(); }
   }
-  // stage floor
-  const fl=g.createLinearGradient(0,H*.68,0,H);
-  fl.addColorStop(0,"#4a2a18"); fl.addColorStop(1,"#1a0c08");
-  g.fillStyle=fl; g.fillRect(0,H*.68,W,H*.32);
-  g.strokeStyle="rgba(255,207,58,.18)"; g.lineWidth=2;
-  for (let i=0;i<8;i++){
-    g.beginPath(); g.moveTo(0,H*.70+i*22); g.lineTo(W,H*.70+i*22); g.stroke();
-  }
-  // colored spotlight pools
-  const pools=[[220,H*.78,"rgba(255,77,141,.28)"],[480,H*.8,"rgba(61,224,255,.22)"],[740,H*.76,"rgba(255,207,58,.26)"]];
-  for (const p of pools){
-    const rg=g.createRadialGradient(p[0],p[1],10,p[0],p[1],160);
-    rg.addColorStop(0,p[2]); rg.addColorStop(1,"rgba(0,0,0,0)");
-    g.fillStyle=rg; g.beginPath(); g.ellipse(p[0],p[1],170,46,0,0,Math.PI*2); g.fill();
-  }
+  // valance
+  const vg=g.createLinearGradient(0,0,0,40); vg.addColorStop(0,"#7a1426"); vg.addColorStop(1,"#4a0c1a"); g.fillStyle=vg;
+  g.beginPath(); g.moveTo(0,0); g.lineTo(W,0); g.lineTo(W,26); for (let x=W;x>=0;x-=50) g.quadraticCurveTo(x-25,46,x-50,26); g.closePath(); g.fill();
+  g.fillStyle="#ffcf3a"; for (let x=25;x<W;x+=50){ g.beginPath(); g.arc(x,40,3,0,Math.PI*2); g.fill(); }
   // speaker stacks
-  for (const x of [96, W-96]){
-    g.fillStyle="#1b1220"; g.beginPath(); g.roundRect(x-28,H*.52,56,120,8); g.fill();
-    g.strokeStyle="#ffcf3a"; g.lineWidth=3;
-    g.beginPath(); g.arc(x,H*.58,14,0,Math.PI*2); g.stroke();
-    g.beginPath(); g.arc(x,H*.68,18,0,Math.PI*2); g.stroke();
+  for (const x of [128, W-128]){
+    g.fillStyle="#15101c"; g.beginPath(); g.roundRect(x-30,H*.47,60,146,8); g.fill(); g.strokeStyle="#3a3350"; g.lineWidth=2; g.stroke();
+    for (const [yy,r] of [[H*.47+30,12],[H*.47+82,20],[H*.47+124,12]]){ g.fillStyle="#0a0810"; g.beginPath(); g.arc(x,yy,r+4,0,Math.PI*2); g.fill(); g.strokeStyle="#ffcf3a"; g.lineWidth=2; g.beginPath(); g.arc(x,yy,r,0,Math.PI*2); g.stroke(); }
   }
 }
-function drawSign(){
-  // neon sign flickers to life, buzzes when the yard is loud
-  const flick = M.party>0 ? .85+Math.sin(M.t*40)*.15 : (Math.sin(M.t*1.3)>.97 ? .55 : 1);
-  ctx.save(); ctx.globalAlpha=flick;
-  ctx.shadowColor= M.party>0 ? "hsl("+M.hue+",100%,70%)" : "#ff4d8d"; ctx.shadowBlur=18+M.party*14;
-  ctx.font="700 42px Fredoka, system-ui, sans-serif";
-  ctx.fillStyle="#ffd0e4"; ctx.textAlign="center";
-  ctx.fillText("BERNARD SAYS", W/2, 168);
+function drawSign(){ // marquee box with chasing bulbs and the neon title
+  const x=W/2-200, y=88, w=400, h=62, bulbs=24, sp=4+M.seq.length*.3+M.party*6;
+  ctx.fillStyle="#1d0f2c"; ctx.beginPath(); ctx.roundRect(x,y,w,h,14); ctx.fill();
+  ctx.strokeStyle="#ffcf3a"; ctx.lineWidth=3; ctx.stroke();
+  for (let i=0;i<bulbs;i++){ // bulbs run round the edge
+    const t=i/bulbs, per=2*(w+h), d=t*per; let bx,by;
+    if (d<w){ bx=x+d; by=y; } else if (d<w+h){ bx=x+w; by=y+d-w; } else if (d<2*w+h){ bx=x+w-(d-w-h); by=y+h; } else { bx=x; by=y+h-(d-2*w-h); }
+    const on=Math.sin(M.t*sp-i*.9)>0;
+    ctx.fillStyle=on?(M.party>0?"hsl("+((M.hue+i*15)%360)+",100%,70%)":"#fff1b8"):"rgba(255,241,184,.18)";
+    ctx.beginPath(); ctx.arc(bx,by,on?3.6:2.6,0,Math.PI*2); ctx.fill();
+  }
+  const flick = M.party>0 ? .88+Math.sin(M.t*40)*.12 : (Math.sin(M.t*1.3)>.985 ? .55 : 1);
+  ctx.save(); ctx.globalAlpha=flick; ctx.textAlign="center"; ctx.textBaseline="middle";
+  const col=M.party>0?"hsl("+M.hue+",100%,72%)":"#ff5fa2";
+  ctx.font="700 40px Fredoka, system-ui, sans-serif";
+  ctx.lineJoin="round"; ctx.strokeStyle=col; ctx.globalAlpha=flick*.35; ctx.lineWidth=12; ctx.strokeText("BERNARD SAYS",W/2,y+h/2+2);
+  ctx.globalAlpha=flick; ctx.lineWidth=4; ctx.strokeText("BERNARD SAYS",W/2,y+h/2+2);
+  ctx.fillStyle="#fff0f7"; ctx.fillText("BERNARD SAYS",W/2,y+h/2+2);
   ctx.restore();
 }
-function drawKid(name,x,baseY,phase,fallback){
-  const jump=M.kidsJump>0 ? Math.abs(Math.sin(M.t*9+phase))*(70*M.kidsJump) : (M.phase==="show"?Math.abs(Math.sin(M.t*4+phase))*8:Math.sin(M.t*2+phase)*3);
-  const y=baseY-jump;
-  if (!drawSprC(name,x,y,72,92,M.kidsJump>0?Math.sin(M.t*9+phase)*.12:0,false)){
-    ctx.fillStyle=fallback; ctx.beginPath(); ctx.arc(x,y-30,16,0,Math.PI*2); ctx.fill(); ctx.fillRect(x-14,y-20,28,36);
-  }
-}
-function drawMemoCrowd(){
-  if (M.wash){
-    ctx.globalAlpha=clamp(M.wash.life,0,1)*.28;
-    ctx.fillStyle=M.wash.col; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1;
-  }
-  // marquee lights: chase faster each round, sweep red when you're running out of time
-  const speed=5+M.seq.length*.35, low=M.phase==="input" && M.inputT<1.6;
-  for (let i=0;i<16;i++){
-    const x=36+i*((W-72)/15);
-    const chase=Math.sin(M.t*speed-i*.55)>0.15;
-    const hot=M.lit && i%4===MEMO_KEYS.indexOf(M.lit)%4;
-    ctx.fillStyle=hot?(MEMO_INFO[M.lit].lit):low?(Math.sin(M.t*18)>0?"#ff5a45":"rgba(255,90,69,.25)"):chase?"#ffcf3a":"rgba(255,255,255,.14)";
-    ctx.beginPath(); ctx.arc(x,26,hot||chase?6:3.5,0,Math.PI*2); ctx.fill();
-  }
-  drawSign();
-  // Nick & Giulia peek up from behind the pad and jump when you nail a round
-  drawKid("hopNic",250,MEMO_PAD.y-MEMO_PAD.h/2+12,0,"#2f6fd8");
-  drawKid("hopGiulia",650,MEMO_PAD.y-MEMO_PAD.h/2+12,1.7,"#e45aa0");
-  // live spotlight beams; their colour drifts with the round
-  ctx.save();
-  ctx.globalCompositeOperation="lighter";
-  for (let i=0;i<3;i++){
-    const x=240+i*220+Math.sin(M.t*(.7+M.party)+i)*(24+M.party*40);
-    const hue=(M.hue+i*110)%360, a=.12+M.party*.08;
-    const beam=ctx.createLinearGradient(x,40,x,H*.78);
-    beam.addColorStop(0, "hsla("+hue+",100%,65%,"+a+")");
-    beam.addColorStop(1,"rgba(0,0,0,0)");
-    ctx.fillStyle=beam;
-    ctx.beginPath(); ctx.moveTo(x,36); ctx.lineTo(x-70,H*.8); ctx.lineTo(x+70,H*.8); ctx.closePath(); ctx.fill();
-  }
-  ctx.restore();
-  if (M.balls){
-    for (const b of M.balls){
-      ctx.fillStyle=b.col;
-      ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.fill();
-      ctx.strokeStyle="rgba(255,255,255,.65)"; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.arc(b.x-b.r*.25,b.y-b.r*.25,b.r*.28,0,Math.PI*2); ctx.stroke();
+function drawMemoWall(){ // LED video wall: dot matrix, equalizer bars in the round's colour, a wash on every note
+  const Wl=MEMO_WALL;
+  ctx.save(); ctx.beginPath(); ctx.roundRect(Wl.x,Wl.y,Wl.w,Wl.h,6); ctx.clip();
+  const base=M.wash?M.wash.col:null, hue=M.hue;
+  ctx.fillStyle="#0c0a18"; ctx.fillRect(Wl.x,Wl.y,Wl.w,Wl.h);
+  if (base){ ctx.globalAlpha=clamp(M.wash.life,0,1)*.35; ctx.fillStyle=base; ctx.fillRect(Wl.x,Wl.y,Wl.w,Wl.h); ctx.globalAlpha=1; }
+  const n=M.eq.length, bw=Wl.w/n;
+  for (let i=0;i<n;i++){
+    const idle=.12+.08*Math.sin(M.t*(2+M.seq.length*.1)+i*.7)+(M.started?.06*Math.sin(M.t*7+i*1.9):0);
+    const v=clamp(Math.max(idle,M.eq[i]),0,1), cells=Math.round(v*10);
+    for (let c=0;c<cells;c++){
+      const yy=Wl.y+Wl.h-8-c*11, l=50+c*4;
+      ctx.fillStyle="hsl("+((hue+i*6+c*8)%360)+",95%,"+l+"%)";
+      ctx.fillRect(Wl.x+i*bw+3,yy-6,bw-6,7);
     }
   }
+  ctx.fillStyle="rgba(0,0,0,.35)"; for (let y=Wl.y;y<Wl.y+Wl.h;y+=4) ctx.fillRect(Wl.x,y,Wl.w,1); // scanlines
+  if (M.boom && M.boom.t<.12){ ctx.fillStyle="rgba(255,255,255,"+(1-M.boom.t/.12)*.8+")"; ctx.fillRect(Wl.x,Wl.y,Wl.w,Wl.h); }
+  ctx.restore();
+}
+function drawMemoBeams(front){ // the moving heads swing to the lit button and wash it in its colour; idle they sweep the stage
+  ctx.save(); ctx.globalCompositeOperation="lighter";
+  if (front){ // in front of the controller: just the pools of light on the lit button
+    if (M.aim){ const r=58, gp=ctx.createRadialGradient(M.aim.x,M.aim.y,4,M.aim.x,M.aim.y,r); gp.addColorStop(0,M.aim.col); gp.addColorStop(1,"rgba(0,0,0,0)"); ctx.globalAlpha=clamp(.25+M.aimT*.6,0,.7); ctx.fillStyle=gp; ctx.beginPath(); ctx.arc(M.aim.x,M.aim.y,r,0,Math.PI*2); ctx.fill();
+      MEMO_LIGHTS.forEach((lx,i)=>{ const tx=M.aim.x+(i-1.5)*14, ty=M.aim.y, ang=Math.atan2(ty-82,tx-lx), len=Math.hypot(tx-lx,ty-82); ctx.save(); ctx.translate(lx,82); ctx.rotate(ang-Math.PI/2); const gr=ctx.createLinearGradient(0,len*.55,0,len); gr.addColorStop(0,"rgba(0,0,0,0)"); gr.addColorStop(1,M.aim.col); ctx.globalAlpha=clamp(.10+M.aimT*.2,0,.3); ctx.fillStyle=gr; ctx.beginPath(); ctx.moveTo(-6,0); ctx.lineTo(6,0); ctx.lineTo(30,len); ctx.lineTo(-30,len); ctx.closePath(); ctx.fill(); ctx.restore(); }); }
+    ctx.restore(); ctx.globalAlpha=1; return;
+  }
+  MEMO_LIGHTS.forEach((lx,i)=>{
+    let tx, ty, col, a;
+    if (M.aim){ tx=M.aim.x+(i-1.5)*14; ty=M.aim.y; col=M.aim.col; a=.28+M.aimT*.35; }
+    else { tx=W/2+Math.sin(M.t*(.6+M.party*1.5)+i*1.7)*(260+M.party*80); ty=H*.86; col="hsl("+((M.hue+i*90)%360)+",100%,65%)"; a=.09+M.party*.10; }
+    const ang=Math.atan2(ty-82,tx-lx), len=Math.hypot(tx-lx,ty-82)+30, wid=M.aim?46:70;
+    ctx.save(); ctx.translate(lx,82); ctx.rotate(ang-Math.PI/2);
+    const gr=ctx.createLinearGradient(0,0,0,len); gr.addColorStop(0,col); gr.addColorStop(1,"rgba(0,0,0,0)");
+    ctx.globalAlpha=clamp(a,0,.6); ctx.fillStyle=gr; ctx.beginPath(); ctx.moveTo(-6,0); ctx.lineTo(6,0); ctx.lineTo(wid,len); ctx.lineTo(-wid,len); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.globalAlpha=1; ctx.fillStyle=M.aim?M.aim.col:"#fff6c9"; ctx.beginPath(); ctx.arc(lx,80,5,0,Math.PI*2); ctx.fill();
+  });
+  // lasers during the boom
+  if (M.boom){ const b=M.boom, life=1-b.t/(b.big?1.5:1.1);
+    for (let i=0;i<(b.big?10:6);i++){ const lx=MEMO_LIGHTS[i%4], sw=Math.sin(b.t*(3+i*.4)+i)*1.1, ex=lx+Math.sin(sw)*900, ey=82+Math.cos(sw)*900;
+      ctx.globalAlpha=life*.7; ctx.strokeStyle="hsl("+((M.hue+i*36)%360)+",100%,62%)"; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(lx,82); ctx.lineTo(ex,ey); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+function drawMemoCrowdDogs(){ // front row of dog silhouettes, lit from the stage
+  const hue=M.hue, hz=ctx.createLinearGradient(0,H-120,0,H); hz.addColorStop(0,"rgba(0,0,0,0)"); hz.addColorStop(.55,"hsla("+hue+",80%,55%,"+(.16+M.party*.12)+")"); hz.addColorStop(1,"hsla("+((hue+60)%360)+",80%,60%,"+(.28+M.party*.15)+")"); ctx.fillStyle=hz; ctx.fillRect(0,H-120,W,120);
+  for (const d of M.crowd||[]){
+    const bob=M.started?Math.abs(Math.sin(M.t*(3+M.seq.length*.15)+d.ph))*4:Math.sin(M.t*1.5+d.ph)*1.5;
+    const x=d.x, y=H+14+d.y-bob, s=d.s;
+    ctx.save(); ctx.translate(x,y); ctx.scale(s,s);
+    ctx.fillStyle="#0b0812";
+    ctx.beginPath(); ctx.ellipse(0,-18,36,26,0,0,Math.PI*2); ctx.fill();               // shoulders
+    ctx.beginPath(); ctx.arc(0,-50,19,0,Math.PI*2); ctx.fill();                         // head
+    ctx.beginPath(); ctx.ellipse(0,-40,9,7,0,0,Math.PI*2); ctx.fill();                  // muzzle (seen from behind it's just a bump)
+    if (d.kind===0){ for (const k of [-1,1]){ ctx.beginPath(); ctx.moveTo(k*6,-62); ctx.lineTo(k*16,-88); ctx.lineTo(k*19,-58); ctx.closePath(); ctx.fill(); } }      // shepherd ears
+    else if (d.kind===1){ for (const k of [-1,1]){ ctx.beginPath(); ctx.ellipse(k*18,-46,7,15,k*.3,0,Math.PI*2); ctx.fill(); } }                                   // floppy ears
+    else { for (const k of [-1,1]){ ctx.beginPath(); ctx.arc(k*14,-66,7,0,Math.PI*2); ctx.fill(); } }                                                                // round ears
+    ctx.strokeStyle="hsla("+((hue+d.ph*40)%360)+",100%,72%,.8)"; ctx.lineWidth=3;      // rim light from the stage
+    ctx.beginPath(); ctx.arc(0,-50,19,Math.PI*1.05,Math.PI*1.95); ctx.stroke(); ctx.beginPath(); ctx.ellipse(0,-18,36,26,0,Math.PI*1.1,Math.PI*1.9); ctx.stroke();
+    if (M.party>.3){ ctx.strokeStyle="hsl("+((hue+d.ph*70)%360)+",100%,65%)"; ctx.lineWidth=4; ctx.lineCap="round"; ctx.beginPath(); ctx.moveTo(24,-30); ctx.lineTo(34+Math.sin(M.t*10+d.ph)*6,-62); ctx.stroke(); } // glow stick when the place is loud
+    ctx.restore();
+  }
+}
+function drawMemoFireworks(){
+  ctx.save(); ctx.globalCompositeOperation="lighter";
+  for (const r of M.rockets){ if (r.wait>0) continue; ctx.fillStyle="#fff6c9"; ctx.beginPath(); ctx.arc(r.x,r.y,3,0,Math.PI*2); ctx.fill(); }
+  for (const f of M.fw){ const a=clamp(f.life/f.max,0,1); ctx.globalAlpha=a; ctx.fillStyle="hsl("+f.hue+",100%,"+(55+a*25)+"%)"; ctx.beginPath(); ctx.arc(f.x,f.y,f.sz*(.6+a*.6),0,Math.PI*2); ctx.fill(); }
+  ctx.restore(); ctx.globalAlpha=1;
+  for (const n of M.notes){ ctx.globalAlpha=clamp(n.life,0,1); ctx.font="700 24px system-ui, sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.lineWidth=4; ctx.strokeStyle="#1a0f24"; ctx.strokeText(n.glyph,n.x,n.y); ctx.fillStyle=n.col; ctx.fillText(n.glyph,n.x,n.y); }
+  ctx.globalAlpha=1;
+}
+function drawMemoBoomText(){ // the slam: big text drops in with an overshoot, a shockwave, then fades
+  const b=M.boom; if (!b) return;
+  const T=b.big?1.5:1.1, inT=.22, p=clamp(b.t/inT,0,1), out=clamp((T-b.t)/.3,0,1);
+  const sc=p<1 ? 2.6-1.75*(1-Math.pow(1-p,3)) : 1+Math.sin(Math.min(1,(b.t-inT)/.25)*Math.PI)*.06;
+  const y=MEMO_WALL.y+MEMO_WALL.h/2-8;
+  ctx.save(); ctx.globalAlpha=Math.min(p*1.5,1)*out; ctx.translate(W/2,y); ctx.scale(sc,sc); ctx.rotate(Math.sin(b.t*14)*.015);
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  const fill=b.kind==="record"?"#ffe066":b.kind==="mile"?"#7CFF6B":b.kind==="quick"?"#9ec8ff":"#fff6c9";
+  chunky(ctx,b.text,0,0,b.big?54:46,fill,"#3a0f24",700);
+  ctx.restore();
+  ctx.save(); ctx.globalAlpha=out*clamp((b.t-.15)*4,0,1); ctx.textAlign="center"; ctx.textBaseline="middle";
+  chunky(ctx,b.sub,W/2,y+44,17,"#ffe9b0","#2a1810",600); ctx.restore();
+  if (b.t<inT+.05 && !b.slammed){ b.slammed=true; M.rings.push({x:W/2,y,r:30,life:.8,w:16,col:"#fff6c9"}); M.rings.push({x:W/2,y,r:10,life:1,w:10,col:"hsl("+M.hue+",100%,70%)"}); }
 }
 function drawMemoPad(){
   const P=MEMO_PAD;
@@ -9767,9 +9832,6 @@ function drawMemoPad(){
     ctx.fillStyle=gg;
     ctx.beginPath(); ctx.ellipse(gx,P.y+16,84,116,sx*.25,0,Math.PI*2); ctx.fill();
   }
-  // cable
-  ctx.strokeStyle="#4c4f5a"; ctx.lineWidth=9; ctx.lineCap="round";
-  ctx.beginPath(); ctx.moveTo(P.x,P.y-P.h/2+4); ctx.quadraticCurveTo(P.x-40,P.y-P.h/2-70,P.x-160,P.y-P.h/2-120); ctx.stroke();
   // centre plate, select/start
   const cp=ctx.createLinearGradient(0,P.y-40,0,P.y+60);
   cp.addColorStop(0,"#c5c8d2"); cp.addColorStop(1,"#9a9da9");
@@ -9886,7 +9948,7 @@ function drawMemoHUD(){
   ctx.fillText(heat>.7?"YARD IS LOUD":"YARD",W/2,30);
   // progress dots through this round's sequence
   if (M.seq.length){
-    const n=M.seq.length, dw=Math.min(22,560/n), x0=W/2-(n-1)*dw/2, y=100;
+    const n=M.seq.length, dw=Math.min(22,560/n), x0=W/2-(n-1)*dw/2, y=164;
     for (let i=0;i<n;i++){
       const done = M.phase==="input" ? i<M.step : M.phase==="show" ? i<M.showI : M.phase==="wait" && M.mood==="happy";
       const cur = (M.phase==="input" && i===M.step) || (M.phase==="show" && i===M.showI-1);
@@ -9905,6 +9967,7 @@ function drawMemoHUD(){
     ctx.fillText("Bernard lights up the pad · press the same buttons back · one more each round",W/2,H-52);
   } else if (M.phase==="input"){
     const low=M.inputT<1.6;
+    ctx.fillStyle="rgba(12,8,20,.78)"; ctx.beginPath(); ctx.roundRect(W/2-130,H-76,260,58,16); ctx.fill(); ctx.strokeStyle="rgba(255,207,58,.5)"; ctx.lineWidth=2; ctx.stroke();
     ctx.globalAlpha=.6+pl*.4;
     chunky(ctx,low?"HURRY!":"YOUR TURN",W/2,H-54,22,low?"#ff8a7a":"#c9f24d",low?"#4a1208":"#1f3a08",700);
     ctx.globalAlpha=1;
@@ -9913,6 +9976,7 @@ function drawMemoHUD(){
     ctx.fillStyle="rgba(0,0,0,.35)"; ctx.beginPath(); ctx.roundRect(W/2-110,H-38,220,10,5); ctx.fill();
     ctx.fillStyle=low?"#ff5a45":"#c9f24d"; ctx.beginPath(); ctx.roundRect(W/2-110,H-38,220*f,10,5); ctx.fill();
   } else if (M.phase==="show"){
+    ctx.fillStyle="rgba(12,8,20,.78)"; ctx.beginPath(); ctx.roundRect(W/2-130,H-72,260,44,16); ctx.fill(); ctx.strokeStyle="rgba(255,207,58,.5)"; ctx.lineWidth=2; ctx.stroke();
     chunky(ctx,"WATCH BERNARD",W/2,H-48,22,"#ffcf3a","#4a2408",700);
   }
   for (const t of M.toasts){
@@ -9924,9 +9988,9 @@ function drawMemoHUD(){
   }
   if (M.roundCard){
     const life=M.roundCard.life, a=clamp(life*3,0,1), zoom=1+Math.max(0,life-.8)*2.5;
-    ctx.save(); ctx.globalAlpha=a; ctx.translate(W/2,250); ctx.scale(zoom,zoom);
-    chunky(ctx,M.roundCard.text,0,0,46,"#fff6c9","#4a2408",700);
-    ctx.restore();
+    if (M.boom){ ctx.globalAlpha=1; } else { ctx.save(); ctx.globalAlpha=a; ctx.translate(W/2,MEMO_WALL.y+MEMO_WALL.h/2); ctx.scale(zoom,zoom);
+    ctx.textAlign="center"; ctx.textBaseline="middle"; chunky(ctx,M.roundCard.text,0,0,46,"#fff6c9","#4a2408",700);
+    ctx.restore(); }
   }
   if (M.banner){
     const a=clamp(M.banner.life,0,1);
@@ -9947,9 +10011,15 @@ function drawMemoHUD(){
 function drawMemo(){
   ctx.drawImage(mbg,0,0);
   ctx.save();
-  drawMemoCrowd();
+  // camera punch-in on the boom
+  if (M.zoom>0){ const z=1+Math.pow(M.zoom,2)*.07; ctx.translate(W/2,H*.55); ctx.scale(z,z); ctx.translate(-W/2,-H*.55); }
+  drawMemoWall();
+  drawMemoBeams(false);
+  drawSign();
   drawMemoPad();
+  drawMemoBeams(true);
   drawMemoBernard();
+  drawMemoFireworks();
   for (const s of M.sparks){
     ctx.globalAlpha=clamp(s.life*2,0,1); ctx.fillStyle=s.col;
     ctx.beginPath(); ctx.arc(s.x,s.y,s.sz||3,0,Math.PI*2); ctx.fill();
@@ -9964,8 +10034,10 @@ function drawMemo(){
     ctx.fillStyle=c.col; ctx.fillRect(-c.w/2,-c.h/2,c.w,c.h); ctx.restore();
   }
   ctx.globalAlpha=1;
-  if (M.flash){ ctx.globalAlpha=clamp(M.flash.life*2,0,1)*.35; ctx.fillStyle=M.flash.col; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1; }
+  drawMemoCrowdDogs();
+  if (!POSTER) drawMemoBoomText();
   ctx.restore();
+  if (M.flash){ ctx.globalAlpha=clamp(M.flash.life*2,0,1)*(M.flash.col==="#ffffff"?.55:.35); ctx.fillStyle=M.flash.col; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1; }
   if (!POSTER) drawMemoHUD();
   if (M.over && !POSTER) drawMemoOver();
   if (glare && !POSTER) drawGlass();
@@ -10453,7 +10525,8 @@ window.__BA={
   car(){ return {i:CAR.index,pos:+CAR.pos.toFixed(2)}; },
   carNudge(d){ carouselNudge(d||1); },
   hopGo(n){ if(LH){ LH.player.r=n; LH.started=true; LH.running=true; } },
-  hopRide(){ hFerry(); }
+  hopRide(){ hFerry(); },
+  memoOpen(){ openMemo(); }, memoStart(){ startMemo(); }, memo(){ return M; }, memoPress(k){ memoPress(k); }
 };
 // =============================================================================
 // Bernard's Big Adventure
