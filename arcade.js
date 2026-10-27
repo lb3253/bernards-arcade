@@ -620,7 +620,7 @@ function uiBack(){ const sc=gpScreen(); if (sc==="pause") quitToArcade(); else i
 const CAR = {
   items:["pickFlap","pickHop","pickAir","pickMemo","pickCups","pickBrt"],
   flashKey:{pickFlap:"flap", pickHop:"hop", pickAir:"air", pickBallies:"ballies", pickMemo:"memo", pickCups:"cups", pickCatch:"catch", pickBba:"bba", pickBrt:"brt"},
-  spill:{pickFlap:"rgba(80,190,255,.32)", pickHop:"rgba(110,220,90,.30)", pickAir:"rgba(255,90,160,.32)", pickBallies:"rgba(255,207,58,.30)", pickMemo:"rgba(170,110,255,.32)", pickCups:"rgba(255,180,60,.36)", pickCatch:"rgba(255,140,60,.34)", pickBba:"rgba(90,190,255,.34)", pickBrt:"rgba(255,140,60,.36)"},
+  spill:{pickFlap:"rgba(58,184,255,.34)", pickHop:"rgba(139,226,74,.30)", pickAir:"rgba(255,77,109,.32)", pickBallies:"rgba(255,207,58,.30)", pickMemo:"rgba(166,107,255,.36)", pickCups:"rgba(255,165,58,.34)", pickCatch:"rgba(255,140,60,.34)", pickBba:"rgba(90,190,255,.34)", pickBrt:"rgba(255,210,63,.32)"},
   index:0, pos:0, vel:0, target:0, bounce:0,
   tiltX:0, tiltY:0, wantTiltX:0, wantTiltY:0,
   drag:null, lastIdx:-1, chaseT:0, ready:false
@@ -10320,11 +10320,6 @@ document.getElementById("soundBtn").addEventListener("click",e=>{
   e.target.setAttribute("aria-pressed",String(audioOn));
   if (audioOn && homeEl.classList.contains("on")) menuHumStart();
   else menuHumStop();
-});
-document.getElementById("glareBtn").addEventListener("click",e=>{
-  glare=!glare;
-  e.target.textContent="Glare: "+(glare?"on":"off");
-  e.target.setAttribute("aria-pressed",String(glare));
 });
 
 let FS_SOFT=false;
