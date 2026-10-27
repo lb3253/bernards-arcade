@@ -36,6 +36,12 @@
   /* Stay off the picker until this cabinet is opened. */
   #brt-root:not(.on){display:none !important}
   #brt-root.on{z-index:30;background:#140f17}
+  /* Bernard's Keep-Away: same full-window stage as Road Trip */
+  #ka-root { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #0b0f1c; }
+  #ka-root:not(.on){display:none !important}
+  #ka-root.on{z-index:30}
+  #ka-stage { position: relative; aspect-ratio: 16 / 9; max-width: 100%; max-height: 100%; border-radius: 14px; overflow: hidden; box-shadow: 0 0 0 6px #1b2131, 0 24px 60px rgba(0,0,0,.6); background:#000; }
+  #ka-canvas { display: block; width: 100% !important; height: 100% !important; position: relative !important; left: auto !important; top: auto !important; transform: none !important; touch-action: none; }
 </style>
 </head>
 <body>
@@ -75,6 +81,16 @@
             </figure>
             <div class="carousel" id="carousel">
               <div class="car-track" id="carTrack">
+                <button class="pick cab" id="pickKeep" type="button">
+                  <span class="badge">NEW &middot; 2P</span><span class="best" id="bestKeep"></span>
+                  <span class="ribbon" aria-hidden="true">NEW HIGH SCORE!</span>
+                  <span class="thumb"></span>
+                  <span class="cab-bezel"></span>
+                  <span class="cap">
+                    <span class="nm">Bernard's Keep-Away</span>
+                    <span class="sub">Nick and Giulia pass it back and forth. Don't let Bernard get the ball!</span>
+                  </span>
+                </button>
                 <button class="pick cab" id="pickFlap" type="button">
                   <span class="badge">SKY</span><span class="best" id="bestFlap"></span>
                   <span class="ribbon" aria-hidden="true">NEW HIGH SCORE!</span>
@@ -369,6 +385,12 @@
   </footer>
 </div>
 
+<div id="ka-root">
+  <div id="ka-stage">
+    <canvas id="ka-canvas" width="960" height="540" aria-label="Bernard's Keep-Away game"></canvas>
+  </div>
+</div>
+
 <div id="brt-root">
   <div id="brt-stage">
     <canvas id="brt-canvas" width="960" height="540" aria-label="Bernard's Road Trip game"></canvas>
@@ -386,6 +408,7 @@
 
 <script>window.BRT_NO_AUTOSTART=true;</script>
 <script src="arcade.js"></script>
+<script src="keepaway.js"></script>
 <script>
 /* =====================================================================
    BERNARD'S ROAD TRIP — an OutRun-style pseudo-3D driving game

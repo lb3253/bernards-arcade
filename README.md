@@ -2,6 +2,7 @@
 
 TV arcade starring **Bernard**, a long-haired German Shepherd.
 
+- **Bernard's Keep-Away** — monkey in the middle for 1 or 2 players: Nick and Giulia pass, Bernard tries to steal it (controller 1 = Nick, controller 2 = Giulia; with one pad the computer plays Giulia)
 - **Flappy Bernard** — flap through the brick gaps
 - **Lane Hoppers with Bernard** — Nick or Giulia hop the streets, yards and creeks; Bernard ferries the water. Grab the bike for double hops.
 - **Flying with Bernard** — biplane or firefighter jet

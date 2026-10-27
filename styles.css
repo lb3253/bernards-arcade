@@ -920,7 +920,7 @@ body{
 .star figcaption{ font:400 8px/1 var(--ar-label) !important; letter-spacing:.18em !important; color:#9fb0d6 !important; margin-top:10px !important; text-shadow:none !important; }
 
 /* ---- cards: per-game accent */
-#pickFlap{--acc:#3ab8ff} #pickHop{--acc:#8be24a} #pickAir{--acc:#ff4d6d}
+#pickKeep{--acc:#c6ff3d} #pickFlap{--acc:#3ab8ff} #pickHop{--acc:#8be24a} #pickAir{--acc:#ff4d6d}
 #pickMemo{--acc:#a66bff} #pickCups{--acc:#ffa53a} #pickBrt{--acc:#ffd23f}
 .lobby > .carousel .pick.cab{
   border-radius:18px !important; background:#0b0f1c !important;
@@ -1003,3 +1003,6 @@ footer, .snesfoot{ color:#8f9bb8 !important; }
 #padChip.live{ color:var(--ar-lime) !important; border-color:rgba(198,255,61,.45) !important; }
 @media (max-width:820px){ #frame{ box-shadow:0 10px 0 #03040a, 0 16px 28px rgba(0,0,0,.6) !important; } .marquee::before,.marquee::after{ display:none } }
 @media (prefers-reduced-motion:reduce){ #home .scrim::before, #home .scrim::after, .star::before, .pick.cab.is-center .cab-bezel, .marquee .bulbs i{ animation:none !important } }
+
+#pickKeep .thumb{background-image:url("/art/card-keep.jpg?v=2") !important;background-size:cover !important;background-position:50% 60% !important}
+body[data-screen="keep"] .fs-btn, body[data-screen="brt"] .fs-btn{ top:auto !important; bottom:10px; }
