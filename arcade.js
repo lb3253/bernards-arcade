@@ -73,7 +73,7 @@ loadSpr("hopSprinkler","/art/spr-hop-sprinkler.png");
 loadSpr("hopTree","/art/spr-hop-tree.png");
 loadSpr("hopBall","/art/spr-hop-ball.png");
 loadSpr("hopBone","/art/spr-hop-bone.png");
-["hopBall","hopBernard","hopNic","hopGiulia","hopTree"].forEach(n=>{ SPR[n].addEventListener("load",()=>{ try{ bakeBallSprites(); if(typeof makeBalliesPoster==="function") makeBalliesPoster(); if(typeof makeMemoPoster==="function") makeMemoPoster(); }catch(e){} }); });
+["hopBall","hopBernard","hopNic","hopGiulia","hopTree"].forEach(n=>{ SPR[n].addEventListener("load",()=>{ try{ bakeBallSprites(); if(typeof makeBalliesPoster==="function") makeBalliesPoster(); if(typeof makeMemoPoster==="function") makeMemoPoster(); if(typeof makeCupsPoster==="function") makeCupsPoster(); }catch(e){} }); });
 ["fly","biplane","jet","balloon","storm","skyAir","saucer","drone","diver","mothership","disc","scout","missile","plasma","boom","shot","muzzle","hills","jeep","skyJeep","jtrail","jpalm","jramp","jstop","jscrub"].forEach(n=>{ SPR[n].addEventListener("load",()=>{ try{ if(typeof bakeAirSky==="function") bakeAirSky(); if(typeof bakeFlapSky==="function") bakeFlapSky(); if(typeof bakeJeepSky==="function") bakeJeepSky(); }catch(e){} }); });
 function sprReady(name){
   const im=SPR[name];
@@ -275,7 +275,7 @@ function chunky(c,txt,x,y,size,fill,stroke,weight){
 
 // ---------------------------------------------------------------- audio
 let audioOn=true, glare=true, ac=null;
-const ARCADE_FLASH = {flap:false, hop:false, air:false, ballies:false, memo:false, catch:false, bba:false, brt:false};
+const ARCADE_FLASH = {flap:false, hop:false, air:false, ballies:false, memo:false, cups:false, catch:false, bba:false, brt:false};
 function ensureAC(){ if (!ac){ try{ ac=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if (ac && ac.state==="suspended") ac.resume(); return ac; }
 function beep(f,dur,type,vol,when){
   if (!audioOn) return;
@@ -512,8 +512,9 @@ let pointer={down:false,x:0,y:0};
 const GP = { idx:null, id:"", prev:{}, focus:0, lastScreen:"", navHold:0, lastBtn:"" };
 
 const GP_ITEMS = {
-  home:     ["pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickBrt"],
+  home:     ["pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickCups","pickBrt"],
   memomenu: ["memoStartBtn","memoBack"],
+  cupsmenu: ["cupsStartBtn","cupsBack"],
   catchmenu: ["catchStartBtn","catchBack"],
   menu:     ["startBtn","menuBack"],
   titamenu: ["titaStartBtn","titaBack"],
@@ -536,6 +537,7 @@ function gpScreen(){
   if (on("airmenu")) return "airmenu";
   if (on("hopmenu")) return "hopmenu";
   if (on("memomenu")) return "memomenu";
+  if (on("cupsmenu")) return "cupsmenu";
   if (on("catchmenu")) return "catchmenu";
   if (on("airstory")) return "airstory";
   if (on("gameover")) return "over";
@@ -616,9 +618,9 @@ function uiBack(){ const sc=gpScreen(); if (sc==="pause") quitToArcade(); else i
 
 // ---------------------------------------------------------------- lobby carousel
 const CAR = {
-  items:["pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickBrt"],
-  flashKey:{pickFlap:"flap", pickHop:"hop", pickAir:"air", pickBallies:"ballies", pickMemo:"memo", pickCatch:"catch", pickBba:"bba", pickBrt:"brt"},
-  spill:{pickFlap:"rgba(80,190,255,.32)", pickHop:"rgba(110,220,90,.30)", pickAir:"rgba(255,90,160,.32)", pickBallies:"rgba(255,207,58,.30)", pickMemo:"rgba(170,110,255,.32)", pickCatch:"rgba(255,140,60,.34)", pickBba:"rgba(90,190,255,.34)", pickBrt:"rgba(255,140,60,.36)"},
+  items:["pickFlap","pickHop","pickAir","pickBallies","pickMemo","pickCups","pickBrt"],
+  flashKey:{pickFlap:"flap", pickHop:"hop", pickAir:"air", pickBallies:"ballies", pickMemo:"memo", pickCups:"cups", pickCatch:"catch", pickBba:"bba", pickBrt:"brt"},
+  spill:{pickFlap:"rgba(80,190,255,.32)", pickHop:"rgba(110,220,90,.30)", pickAir:"rgba(255,90,160,.32)", pickBallies:"rgba(255,207,58,.30)", pickMemo:"rgba(170,110,255,.32)", pickCups:"rgba(255,180,60,.36)", pickCatch:"rgba(255,140,60,.34)", pickBba:"rgba(90,190,255,.34)", pickBrt:"rgba(255,140,60,.36)"},
   index:0, pos:0, vel:0, target:0, bounce:0,
   tiltX:0, tiltY:0, wantTiltX:0, wantTiltY:0,
   drag:null, lastIdx:-1, chaseT:0, ready:false
@@ -662,6 +664,7 @@ function carouselLaunch(){
   else if (id==="pickAir") openAir();
   else if (id==="pickBallies") openBallies();
   else if (id==="pickMemo") openMemo();
+  else if (id==="pickCups") openCups();
   else if (id==="pickCatch") openCatch();
   else if (id==="pickBba") bbaOpen();
   else if (id==="pickBrt") brtOpen();
@@ -1298,6 +1301,7 @@ cv.addEventListener("pointerdown",e=>{
     }
     memoTap(p); return;
   }
+  if (MODE==="cups"){ cupsPointer(p); return; }
   if (MODE==="catch"){ pointer={down:true,x:p.x,y:p.y}; if (p.y<520) catchJump(); return; }
   if (MODE==="tita"){ pointer={down:true,x:p.x,y:p.y}; actionDown(); return; }
   if (G && G.carry.length && Math.hypot(p.x-THROW_BTN.x,p.y-THROW_BTN.y)<THROW_BTN.r){
@@ -1368,6 +1372,7 @@ function actionDown(){
   else if (MODE==="hop") hFerry();
   else if (MODE==="jeep"){ if (J) J.touchGas=true; }
   else if (MODE==="memo"){ /* Bernard Says reads its buttons itself */ }
+  else if (MODE==="cups"){ cupsConfirm(); }
   else if (MODE==="catch") catchJump();
   else if (MODE==="bba") return;
   else if (MODE==="brt") return;
@@ -8840,6 +8845,287 @@ function startCatch(){
   syncHud();
 }
 
+// ---------------------------------------------------------------- Julia's Cups
+// Bernard hides the red, green and gold balls. He names one. Find that cup.
+let CU=null;
+const cupsEl=document.getElementById("cupsmenu");
+const cupRand=(a,b)=>a+Math.random()*(b-a);
+function newCups(best){
+  return { best:best||0, score:0, lives:3, round:0, running:false, over:false, overT:0,
+    phase:"call", phaseT:0, cups:[], target:"gold", sel:0, swaps:[], swapT:0,
+    hit:false, held:{}, pops:[], shake:0, cheer:"" };
+}
+function loadCupsBest(){ try{ if(CU) CU.best=+localStorage.getItem("cups_best")||0; }catch(e){} }
+function saveCupsBest(v){ try{ const o=+localStorage.getItem("cups_best")||0; if(v>o){ ARCADE_FLASH.cups=true; localStorage.setItem("cups_best",String(v)); } }catch(e){} }
+function cupsCount(round){ return round<2 ? 3 : round<5 ? 4 : 5; }
+function cupsPlace(n){
+  const gap = n<=3 ? 200 : n===4 ? 168 : 142;
+  const left = (W-(n-1)*gap)/2;
+  const xs=[]; for(let i=0;i<n;i++) xs.push(left+i*gap);
+  return xs;
+}
+function cupsBeginRound(){
+  const n=cupsCount(CU.round);
+  const kinds=["red","green","gold"];
+  const target=kinds[Math.floor(Math.random()*3)];
+  const decoys = CU.round===0 ? 0 : CU.round<3 ? 1 : 2;
+  const xs=cupsPlace(n);
+  const cups=xs.map((x,i)=>({i, x, home:x, y:560, lift:1, ball:null, hop:0}));
+  const free=cups.map((_,i)=>i);
+  const take=()=>free.splice(Math.floor(Math.random()*free.length),1)[0];
+  cups[take()].ball=target;
+  const others=kinds.filter(k=>k!==target);
+  for(let d=0;d<decoys && free.length;d++) cups[take()].ball=others[d%others.length];
+  const swaps=[];
+  let a=0;
+  const nSwap=REDUCED ? 1 : 2+Math.min(5, CU.round);
+  for(let s=0;s<nSwap;s++){
+    let b=(a+1+Math.floor(Math.random()*(n-1)))%n;
+    if(b===a) b=(a+1)%n;
+    swaps.push([a,b]); a=b;
+  }
+  CU.cups=cups; CU.target=target; CU.sel=cups.findIndex(c=>c.ball===target);
+  CU.swaps=swaps; CU.swapT=0; CU.hit=false; CU.cheer="";
+  CU.phase="call"; CU.phaseT=0;
+  try{ beep(520,.08,"triangle",.04); }catch(e){}
+}
+function cupsEase(t){ return t<.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2; }
+function cupsByX(){ return CU.cups.slice().sort((a,b)=>a.x-b.x); }
+function cupsNudge(dir){
+  const row=cupsByX();
+  let i=row.findIndex(c=>c.i===CU.sel);
+  if(i<0) i=0;
+  i=clamp(i+dir,0,row.length-1);
+  CU.sel=row[i].i;
+  try{ beep(440,.04,"square",.03); }catch(e){}
+}
+function cupsConfirm(){
+  if(!CU || CU.over || CU.phase!=="pick") return;
+  const c=CU.cups.find(q=>q.i===CU.sel);
+  CU.hit=!!(c && c.ball===CU.target);
+  CU.phase="reveal"; CU.phaseT=0;
+  if(CU.hit){
+    const add=100+CU.round*25;
+    CU.score+=add; CU.cheer="+"+add;
+    if(CU.score>CU.best){ CU.best=CU.score; saveCupsBest(CU.best); }
+    try{ beep(660,.07,"square",.05); setTimeout(()=>beep(880,.1,"square",.05),90); }catch(e){}
+    for(let i=0;i<14;i++) CU.pops.push({x:c.x+cupRand(-20,20), y:c.y-40, vx:cupRand(-80,80), vy:cupRand(-220,-80), life:0.8, col:KINDS[CU.target].rim});
+  } else {
+    CU.lives--;
+    try{ beep(180,.18,"sawtooth",.05); }catch(e){}
+    CU.shake=.35;
+  }
+}
+function cupsEdge(name, down){
+  const was=!!CU.held[name]; CU.held[name]=down; return down && !was;
+}
+function cupsPointer(p){
+  if(!CU) return;
+  if(CU.over){ if(CU.overT>.55) startCups(); return; }
+  if(CU.phase!=="pick") return;
+  let best=null, bd=78;
+  for(const c of CU.cups){
+    const d=Math.hypot(p.x-c.x, p.y-(c.y-36));
+    if(d<bd){ bd=d; best=c; }
+  }
+  if(!best) return;
+  CU.sel=best.i;
+  cupsConfirm();
+}
+function updateCups(dt){
+  if(!CU.running) return;
+  CU.phaseT+=dt; CU.t=(CU.t||0)+dt;
+  if(CU.shake>0) CU.shake=Math.max(0, CU.shake-dt);
+  for(let i=CU.pops.length-1;i>=0;i--){
+    const q=CU.pops[i]; q.life-=dt; q.x+=q.vx*dt; q.y+=q.vy*dt; q.vy+=420*dt;
+    if(q.life<=0) CU.pops.splice(i,1);
+  }
+  if(CU.over){
+    CU.overT+=dt;
+    const go=keys.has("Space")||keys.has("Enter")||keys.has("KeyX");
+    if(CU.overT>.55 && cupsEdge("go", go)) startCups();
+    return;
+  }
+  const go=keys.has("Space")||keys.has("Enter")||keys.has("KeyX")||keys.has("ArrowUp")||keys.has("KeyW");
+  if(CU.phase==="pick"){
+    if(cupsEdge("l", keys.has("ArrowLeft")||keys.has("KeyA"))) cupsNudge(-1);
+    if(cupsEdge("r", keys.has("ArrowRight")||keys.has("KeyD"))) cupsNudge(1);
+    if(cupsEdge("go", go)) cupsConfirm();
+  } else CU.held.go=go;
+  const showFor=Math.max(.55, 1.35-CU.round*.08);
+  if(CU.phase==="call" && CU.phaseT>1.05){ CU.phase="show"; CU.phaseT=0; }
+  else if(CU.phase==="show" && CU.phaseT>showFor){ CU.phase="close"; CU.phaseT=0; }
+  else if(CU.phase==="close" && CU.phaseT>.42){ CU.phase="shuffle"; CU.phaseT=0; CU.swapT=0; CU.sel=0; }
+  else if(CU.phase==="shuffle"){
+    const dur=REDUCED ? .16 : Math.max(.34, .82-CU.round*.05);
+    const pair=CU.swaps[0];
+    if(!pair){
+      const row=cupsByX();
+      CU.sel=row.length?row[0].i:0;
+      CU.phase="pick"; CU.phaseT=0; CU.held={};
+      return;
+    }
+    CU.swapT+=dt;
+    const t=clamp(CU.swapT/dur,0,1), e=cupsEase(t);
+    const A=CU.cups[pair[0]], B=CU.cups[pair[1]];
+    if(!A._sx){ A._sx=A.home; B._sx=B.home; }
+    A.x=lerp(A._sx, B._sx, e); B.x=lerp(B._sx, A._sx, e);
+    const hop=Math.sin(t*Math.PI)*(REDUCED?8:34);
+    A.hop=hop; B.hop=-hop*.35;
+    if(t>=1){
+      const ah=A._sx; A.home=B._sx; B.home=ah; A.x=A.home; B.x=B.home; A.hop=B.hop=0;
+      delete A._sx; delete B._sx;
+      CU.swaps.shift(); CU.swapT=0;
+      try{ beep(300+CU.round*20,.04,"square",.025); }catch(e){}
+    }
+  }
+  else if(CU.phase==="reveal" && CU.phaseT>1.05){
+    if(CU.hit){ CU.round++; cupsBeginRound(); }
+    else if(CU.lives<=0){ CU.over=true; CU.overT=0; CU.running=true; try{ beep(140,.3,"triangle",.06); }catch(e){} }
+    else cupsBeginRound();
+  }
+  for(const c of CU.cups){
+    let goal=0;
+    if(CU.phase==="call"||CU.phase==="show") goal=1;
+    else if(CU.phase==="reveal"){
+      if(c.i===CU.sel) goal=1;
+      else if(!CU.hit && c.ball===CU.target && CU.phaseT>.28) goal=1;
+    }
+    c.lift=lerp(c.lift, goal, 1-Math.pow(.001, dt));
+  }
+}
+function cupsBall(c,x,y,r){
+  if(drawBallSpr(ctx, c.ball, x, y, r, CU.t||0)) return;
+  const k=KINDS[c.ball];
+  ctx.fillStyle=k.rim; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle="#2b1a10"; ctx.lineWidth=3; ctx.stroke();
+}
+function drawOneCup(c, hot){
+  const x=c.x, up=c.lift*62+(c.hop||0);
+  ctx.save();
+  ctx.fillStyle="rgba(40,24,10,.28)";
+  ctx.beginPath(); ctx.ellipse(x, c.y+8, 40, 10, 0, 0, Math.PI*2); ctx.fill();
+  if(c.ball && c.lift>.2) cupsBall(c, x, c.y-18, 20);
+  ctx.translate(x, c.y-up);
+  if(hot){ ctx.strokeStyle="#ffcf3a"; ctx.lineWidth=6; ctx.beginPath(); ctx.ellipse(0, 16, 52, 16, 0, 0, Math.PI*2); ctx.stroke(); }
+  ctx.fillStyle=hot?"#fff8df":"#f3ecdf";
+  ctx.strokeStyle="#2b1a10"; ctx.lineWidth=4; ctx.lineJoin="round";
+  ctx.beginPath();
+  ctx.moveTo(-48,-4); ctx.lineTo(-32,-86); ctx.quadraticCurveTo(0,-108,32,-86); ctx.lineTo(48,-4); ctx.quadraticCurveTo(0,16,-48,-4);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(0,-2,48,15,0,0,Math.PI*2);
+  ctx.fillStyle="#fff6c9"; ctx.fill(); ctx.stroke();
+  ctx.strokeStyle="#e2a21a"; ctx.lineWidth=5;
+  ctx.beginPath(); ctx.moveTo(-36,-48); ctx.lineTo(36,-48); ctx.stroke();
+  ctx.restore();
+}
+function cupsLabel(text,x,y,size,fill,align){
+  ctx.font="700 "+size+"px Fredoka, system-ui, sans-serif";
+  ctx.textAlign=align||"center"; ctx.textBaseline="middle";
+  ctx.lineWidth=Math.max(4, size/6); ctx.strokeStyle="#2b1a10"; ctx.strokeText(text,x,y);
+  ctx.fillStyle=fill||"#fff6c9"; ctx.fillText(text,x,y);
+}
+function drawCupsBernard(){
+  if(sprReady("hopBernard")){
+    const im=SPR.hopBernard, h=188, w=h*(im.naturalWidth/im.naturalHeight);
+    ctx.drawImage(im, 8, 372, w, h);
+    return;
+  }
+  ctx.save(); ctx.translate(96, 455);
+  ctx.fillStyle="#c9844a"; ctx.strokeStyle="#2b1a10"; ctx.lineWidth=4;
+  ctx.beginPath(); ctx.ellipse(0, 28, 28, 22, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(0, 0, 32, 28, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle="#1a120c";
+  ctx.beginPath(); ctx.moveTo(-18,-10); ctx.lineTo(-30,-46); ctx.lineTo(-6,-16); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(18,-10); ctx.lineTo(30,-46); ctx.lineTo(6,-16); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, 8, 14, 11, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle="#f0472f"; ctx.beginPath(); ctx.ellipse(5, 14, 6, 3.5, .4, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(-9,-2,3.4,0,Math.PI*2); ctx.arc(9,-2,3.4,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle="#1a120c"; ctx.beginPath(); ctx.arc(-9,-2,1.7,0,Math.PI*2); ctx.arc(9,-2,1.7,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function drawCups(){
+  if(!CU) return;
+  ctx.save();
+  if(CU.shake>0){ ctx.translate(Math.sin(CU.shake*80)*6, 0); }
+  const sky=ctx.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,"#7ec0ee"); sky.addColorStop(.55,"#ffe7a8"); sky.addColorStop(1,"#6aaa4a");
+  ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle="#3f8a3a"; ctx.fillRect(0,560,W,H-560);
+  ctx.fillStyle="#c9844a";
+  ctx.beginPath(); ctx.roundRect(70,548,W-140,28,14); ctx.fill();
+  ctx.strokeStyle="#6a3e22"; ctx.lineWidth=4; ctx.stroke();
+  drawCupsBernard();
+  const k=KINDS[CU.target]||KINDS.gold;
+  ctx.fillStyle="rgba(255,246,201,.94)";
+  ctx.strokeStyle="#2b1a10"; ctx.lineWidth=4;
+  ctx.beginPath(); ctx.roundRect(250,28,400,78,18); ctx.fill(); ctx.stroke();
+  const say = CU.over ? "He kept that one!" : CU.phase==="pick" ? "Which cup?" : CU.phase==="reveal" ? (CU.hit?"YES! That's it!":"Not that one!") : "Find the "+k.label+" ball!";
+  cupsLabel(say, 450, 68, 28, "#2b1a10");
+  if(!CU.over && (CU.phase==="call"||CU.phase==="show")){
+    cupsBall({ball:CU.target}, 610, 66, 22);
+  }
+  for(const c of CU.cups) drawOneCup(c, CU.phase==="pick" && c.i===CU.sel);
+  if(CU.cheer){ cupsLabel(CU.cheer, W/2, 250, 42, "#ffcf3a"); }
+  for(const q of CU.pops){ ctx.globalAlpha=clamp(q.life*2,0,1); ctx.fillStyle=q.col; ctx.beginPath(); ctx.arc(q.x,q.y,6,0,Math.PI*2); ctx.fill(); }
+  ctx.globalAlpha=1;
+  if(!POSTER){
+    cupsLabel(String(CU.score).padStart(6,"0"), 28, 36, 22, "#fff6c9", "left");
+    cupsLabel("BEST "+CU.best, 28, 64, 14, "#ffe08a", "left");
+    let hx=W-36;
+    for(let i=0;i<3;i++){
+      ctx.beginPath(); ctx.arc(hx, 40, 12, 0, Math.PI*2);
+      ctx.fillStyle=i<CU.lives?"#f0472f":"rgba(0,0,0,.25)"; ctx.fill();
+      ctx.strokeStyle="#2b1a10"; ctx.lineWidth=3; ctx.stroke();
+      hx-=32;
+    }
+    cupsLabel("ROUND "+(CU.round+1), W/2, 150, 16, "#fff6c9");
+  }
+  if(CU.over && !POSTER){
+    ctx.fillStyle="rgba(18,10,6,.55)"; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle="#fff6c9"; ctx.strokeStyle="#2b1a10"; ctx.lineWidth=5;
+    ctx.beginPath(); ctx.roundRect(W/2-230, 200, 460, 220, 22); ctx.fill(); ctx.stroke();
+    cupsLabel("BALL KEPT", W/2, 250, 36, "#f0472f");
+    cupsLabel("Score "+CU.score, W/2, 304, 22, "#2b1a10");
+    if(CU.score>=CU.best && CU.score>0) cupsLabel("NEW BEST!", W/2, 340, 18, "#d99406");
+    if(Math.floor((CU.t||0)*2)%2===0) cupsLabel("Press A to play again", W/2, 384, 16, "#2b1a10");
+  }
+  ctx.restore();
+  if(glare && !POSTER) drawGlass();
+}
+function openCups(){
+  hideAll();
+  if(cupsEl) cupsEl.classList.add("on");
+  setMark("cups");
+  MODE="cups";
+  if(!CU){ CU=newCups(0); loadCupsBest(); }
+  CU.running=false;
+  if(!CU.cups.length){
+    CU.round=1; cupsBeginRound(); CU.phase="show"; CU.phaseT=1;
+  }
+  drawCups();
+}
+function startCups(){
+  const best=CU?CU.best:0;
+  CU=newCups(best); loadCupsBest();
+  CU.running=true;
+  cupsBeginRound();
+  MODE="cups"; setMark("cups");
+  hideAll();
+  if(!ac) beep(1,.01);
+  syncHud();
+}
+function makeCupsPoster(){
+  const keep=CU, keepMode=MODE;
+  CU=newCups(0); CU.round=1; cupsBeginRound();
+  CU.phase="show"; CU.phaseT=1;
+  for(const c of CU.cups) c.lift = c.ball==="gold" ? 1 : .15;
+  CU.target="gold";
+  POSTER=true;
+  try{ drawCups(); document.documentElement.style.setProperty("--ph-cups","url("+cv.toDataURL("image/jpeg",.82)+")"); }catch(e){}
+  POSTER=false; CU=keep; MODE=keepMode;
+}
+
 // ---------------------------------------------------------------- loop
 let last=performance.now();
 let frameErr=0;
@@ -8867,6 +9153,7 @@ function frame(now){
       else if (MODE==="hop"){ if (LH){ if(!PAUSED) updateHop(d); drawHop(); } }
       else if (MODE==="jeep"){ if (J){ if(!PAUSED) updateJeep(d); drawJeep(); } }
       else if (MODE==="memo"){ if (M){ if(!PAUSED) updateMemo(d); drawMemo(); } }
+      else if (MODE==="cups"){ if (CU){ if(!PAUSED) updateCups(d); drawCups(); } }
       else if (MODE==="catch"){ if (C){ if(!PAUSED) updateCatch(d); drawCatch(); } }
       else if (MODE==="bba"){ /* Bernard's Big Adventure draws on its own canvas */ }
       else if (MODE==="brt"){ /* Bernard's Road Trip draws on its own canvas */ }
@@ -9696,6 +9983,7 @@ const MARKS={
   bba:   ["Bernard's","ADVENTURE"],
   brt:   ["Bernard's","ROAD TRIP"],
   memo:  ["Bernard","SAYS"],
+  cups:  ["Julia's","CUPS"],
   jeep:  ["Bernard Goes","OFF ROAD"]
 };
 function setMark(which){
@@ -9710,6 +9998,7 @@ function hideAll(){
   airEl.classList.remove("on");
   if (hopEl) hopEl.classList.remove("on");
   if (memoEl) memoEl.classList.remove("on");
+  if (cupsEl) cupsEl.classList.remove("on");
   if (catchEl) catchEl.classList.remove("on");
   if (jeepEl) jeepEl.classList.remove("on");
   pauseEl.classList.remove("on"); PAUSED=false;
@@ -9723,6 +10012,7 @@ function refreshBests(){
   set("bestBallies",get("ballies_best")); set("bestTita",get("tita_best")); set("bestFlap",get("flap_best"));
   set("bestPaddle",get("paddle_best")); set("bestAir",get("air_best")); set("bestHop",get("hop_best")); set("bestJeep",get("jeep_best"));
   set("bestMemo",get("memo_best"));
+  set("bestCups",get("cups_best"));
   set("bestCatch",get("catch_best"));
   set("bestBba",get("bba_best"));
   set("bestBrt",get("brt_best"));
@@ -9744,6 +10034,7 @@ function goHome(){
   if (LH) LH.running=false;
   if (J) J.running=false;
   if (M) M.running=false;
+  if (CU) CU.running=false;
   if (C) C.running=false;
   initCarousel();
   applyNewHighRibbons();
@@ -9843,14 +10134,14 @@ function updateStar(){
   const id=(GP_ITEMS.home||[])[GP.focus]||"pickFlap";
   const air=id==="pickAir";
   const hop=id==="pickHop";
-  const yard=id==="pickBallies", memo=id==="pickMemo", cat=id==="pickCatch", bbaCard=id==="pickBba", brtCard=id==="pickBrt";
-  const which=brtCard?"brt":bbaCard?"bba":cat?"catch":memo?"memo":yard?"yard":hop?"hop":air?(A_PLANE==="jet"?"jet":"air"):"flap";
+  const yard=id==="pickBallies", memo=id==="pickMemo", cupsCard=id==="pickCups", cat=id==="pickCatch", bbaCard=id==="pickBba", brtCard=id==="pickBrt";
+  const which=brtCard?"brt":bbaCard?"bba":cat?"catch":cupsCard?"cups":memo?"memo":yard?"yard":hop?"hop":air?(A_PLANE==="jet"?"jet":"air"):"flap";
   if (img.getAttribute("data-which")===which){ img.style.opacity="1"; return; }
   img.style.opacity="0";
   setTimeout(()=>{
     img.src=hop?"/art/bernard-portrait.jpg":air?(which==="jet"?"/art/bernard-jet-portrait.jpg":"/art/bernard-pilot-portrait.jpg"):"/art/bernard-portrait.jpg";
     img.setAttribute("data-which",which);
-    if (cap) cap.textContent=brtCard?"Road trip":bbaCard?"Big adventure":cat?"Catch!":memo?"Simon says":yard?"Ball thief":hop?"The hoppers":air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
+    if (cap) cap.textContent=brtCard?"Road trip":bbaCard?"Big adventure":cat?"Catch!":cupsCard?"Julia's cups":memo?"Simon says":yard?"Ball thief":hop?"The hoppers":air?(which==="jet"?"Firefighter":"Pilot"):"The proprietor";
     img.style.opacity="1";
   },90);
 }
@@ -9868,11 +10159,12 @@ function gameRunning(){
   return (MODE==="tita"&&T&&T.running)||(MODE==="flap"&&F&&F.running)||
          (MODE==="paddle"&&P&&P.running)||(MODE==="air"&&A&&A.running)||
          (MODE==="hop"&&LH&&LH.running)||(MODE==="jeep"&&J&&J.running)||(MODE==="ballies"&&G&&G.running)||
-         (MODE==="memo"&&M&&(M.running||M.over))||(MODE==="catch"&&C&&C.running);
+         (MODE==="memo"&&M&&(M.running||M.over))||(MODE==="cups"&&CU&&(CU.running||CU.over))||(MODE==="catch"&&C&&C.running);
 }
 function togglePause(){
   if (MODE==="bba"){ bbaTogglePause(); return; }
   if (MODE==="memo" && M && M.over) return;
+  if (MODE==="cups" && CU && CU.over) return;
   if (!gameRunning()) return;
   PAUSED=!PAUSED;
   pauseEl.classList.toggle("on",PAUSED);
@@ -9909,7 +10201,7 @@ function startTita(){
   hideAll();
   if (!ac) beep(1,.01);
 }
-function startCurrent(){ if (MODE==="tita") startTita(); else if (MODE==="flap") startFlap(); else if (MODE==="paddle") startPaddle(); else if (MODE==="air") startAir({skipStory:true}); else if (MODE==="hop") startHop(); else if (MODE==="jeep") startJeep(); else if (MODE==="memo") startMemo(); else if (MODE==="catch") startCatch(); else start(); }
+function startCurrent(){ if (MODE==="tita") startTita(); else if (MODE==="flap") startFlap(); else if (MODE==="paddle") startPaddle(); else if (MODE==="air") startAir({skipStory:true}); else if (MODE==="hop") startHop(); else if (MODE==="jeep") startJeep(); else if (MODE==="memo") startMemo(); else if (MODE==="cups") startCups(); else if (MODE==="catch") startCatch(); else start(); }
 
 document.getElementById("goalNum").textContent=WIN_SCORE;
 document.getElementById("titaGoal").textContent=T_WIN;
@@ -9926,6 +10218,10 @@ document.getElementById("padNic").addEventListener("click",()=>setChar("nic"));
 document.getElementById("hopStartBtn").addEventListener("click",startHop);
 const memoStartBtn=document.getElementById("memoStartBtn");
 if (memoStartBtn) memoStartBtn.addEventListener("click",startMemo);
+const cupsStartBtn=document.getElementById("cupsStartBtn");
+if (cupsStartBtn) cupsStartBtn.addEventListener("click",startCups);
+const cupsBackBtn=document.getElementById("cupsBack");
+if (cupsBackBtn) cupsBackBtn.addEventListener("click",goHome);
 const catchStartBtn=document.getElementById("catchStartBtn");
 if (catchStartBtn) catchStartBtn.addEventListener("click",startCatch);
 const catchBackBtn=document.getElementById("catchBack");
@@ -10131,7 +10427,7 @@ function makeCatchPoster(){
   try{ drawCatch(); document.documentElement.style.setProperty("--ph-catch","url("+cv.toDataURL("image/jpeg",.82)+")"); }catch(e){}
   POSTER=false; C=keep; MODE=keepMode;
 }
-function makePosters(){ makeTitaPoster(); makeFlapPoster(); makePaddlePoster(); makeAirPoster(); makeBalliesPoster(); makeMemoPoster(); makeCatchPoster(); }
+function makePosters(){ makeTitaPoster(); makeFlapPoster(); makePaddlePoster(); makeAirPoster(); makeBalliesPoster(); makeMemoPoster(); makeCupsPoster(); makeCatchPoster(); }
 makePosters();
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(makePosters);
 setMark("home");

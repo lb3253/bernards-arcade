@@ -527,6 +527,7 @@ body:not([data-screen="home"]) .chase{ display:none }
 #pickHop .thumb{background-image:url("/art/card-hop.jpg") !important;background-position:center 40% !important}
 #pickBallies .thumb{background-image:var(--ph-ballies,var(--ph-bernard)) !important;background-position:center 58% !important}
 #pickMemo .thumb{background-image:var(--ph-memo,var(--ph-bernard)) !important;background-position:center 60% !important}
+#pickCups .thumb{background-image:var(--ph-cups,var(--ph-bernard)) !important;background-position:center 62% !important}
 #pickCatch .thumb{background-image:var(--ph-catch,var(--ph-bernard)) !important;background-position:center 55% !important}
 #pickBba .thumb{background-image:url("/art/card-bba.jpg") !important;background-position:center 48% !important}
 #pickBrt .thumb{
@@ -536,6 +537,8 @@ body:not([data-screen="home"]) .chase{ display:none }
   background-repeat:no-repeat !important;
 }
 #memomenu .shot{background-image:var(--ph-memo,var(--ph-bernard));background-size:cover;background-position:center 40%}
+#cupsmenu .shot{background-image:var(--ph-cups,var(--ph-bernard));background-size:cover;background-position:center 42%}
+#cupsmenu .scrim{background:linear-gradient(180deg, rgba(40,24,8,.05) 0%, rgba(40,24,8,.28) 48%, rgba(18,10,6,.94) 100%)}
 #memomenu .scrim{background:linear-gradient(180deg, rgba(20,10,40,.1) 0%, rgba(20,10,40,.35) 50%, rgba(12,6,24,.95) 100%)}
 #catchmenu .shot{background-image:var(--ph-catch,var(--ph-bernard));background-size:cover;background-position:center 42%}
 #catchmenu .scrim{background:linear-gradient(180deg, rgba(20,50,80,.08) 0%, rgba(10,30,20,.3) 46%, rgba(6,18,12,.94) 100%)}
