@@ -473,7 +473,7 @@ const STORY_STAGES = [
 const ROUTES = [
   { id: 0, name: 'Little Elm, Texas', stages: TX_STAGES, shop: 'Black Sheep Coffee', shopStyle: 'sheep', park: 'oak', welcome: ['WELCOME TO', 'LITTLE ELM'], blurb: 'Longhorns, windmills, the lake bridge, Dallas at sunset' },
   { id: 1, name: 'Miami, Florida', stages: MIA_STAGES, shop: 'CAO Coffee', shopStyle: 'cao', park: 'palm', welcome: ['BIENVENIDOS A', 'MIAMI'], blurb: 'Ocean Drive, the causeway, downtown neon at night' },
-  { id: 2, name: 'Story: The School Run', stages: STORY_STAGES, shop: 'Black Sheep Coffee', shopStyle: 'sheep', park: 'oak', welcome: ['WELCOME TO', 'LITTLE ELM'], blurb: 'Pick up Nick & Giulia, Slush Rush at Tinman Social, maybe a boat ride on the lake', story: true, time: 170, cpTime: 145 }
+  { id: 2, name: 'Story: The School Run', stages: STORY_STAGES, shop: 'Black Sheep Coffee', shopStyle: 'sheep', park: 'oak', welcome: ['WELCOME TO', 'LITTLE ELM'], blurb: 'Pick up Nick & Giulia, Slush Rush at Tinman Social, maybe a boat ride on the lake', story: true, time: 195, cpTime: 165 }
 ];
 let route = ROUTES[0], STAGES = route.stages;
 try { const r = +localStorage.getItem('brt_route'); if (r === 1 || r === 2) { route = ROUTES[r]; STAGES = route.stages; } } catch (e) { }
@@ -1402,11 +1402,13 @@ function buildStory() {
   curStage = 0; stageStarts[0] = 0;
   straight(LEN.short); curve(LEN.short, -CURVE.easy); straight(LEN.short); curve(LEN.med, CURVE.easy); straight(LEN.med); lowRolling(15, 12);
   fork('FM 423', 'DIRT TRAIL', () => { curve(LEN.med, -CURVE.easy); straight(LEN.med); sCurves(); }, () => { bumps(); lowRolling(15, 14); bumps(); straight(LEN.short); }, 'R');
-  pendShop(); straight(LEN.med); curve(LEN.short, -CURVE.med); straight(LEN.med); hill(LEN.short, HILL.low); straight(LEN.med); curve(LEN.med, CURVE.easy); straight(LEN.med); curve(LEN.med, -CURVE.easy, HILL.low); straight(LEN.med); straight(LEN.short);
+  pendShop(); straight(LEN.med); curve(LEN.short, -CURVE.med); straight(LEN.med); hill(LEN.short, HILL.low); straight(LEN.med); curve(LEN.med, CURVE.easy); straight(LEN.med); curve(LEN.med, -CURVE.easy, HILL.low); straight(LEN.med);
+  straight(LEN.long); curve(LEN.med, CURVE.easy); straight(LEN.med); lowRolling(15, 12); curve(LEN.med, -CURVE.med); straight(LEN.med); straight(LEN.short);
   curStage = 1; stageStarts[1] = segments.length;
   straight(LEN.short); curve(LEN.med, CURVE.easy); straight(LEN.med);
   fork('ELDORADO PKWY', 'LAKESHORE TRAIL', () => { curve(LEN.med, -CURVE.med, -HILL.low); straight(LEN.med); curve(LEN.med, CURVE.easy); }, () => { bumps(); curve(LEN.short, -CURVE.easy); bumps(); lowRolling(15, 10); }, 'R');
   straight(LEN.med); curve(LEN.short, CURVE.easy); straight(LEN.med); curve(LEN.med, -CURVE.easy); straight(LEN.med);
+  straight(LEN.long); curve(LEN.med, CURVE.med); straight(LEN.med); lowRolling(15, 10); curve(LEN.med, -CURVE.easy); straight(LEN.med);
   // optional detour: keep right at the AIRPORT exit and the trip turns into a flight over Little Elm
   airportFork = fork('TINMAN SOCIAL', 'AIRPORT', () => { straight(LEN.med); curve(LEN.short, -CURVE.easy); straight(LEN.short); }, buildAirport, null); airportFork.airport = true;
   lowRolling(15, 10); straight(LEN.med); straight(LEN.short);
@@ -1416,7 +1418,8 @@ function buildStory() {
   marinaFork = fork('HOME', 'MARINA', () => { straight(LEN.med); curve(LEN.short, CURVE.easy); straight(LEN.short); }, buildLake, null); marinaFork.marina = true;
   straight(LEN.med);
   fork('NEIGHBORHOOD', 'FIELD SHORTCUT', () => { lowRolling(15, 10); curve(LEN.med, CURVE.med); straight(LEN.med); }, () => { bumps(); bumps(); curve(LEN.short, CURVE.easy); }, 'R');
-  straight(LEN.med); curve(LEN.short, -CURVE.easy); straight(LEN.med); curve(LEN.med, CURVE.easy); straight(LEN.med); downhillToEnd(50); straight(LEN.med); straight(LEN.med); straight(LEN.short);
+  straight(LEN.med); curve(LEN.short, -CURVE.easy); straight(LEN.med); curve(LEN.med, CURVE.easy); straight(LEN.med);
+  straight(LEN.long); curve(LEN.med, -CURVE.med); straight(LEN.med); lowRolling(15, 10); curve(LEN.med, CURVE.easy); straight(LEN.long); downhillToEnd(50); straight(LEN.med); straight(LEN.med); straight(LEN.short);
   const N = segments.length; trackLength = N * TUNE.segLen;
   // pup cup stop (Black Sheep Coffee) after the first fork, then the two story events
   pendingShops.slice(0, 1).forEach((n, i) => addShop(n, i));
@@ -1426,7 +1429,7 @@ function buildStory() {
   segments[N - 150].finishLine = true; for (let k = N - 118; k < N - 40; k++) segments[k].lot = true;
   addSprite(N - 80, 'home', 2.3, { solid: 1 }); addSprite(N - 110, 'signJewel', -1.4, { solid: 1 }); for (let k = N - 160; k < N - 150; k += 3) addSprite(k, 'ballG', 0.66, { pickup: 'green' });
   for (let k = N - 140; k < N; k += 7) { addSprite(k, pick(['house1', 'house2', 'house3', 'house4']), -2.2 - hash(k, 3) * 0.6, { solid: 1 }); if (k < N - 118 || k > N - 40) addSprite(k + 3, 'sapling', 1.4 + hash(k, 4) * 0.4, { solid: 1 }); else if (k + 3 < N - 100 || k + 3 > N - 62) addSprite(k + 3, pick(['house1', 'house2', 'house3', 'house4']), 2.3 + hash(k, 5) * 0.4, { solid: 1 }); }
-  addCars(20, stageStarts[1] - 80, 34); addCars(stageStarts[1], stageStarts[2] - 80, 36); addCars(stageStarts[2], N - 170, 40);
+  addCars(20, stageStarts[1] - 80, 75); addCars(stageStarts[1], stageStarts[2] - 80, 85); addCars(stageStarts[2], N - 170, 95);
 }
 let events = [], marinaFork = null, LAKE = {};
 function buildLake() { // the MARINA branch: a lot by the water, then Lake Lewisville itself, then the dock back on shore
@@ -1687,7 +1690,54 @@ try { best = +localStorage.getItem('brt_best') || 0; } catch (e) { }
 
 function setMenu(items) { menu = { items, idx: 0 }; }
 function goTitle() { Music.play(route.id === 2 ? 0 : route.id); Music.duck(0.7); state = 'title'; setMenu(['Start Road Trip', 'Controller Setup', 'Sound: ' + (Audio_.on ? 'On' : 'Off')]); titleT = 0; position = 0; playerX = 0; speed = 0; Audio_.engineSet(0, false); }
-function startGame() { Music.play(route.id === 2 ? 0 : route.id); Music.duck(1); ride = 'jeep'; swapScene = null; pupCups = 0; pup = null; storyKids = false; scene = null; slush = null; slushScore = 0; boat = false; skiers = 0; air = null; airJumps = 0; skisGot = 0; marinaNoticed = false; bannerOverride = null; plane = false; flyAlt = 0.5; rings = 0; airportNoticed = false; buildTrack(); position = 0; speed = 0; playerX = 0; steer = 0; score = 0; balls = 0; timer = route.time || TUNE.startTime; timerAcc = 0; stage = 0; stageBanner = 150; boostMeter = 0; boosting = 0; dizzy = 0; bubble = null; titaBubble = { text: route.story ? 'School\'s out in 10 minutes. ¡Vamos!' : '¡Vamos, Bernard!', life: 180 }; passes = 0; particles = []; texts = []; state = 'intro'; introTimer = 0; }
+/* ---- WEATHER: in the story, a rain shower rolls in after Tinman Social and clears up on the way home ---- */
+// rainTrip counts the segments driven since the last stage began; the shower builds, holds, then thins out
+const RAIN = { build: 90, hold: 1500, fade: 1100, bow: 1400 };
+let rain = 0, rainTrip = 0, rainSaid = 0;
+const DROPS = []; for (let i = 0; i < 220; i++) DROPS.push({ x: Math.random(), y: Math.random(), v: 0.8 + Math.random() * 0.6, l: 0.6 + Math.random() * 0.8 });
+function rainTarget() {
+  if (!route.story || stage !== 2) return 0;
+  const t = rainTrip; if (t < RAIN.build) return t / RAIN.build; if (t < RAIN.hold) return 1;
+  return Math.max(0, 1 - (t - RAIN.hold) / RAIN.fade);
+}
+function rainbowAmt() { // the rainbow shows up as the last clouds clear, then slowly fades
+  if (!route.story || stage !== 2) return 0; const t = rainTrip - RAIN.hold - RAIN.fade * 0.75;
+  return t < 0 ? 0 : t < 200 ? t / 200 : Math.max(0, 1 - (t - 200) / RAIN.bow);
+}
+function updateRain(dt, segsMoved) {
+  if (route.story && stage === 2) rainTrip += segsMoved; else rainTrip = 0;
+  rain += (rainTarget() - rain) * Math.min(1, dt * 1.5);
+  if (rain > 0.5 && rainSaid === 0) { rainSaid = 1; say(pick(['RAIN!! I\'M ALL WET!!', 'Splashy!!', 'Wet dog!! WET DOG!!'])); titaBubble = { text: '¡Ay, it\'s pouring! Slow down a little.', life: 200 }; }
+  if (rainSaid === 1 && rainTrip > RAIN.hold + RAIN.fade * 0.8) { rainSaid = 2; say(pick(['RAINBOW!! LOOK!!', 'The sun is back!!'])); titaBubble = { text: 'Look, kids, a rainbow!', life: 200 }; }
+  if (rain > 0.15 && speed > TUNE.maxSpeed * 0.15 && frame % 2 === 0 && state === 'playing' && !plane) for (const sx of [-1, 1]) particles.push({ x: W / 2 + sx * (60 + rnd(0, 40)), y: H - 18, vx: sx * rnd(1, 3), vy: rnd(-3, -0.5), life: 20, max: 20, r: 3 + rnd(0, 4), color: 'rgba(210,230,255,' + (0.55 * rain).toFixed(2) + ')', type: 'dust' });
+}
+// grey clouds over the sky, and the rainbow, drawn behind the scenery
+function drawRainSky() {
+  if (rain > 0.01) {
+    const g = ctx.createLinearGradient(0, 0, 0, H / 2 + 20); g.addColorStop(0, 'rgba(58,66,86,' + (0.85 * rain).toFixed(3) + ')'); g.addColorStop(1, 'rgba(120,130,150,' + (0.6 * rain).toFixed(3) + ')');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H / 2 + 20);
+    ctx.globalAlpha = 0.9 * rain; for (let i = 0; i < 7; i++) { const x = ((i * 173 + time * 8) % (W + 300)) - 150; ell(ctx, x, 40 + (i % 3) * 34, 120, 34); fs(ctx, '#5E6678', null); ell(ctx, x + 60, 30 + (i % 3) * 34, 90, 30); fs(ctx, '#6F7789', null); } ctx.globalAlpha = 1;
+  }
+  const bow = rainbowAmt(); if (bow > 0.01) {
+    const cols = ['#FF5A5A', '#FF9F3A', '#FFE45A', '#6BDB6B', '#5AA8FF', '#8A6BFF'];
+    ctx.save(); ctx.globalAlpha = 0.55 * bow; ctx.lineWidth = 12;
+    cols.forEach((c, i) => { ctx.beginPath(); ctx.arc(W * 0.62, H / 2 + 60, 300 - i * 12, Math.PI, TAU); ctx.strokeStyle = c; ctx.stroke(); });
+    ctx.restore();
+  }
+}
+// falling rain and a darker, wetter look over the whole road scene
+function drawRain() {
+  if (rain < 0.01) return;
+  ctx.fillStyle = 'rgba(30,40,60,' + (0.22 * rain).toFixed(3) + ')'; ctx.fillRect(0, 0, W, H);
+  const n = Math.floor(DROPS.length * rain), sp = 0.4 + speed / TUNE.maxSpeed;
+  ctx.strokeStyle = 'rgba(205,225,255,' + (0.55 * rain).toFixed(3) + ')'; ctx.lineWidth = 1.6; ctx.beginPath();
+  for (let i = 0; i < n; i++) { const d = DROPS[i], y = ((d.y + time * d.v * 1.6 * sp) % 1) * (H + 40) - 20, x = ((d.x - time * 0.05 * d.v) % 1 + 1) % 1 * W, len = 18 * d.l * sp + 8; ctx.moveTo(x, y); ctx.lineTo(x - len * 0.25, y + len); }
+  ctx.stroke();
+  // splashes on the road
+  ctx.fillStyle = 'rgba(220,235,255,' + (0.5 * rain).toFixed(3) + ')';
+  for (let i = 0; i < 18 * rain; i++) { const d = DROPS[i + 100], ph = (time * 3 + d.v * 7) % 1; ell(ctx, d.x * W, H * 0.62 + d.y * H * 0.36, 4 + ph * 8, 1.5 + ph * 2); ctx.fill(); }
+}
+function startGame() { Music.play(route.id === 2 ? 0 : route.id); Music.duck(1); ride = 'jeep'; swapScene = null; pupCups = 0; pup = null; storyKids = false; scene = null; slush = null; slushScore = 0; boat = false; skiers = 0; air = null; airJumps = 0; skisGot = 0; marinaNoticed = false; bannerOverride = null; rain = 0; rainTrip = 0; rainSaid = 0; plane = false; flyAlt = 0.5; rings = 0; airportNoticed = false; buildTrack(); position = 0; speed = 0; playerX = 0; steer = 0; score = 0; balls = 0; timer = route.time || TUNE.startTime; timerAcc = 0; stage = 0; stageBanner = 150; boostMeter = 0; boosting = 0; dizzy = 0; bubble = null; titaBubble = { text: route.story ? 'School\'s out in 10 minutes. ¡Vamos!' : '¡Vamos, Bernard!', life: 180 }; passes = 0; particles = []; texts = []; state = 'intro'; introTimer = 0; }
 function quitToArcade() { if (typeof window.BRT.onQuit === 'function') { stop(); window.BRT.onQuit(); } else goTitle(); }
 function say(text, who = 'b') { if (who === 'b') bubble = { text, life: 90 }; else titaBubble = { text, life: 110 }; }
 function floatText(x, y, str, color = C.cream) { texts.push({ x, y, str, color, life: 50 }); }
@@ -1801,7 +1851,7 @@ function updatePlaying(dt) {
     car.wreck = { t: 0, dir: car.offset >= rx ? 1 : -1, puff: 0, water: boat }; car.dodge = 0; car.speed = Math.max(car.speed, speed * 1.05);
     speed = Math.max(car.speed * 0.5, speed * 0.5); crash('car'); score += 50; floatText(W / 2 + rnd(-60, 60), 300, boat ? 'SPLASH! +50' : 'FLIP! +50', '#FFD27A'); if (boat) { sfx.splash(); wipeout(); } break;
   }
-  position = increase(position, dt * speed, trackLength);
+  position = increase(position, dt * speed, trackLength); updateRain(dt, dt * speed / TUNE.segLen);
   // ride the merge: as the branch eases back to centre, the Jeep moves with it (so the road never slides out from under you)
   if (segNow.merge) { const segNext = findSegment(position + playerZ); if (segNext.merge === segNow.merge) { const d = mergeShift(segNext, ((position + playerZ) % TUNE.segLen) / TUNE.segLen) - mSh; playerX += d; steer = clamp(steer + d * 4, -1, 1); skyOff = increase(skyOff, d * 0.03, 1); hillOff = increase(hillOff, d * 0.06, 1); } }
   // horn: Bernard barks, cars ahead in our lane move over
@@ -2080,7 +2130,7 @@ function drawRoad() {
   const base = findSegment(position), basePct = (position % TUNE.segLen) / TUNE.segLen;
   const playerSeg = findSegment(position + playerZ), playerPct = ((position + playerZ) % TUNE.segLen) / TUNE.segLen;
   const playerY = lerp(playerSeg.p1.world.y, playerSeg.p2.world.y, playerPct);
-  drawSky(pal); drawBackdrop(pal, playerY); const camLift = planeLift();
+  drawSky(pal); drawRainSky(); drawBackdrop(pal, playerY); const camLift = planeLift();
   let maxy = H, x = 0, dx = -(base.curve * basePct);
   const N = segments.length;
   // Walk the track the way the player will actually drive it: at an undecided fork look down the branch they are
@@ -2519,7 +2569,7 @@ function render() {
   if (state === 'title') { drawTitle(); return; }
   if (state === 'setup') { drawSetup(); return; }
   if (state === 'route') { drawRouteSelect(); return; }
-  drawRoad(); drawFx(); drawHUD();
+  drawRoad(); drawRain(); drawFx(); drawHUD();
   if (state === 'pupcup' && pup.t > 1) drawPupScene(pup.t - 1);
   if (state === 'scene' && scene.kind === 'school' && scene.t > 1) drawSceneSchool(scene.t - 1);
   if (state === 'scene' && scene.kind === 'marina' && scene.t > 0.8) drawSceneMarina(scene.t - 0.8);
@@ -2554,7 +2604,7 @@ function start() {
 function stop() { running = false; cancelAnimationFrame(raf); Music.stop(); Audio_.engineSet(0, false); window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp); window.removeEventListener('blur', onBlur); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('gamepadconnected', onGpc); }
 const onVis = () => { if (document.hidden && state === 'playing') { state = 'paused'; setMenu(['Resume', 'Restart Trip', 'Quit to Arcade']); Audio_.engineSet(0, false); } };
 const onGpc = () => { Audio_.init(); Audio_.engineOn(); };
-window.BRT = { start, stop, onQuit: null, get state() { return state; }, teleport(segIndex) { position = segIndex * TUNE.segLen; playerX = 0; }, cheat(v) { speed = v; }, stageStarts() { return stageStarts.concat([segments.length]); }, stops() { return stops.map(q => q.n); }, swaps() { return swaps.map(q => q.n); }, ride() { return ride; }, events() { return events.map(q => ({ kind: q.kind, n: q.n })); }, forks() { return forks.map(f => ({ decision: f.decision, L0: f.L0, Lb: f.Lb, L1: f.L1, R0: f.R0, Rb: f.Rb, R1: f.R1, off: f.offroadSide, chosen: f.chosen })); }, routeId() { return route.id; }, setRoute(i) { route = ROUTES[i]; STAGES = route.stages; }, setX(x) { playerX = x; }, lake() { return Object.assign({ boat, skiers, air: !!air, airJumps, skisGot, fork: marinaFork && { decision: marinaFork.decision, chosen: marinaFork.chosen } }, LAKE); }, skipScene() { if (state === 'scene') scene.t = 99; if (state === 'slush' && slush) { slush.phase = 'done'; slush.t = 99; } }, lakeItems() { const out = []; if (LAKE.from === undefined) return out; for (let n = LAKE.from; n < LAKE.to; n++) for (const sp of segments[n].sprites) if (sp.ramp || sp.pickup === 'skis' || sp.obstacle) out.push({ n, key: sp.key, offset: sp.offset }); return out; }, setBoat(v) { boat = v; }, airport() { return Object.assign({ plane, flyAlt, rings, lift: flyLiftAt(findSegment(position + playerZ).index), fork: airportFork && { decision: airportFork.decision, chosen: airportFork.chosen } }, AIR); }, setPlane(v) { plane = v; }, setAlt(v) { flyAlt = v; }, setSkiers(v) { skiers = v; }, setSpeed(v) { speed = v; }, dbg() { const sg = findSegment(position + playerZ); return { playerX: +playerX.toFixed(3), seg: sg.index, merge: sg.merge || null, mp: sg.mp1, mergeShift: mergeShift(sg, ((position + playerZ) % TUNE.segLen) / TUNE.segLen), speed: Math.round(speed), state, dizzy: +dizzy.toFixed(2), boat, skiers, airJumps }; }, wrecks() { return cars.filter(c => c.wreck).map(c => ({ seg: Math.floor(c.z / TUNE.segLen), offset: +c.offset.toFixed(2), t: +c.wreck.t.toFixed(2), speed: Math.round(c.speed) })); }, firstCar() { let b = null; for (const c of cars) if (!b || c.z < b.z) b = c; return { seg: Math.floor(b.z / TUNE.segLen), offset: b.offset, kind: b.kind }; } };
+window.BRT = { start, stop, onQuit: null, get state() { return state; }, teleport(segIndex) { position = segIndex * TUNE.segLen; playerX = 0; }, cheat(v) { speed = v; }, stageStarts() { return stageStarts.concat([segments.length]); }, stops() { return stops.map(q => q.n); }, swaps() { return swaps.map(q => q.n); }, ride() { return ride; }, events() { return events.map(q => ({ kind: q.kind, n: q.n })); }, forks() { return forks.map(f => ({ decision: f.decision, L0: f.L0, Lb: f.Lb, L1: f.L1, R0: f.R0, Rb: f.Rb, R1: f.R1, off: f.offroadSide, chosen: f.chosen })); }, routeId() { return route.id; }, setRoute(i) { route = ROUTES[i]; STAGES = route.stages; }, setX(x) { playerX = x; }, lake() { return Object.assign({ boat, skiers, air: !!air, airJumps, skisGot, fork: marinaFork && { decision: marinaFork.decision, chosen: marinaFork.chosen } }, LAKE); }, skipScene() { if (state === 'scene') scene.t = 99; if (state === 'slush' && slush) { slush.phase = 'done'; slush.t = 99; } }, lakeItems() { const out = []; if (LAKE.from === undefined) return out; for (let n = LAKE.from; n < LAKE.to; n++) for (const sp of segments[n].sprites) if (sp.ramp || sp.pickup === 'skis' || sp.obstacle) out.push({ n, key: sp.key, offset: sp.offset }); return out; }, setBoat(v) { boat = v; }, airport() { return Object.assign({ plane, flyAlt, rings, lift: flyLiftAt(findSegment(position + playerZ).index), fork: airportFork && { decision: airportFork.decision, chosen: airportFork.chosen } }, AIR); }, setPlane(v) { plane = v; }, weather() { return { rain: +rain.toFixed(2), rainTrip: Math.round(rainTrip), bow: +rainbowAmt().toFixed(2) }; }, setRainTrip(v) { rainTrip = v; }, setAlt(v) { flyAlt = v; }, setSkiers(v) { skiers = v; }, setSpeed(v) { speed = v; }, dbg() { const sg = findSegment(position + playerZ); return { playerX: +playerX.toFixed(3), seg: sg.index, merge: sg.merge || null, mp: sg.mp1, mergeShift: mergeShift(sg, ((position + playerZ) % TUNE.segLen) / TUNE.segLen), speed: Math.round(speed), state, dizzy: +dizzy.toFixed(2), boat, skiers, airJumps }; }, wrecks() { return cars.filter(c => c.wreck).map(c => ({ seg: Math.floor(c.z / TUNE.segLen), offset: +c.offset.toFixed(2), t: +c.wreck.t.toFixed(2), speed: Math.round(c.speed) })); }, firstCar() { let b = null; for (const c of cars) if (!b || c.z < b.z) b = c; return { seg: Math.floor(b.z / TUNE.segLen), offset: b.offset, kind: b.kind }; } };
 
 if (location.hash === '#sprites') {
   buildSprites(); ctx.fillStyle = '#9fd'; ctx.fillRect(0, 0, W, H);
