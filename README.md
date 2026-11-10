@@ -2,7 +2,7 @@
 
 TV arcade starring **Bernard**, a long-haired German Shepherd.
 
-- **Bernard's Keep-Away** — monkey in the middle for 1 or 2 players: Nick and Giulia pass, Bernard tries to steal it (controller 1 = Nick, controller 2 = Giulia; with one pad the computer plays Giulia)
+- **Bernard's Keep-Away** — monkey in the middle for 1 or 2 players, three rounds, kids against Bernard on the scoreboard. **Team Kids**: controller 1 = Nick, controller 2 = Giulia (with one pad the computer plays Giulia); B pass, A lob, Y fake, X dash. **Be Bernard**: controller 1 is the dog; B pounce, A bark, X zoomies. Power-ups, a star ring to throw through, a sprinkler and a squirrel keep it lively
 - **Flappy Bernard** — flap through the brick gaps
 - **Lane Hoppers with Bernard** — Nick or Giulia hop the streets, yards and creeks; Bernard ferries the water. Grab the bike for double hops.
 - **Flying with Bernard** — biplane or firefighter jet
