@@ -57,4 +57,4 @@ In Bernard Says the d-pad and A, B, X, Y are the game. On a keyboard use the arr
 
 ## Road Trip radio
 
-The songs in `public/music/` are the radio stations in Bernard's Road Trip, plus the built-in chiptune and "Radio Off". L / R on the SNES pad (or Q / E on a keyboard) change station. To add a song, drop the `.mp3` in `public/music/` with a lowercase, no-spaces name and add a line to `STATIONS` in `index.html` and `arcade.html`.
+The songs in `public/music/` are the radio stations in Bernard's Road Trip, plus the built-in chiptune and "Radio Off". The radio is off each time the game opens: L / R on the SNES pad (or Q / E on a keyboard, or "Radio" on the title menu) turns it on at the last station, and L / R then change station. To add a song, drop the `.mp3` in `public/music/` with a lowercase, no-spaces name and add a line to `STATIONS` in `index.html` and `arcade.html`.

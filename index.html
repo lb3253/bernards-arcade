@@ -1001,10 +1001,103 @@ function drawOfficer(g) { // standing at the driver's window, writing the ticket
   ell(g, 44, 40, 14, 14); fs(g, '#C98A5A', C.out, 2.2);
   g.beginPath(); g.moveTo(26, 34); g.lineTo(62, 34); g.lineTo(58, 20); g.lineTo(30, 20); g.closePath(); fs(g, '#1F2A44', C.out, 2.2); rr(g, 22, 32, 44, 6, 3); fs(g, '#16161A', C.out, 1.5); ell(g, 44, 26, 4, 4); fs(g, '#F2C14E', null);
 }
+/* ---- MORE TRAFFIC: cement truck, school bus, ice cream truck, fire truck, camper, motorcycle, tractor (all rear views) ---- */
+function truckBase(g, w, h, tyres) { ell(g, w / 2, h - 6, w * 0.45, 9); fs(g, 'rgba(0,0,0,.3)', null); for (const tx of tyres) { rr(g, tx - 15, h - 46, 30, 40, 8); fs(g, '#1A1A1C', C.out, 2); } }
+function tailLights(g, xs, y, w = 18, h = 16) { for (const lx of xs) { rr(g, lx, y, w, h, 3); fs(g, '#D7322A', C.out, 1.6); rr(g, lx + 2, y + 2, w * 0.4, h * 0.45, 2); fs(g, '#FFB3AD', null); } }
+function drawCementTruck(g) { // 200 x 236: the big striped drum, the chute folded up at the back
+  truckBase(g, 200, 236, [34, 66, 134, 166]);
+  rr(g, 14, 150, 172, 52, 6); fs(g, '#3A3A40', C.out, 2.6); rr(g, 6, 196, 188, 16, 4); fs(g, '#2B2B30', C.out, 2);
+  // drum
+  ell(g, 100, 96, 84, 84); fs(g, '#F4F4F2', C.out, 3);
+  g.save(); g.beginPath(); g.arc(100, 96, 82, 0, TAU); g.clip(); g.strokeStyle = '#FF7A1A'; g.lineWidth = 17;
+  for (let k = -3; k <= 3; k++) { g.beginPath(); g.moveTo(100 + k * 46 - 70, 190); g.quadraticCurveTo(100 + k * 46, 96, 100 + k * 46 + 70, 2); g.stroke(); }
+  g.restore(); ell(g, 100, 96, 84, 84); fs(g, null, C.out, 3);
+  ell(g, 100, 96, 26, 26); fs(g, '#8A8A90', C.out, 2.5); ell(g, 100, 96, 11, 11); fs(g, '#3A3A40', null);
+  // chute + ladder
+  g.beginPath(); g.moveTo(84, 122); g.lineTo(116, 122); g.lineTo(126, 176); g.lineTo(74, 176); g.closePath(); fs(g, '#B8BCC2', C.out, 2.4);
+  for (const y of [136, 150, 164]) { g.beginPath(); g.moveTo(80, y); g.lineTo(120, y); g.strokeStyle = 'rgba(0,0,0,.25)'; g.lineWidth = 2; g.stroke(); }
+  rr(g, 156, 60, 6, 96, 2); fs(g, '#8A8A90', C.out, 1.5); rr(g, 172, 60, 6, 96, 2); fs(g, '#8A8A90', C.out, 1.5); for (let y = 72; y < 150; y += 16) { g.fillStyle = '#8A8A90'; g.fillRect(160, y, 14, 3); }
+  tailLights(g, [18, 164], 170); rr(g, 80, 182, 40, 14, 2); fs(g, '#fff', C.out, 1.4); textO(g, 'MIX', 100, 189, 9, '#2B3A8A', null, 'center', 0);
+  for (const fx of [22, 178]) { rr(g, fx - 14, 200, 28, 20, 3); fs(g, '#16161A', null); }
+}
+function drawSchoolBus(g) { // 200 x 236
+  truckBase(g, 200, 236, [36, 164]);
+  rr(g, 12, 16, 176, 190, 16); fs(g, '#F7C416', C.out, 3);
+  rr(g, 26, 6, 148, 18, 8); fs(g, '#F7C416', C.out, 2.5); for (const [x, c] of [[40, '#FF3A2E'], [66, '#FFB020'], [134, '#FFB020'], [160, '#FF3A2E']]) { ell(g, x, 15, 6, 6); fs(g, c, C.out, 1.5); }
+  rr(g, 28, 30, 144, 22, 5); fs(g, '#16161A', null); textO(g, 'SCHOOL BUS', 100, 41, 15, '#F7C416', null, 'center', 0);
+  for (const wx of [24, 124]) { rr(g, wx, 60, 52, 44, 6); fs(g, '#2A3A50', C.out, 2); g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(wx + 5, 64, 16, 8); }
+  rr(g, 80, 58, 40, 96, 5); fs(g, '#F7C416', C.out, 2.4); rr(g, 86, 64, 28, 34, 4); fs(g, '#2A3A50', C.out, 1.6); textO(g, 'EXIT', 100, 116, 9, '#16161A', null, 'center', 0);
+  // kids' heads in the windows
+  for (const [x, c] of [[40, '#D9A77A'], [58, '#E6B892'], [142, '#C98A5A'], [160, '#E6B892']]) { ell(g, x, 98, 8, 8); fs(g, c, C.out, 1.5); }
+  for (const y of [112, 150]) { g.fillStyle = '#16161A'; g.fillRect(14, y, 172, 5); }
+  tailLights(g, [20, 162], 164); for (const lx of [44, 142]) { rr(g, lx, 166, 14, 12, 3); fs(g, '#FFB020', C.out, 1.4); }
+  rr(g, 8, 196, 184, 16, 5); fs(g, '#16161A', C.out, 2); rr(g, 80, 176, 40, 14, 2); fs(g, '#fff', C.out, 1.4);
+}
+function drawIceCreamTruck(g) { // 190 x 230
+  truckBase(g, 190, 230, [34, 156]);
+  rr(g, 12, 44, 166, 158, 14); fs(g, '#FFF6FA', C.out, 3); rr(g, 12, 44, 166, 30, 14); fs(g, '#FF8FC0', null); rr(g, 12, 150, 166, 20, 0); fs(g, '#7FD8E8', null);
+  g.save(); g.beginPath(); rr(g, 12, 60, 166, 16, 0); g.clip(); for (let x = 12; x < 180; x += 22) { g.fillStyle = (x / 22 | 0) % 2 ? '#FF8FC0' : '#FFFFFF'; g.beginPath(); g.arc(x + 11, 62, 13, 0, Math.PI); g.fill(); } g.restore();
+  rr(g, 12, 44, 166, 158, 14); fs(g, null, C.out, 3);
+  rr(g, 34, 84, 122, 48, 6); fs(g, '#2A3A50', C.out, 2); g.fillStyle = 'rgba(255,255,255,.2)'; g.fillRect(40, 88, 30, 8);
+  textO(g, 'ICE CREAM', 95, 141, 15, '#E8328A', null, 'center', 0);
+  // the giant cone on the roof
+  g.beginPath(); g.moveTo(79, 22); g.lineTo(111, 22); g.lineTo(95, 50); g.closePath(); fs(g, '#E0A050', C.out, 2.2);
+  ell(g, 95, 16, 17, 15); fs(g, '#FF8FC0', C.out, 2.4); ell(g, 88, 6, 9, 8); fs(g, '#FFF6FA', C.out, 2); ell(g, 100, 3, 4, 4); fs(g, '#E8324A', C.out, 1.2);
+  tailLights(g, [18, 156], 174, 16, 14); rr(g, 6, 194, 178, 14, 5); fs(g, '#B8BCC2', C.out, 2); rr(g, 76, 176, 38, 13, 2); fs(g, '#fff', C.out, 1.4);
+}
+function drawFireTruck(g) { // 200 x 230
+  truckBase(g, 200, 230, [34, 66, 134, 166]);
+  rr(g, 12, 44, 176, 158, 10); fs(g, '#D8262A', C.out, 3); rr(g, 12, 96, 176, 12, 0); fs(g, '#F4F4F2', null); rr(g, 12, 112, 176, 5, 0); fs(g, '#FFC93C', null);
+  // roll-up door + hoses
+  rr(g, 40, 122, 120, 62, 4); fs(g, '#B8BCC2', C.out, 2); for (let y = 130; y < 182; y += 9) { g.fillStyle = 'rgba(0,0,0,.14)'; g.fillRect(42, y, 116, 2); }
+  for (const hx of [26, 174]) { ell(g, hx, 150, 11, 11); fs(g, '#F2C14E', C.out, 2); ell(g, hx, 150, 4, 4); fs(g, '#8A6A1E', null); }
+  textO(g, 'LITTLE ELM FIRE', 100, 78, 13, '#FFE680', C.out, 'center', 3); rr(g, 60, 52, 80, 14, 3); fs(g, '#F4F4F2', C.out, 1.5); textO(g, 'ENGINE 1', 100, 59, 9, '#D8262A', null, 'center', 0);
+  // ladder on top, light bar
+  rr(g, 30, 26, 140, 8, 3); fs(g, '#C9CDD4', C.out, 2); rr(g, 30, 38, 140, 8, 3); fs(g, '#C9CDD4', C.out, 2); for (let x = 40; x < 168; x += 14) { g.fillStyle = '#8A9098'; g.fillRect(x, 30, 3, 12); }
+  rr(g, 70, 8, 60, 14, 5); fs(g, '#2B2B30', C.out, 2); rr(g, 73, 10, 25, 10, 3); fs(g, '#FF3A2E', null); rr(g, 102, 10, 25, 10, 3); fs(g, '#3A7BFF', null);
+  tailLights(g, [18, 164], 186, 18, 14); rr(g, 6, 196, 188, 14, 4); fs(g, '#C9CDD4', C.out, 2);
+}
+function drawCamper(g) { // 200 x 236: the family RV, bikes on the back
+  truckBase(g, 200, 236, [36, 164]);
+  rr(g, 14, 14, 172, 190, 16); fs(g, '#F6EFDD', C.out, 3);
+  g.beginPath(); g.moveTo(14, 118); g.quadraticCurveTo(100, 92, 186, 118); g.lineTo(186, 138); g.quadraticCurveTo(100, 112, 14, 138); g.closePath(); fs(g, '#2EC4B6', null);
+  g.beginPath(); g.moveTo(14, 142); g.quadraticCurveTo(100, 116, 186, 142); g.lineTo(186, 150); g.quadraticCurveTo(100, 124, 14, 150); g.closePath(); fs(g, '#F2622A', null);
+  rr(g, 14, 14, 172, 190, 16); fs(g, null, C.out, 3);
+  rr(g, 52, 32, 96, 42, 8); fs(g, '#2A3A50', C.out, 2); g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(58, 36, 28, 8); rr(g, 60, 52, 80, 22, 0); fs(g, '#E8D9A8', null); rr(g, 52, 32, 96, 42, 8); fs(g, null, C.out, 2);
+  rr(g, 152, 30, 5, 70, 2); fs(g, '#8A9098', C.out, 1.2); rr(g, 166, 30, 5, 70, 2); fs(g, '#8A9098', C.out, 1.2); for (let y = 40; y < 98; y += 13) { g.fillStyle = '#8A9098'; g.fillRect(155, y, 13, 3); }
+  // two bikes on the rack
+  g.strokeStyle = C.out; g.lineWidth = 2.5; for (const [bx, c] of [[70, '#E8324A'], [118, '#3C6FD8']]) { for (const dx of [-14, 14]) { ell(g, bx + dx, 172, 13, 13); g.strokeStyle = C.out; g.lineWidth = 4; g.stroke(); } g.beginPath(); g.moveTo(bx - 14, 172); g.lineTo(bx - 2, 154); g.lineTo(bx + 14, 172); g.moveTo(bx - 2, 154); g.lineTo(bx + 8, 154); g.strokeStyle = c; g.lineWidth = 4; g.stroke(); }
+  tailLights(g, [20, 164], 150, 16, 22); rr(g, 8, 194, 184, 14, 5); fs(g, '#B8BCC2', C.out, 2); rr(g, 82, 194, 36, 12, 2); fs(g, '#fff', C.out, 1.4);
+}
+function drawMotorcycle(g) { // 90 x 150: rider in a helmet and leather jacket
+  ell(g, 45, 144, 24, 6); fs(g, 'rgba(0,0,0,.3)', null);
+  rr(g, 36, 96, 18, 48, 8); fs(g, '#1A1A1C', C.out, 2);
+  rr(g, 30, 84, 30, 22, 6); fs(g, '#C8302A', C.out, 2.2); rr(g, 39, 100, 12, 8, 2); fs(g, '#FF5A4A', C.out, 1.2);
+  for (const k of [-1, 1]) { rr(g, 45 + k * 22 - 5, 92, 10, 26, 4); fs(g, '#B8BCC2', C.out, 1.6); }
+  for (const k of [-1, 1]) { g.beginPath(); g.moveTo(45 + k * 12, 86); g.lineTo(45 + k * 24, 112); g.strokeStyle = C.out; g.lineWidth = 12; g.stroke(); g.strokeStyle = '#2F4A7A'; g.lineWidth = 8; g.stroke(); }
+  rr(g, 22, 38, 46, 54, 14); fs(g, '#2B2B30', C.out, 2.5); rr(g, 30, 50, 30, 22, 4); fs(g, '#F2C14E', null); textO(g, 'TX', 45, 61, 12, '#2B2B30', null, 'center', 0);
+  for (const k of [-1, 1]) { g.beginPath(); g.moveTo(45 + k * 20, 46); g.lineTo(45 + k * 38, 70); g.strokeStyle = C.out; g.lineWidth = 11; g.stroke(); g.strokeStyle = '#2B2B30'; g.lineWidth = 7; g.stroke(); }
+  rr(g, 4, 66, 82, 6, 3); fs(g, '#8A9098', C.out, 1.5);
+  ell(g, 45, 24, 19, 20); fs(g, '#E8324A', C.out, 2.5); rr(g, 41, 5, 8, 30, 3); fs(g, '#F4F4F2', null);
+}
+function drawTractor(g) { // 200 x 200: slow green tractor with a hay bale on the back
+  ell(g, 100, 194, 92, 8); fs(g, 'rgba(0,0,0,.3)', null);
+  for (const tx of [34, 166]) { rr(g, tx - 26, 86, 52, 108, 14); fs(g, '#1A1A1C', C.out, 2.5); for (let y = 96; y < 188; y += 13) { g.beginPath(); g.moveTo(tx - 22, y); g.lineTo(tx, y + 7); g.lineTo(tx + 22, y); g.strokeStyle = '#3A3A40'; g.lineWidth = 3; g.stroke(); } }
+  rr(g, 56, 96, 88, 70, 8); fs(g, '#3FA34D', C.out, 2.6);
+  rr(g, 52, 16, 96, 86, 8); fs(g, '#3FA34D', C.out, 2.6); rr(g, 60, 24, 80, 50, 5); fs(g, '#2A3A50', C.out, 2); g.fillStyle = 'rgba(255,255,255,.2)'; g.fillRect(66, 28, 24, 8);
+  ell(g, 100, 60, 11, 11); fs(g, '#C98A5A', C.out, 2); g.beginPath(); g.moveTo(84, 54); g.bezierCurveTo(86, 38, 114, 38, 116, 54); g.closePath(); fs(g, '#E0C27A', C.out, 2); rr(g, 80, 52, 40, 5, 2); fs(g, '#E0C27A', C.out, 1.5);
+  rr(g, 44, 8, 112, 12, 5); fs(g, '#F2C14E', C.out, 2.2); ell(g, 100, 6, 6, 5); fs(g, '#FFB020', C.out, 1.5);
+  // slow-moving-vehicle triangle + the hay bale riding on the hitch
+  g.beginPath(); g.moveTo(100, 104); g.lineTo(122, 140); g.lineTo(78, 140); g.closePath(); fs(g, '#FF7A1A', '#C8302A', 5);
+  ell(g, 100, 170, 34, 22); fs(g, '#E6C36A', C.out, 2.5); for (let k = -2; k <= 2; k++) { g.beginPath(); g.moveTo(100 + k * 12, 150); g.lineTo(100 + k * 12, 190); g.strokeStyle = 'rgba(120,80,20,.35)'; g.lineWidth = 2; g.stroke(); }
+  for (const lx of [58, 132]) { rr(g, lx, 108, 10, 12, 3); fs(g, '#D7322A', C.out, 1.4); }
+}
 const carSprites = {
   sedan: ['#D84A3C', '#3C6FD8', '#E8C53C', '#4FA866', '#F2F2F2', '#8A4FB8'].map((col, i) => sprite('sedan' + i, 160, 110, 560, g => drawSedan(g, col))),
   pickup: ['#2F4A7A', '#8B2E2E', '#C9C9C9'].map((col, i) => sprite('pickup' + i, 170, 132, 600, g => drawPickup(g, col))),
   semi: [['#E9E9E9', 'TEXAS MELONS'], ['#4C86C6', 'LONE STAR ICE']].map(([col, lab], i) => sprite('semi' + i, 220, 268, 820, g => drawSemi(g, col, lab))),
+  cement: [sprite('cement0', 200, 236, 800, drawCementTruck)], bus: [sprite('bus0', 200, 236, 820, drawSchoolBus)], icecream: [sprite('icecream0', 190, 230, 700, drawIceCreamTruck)],
+  fire: [sprite('fire0', 200, 230, 800, drawFireTruck)], camper: [sprite('camper0', 200, 236, 800, drawCamper)], moto: [sprite('moto0', 90, 150, 260, drawMotorcycle)], tractor: [sprite('tractor0', 200, 200, 760, drawTractor)],
   jetski: ['#2EC4B6', '#F2C14E', '#E8324A', '#8A4FB8'].map((col, i) => sprite('jetski' + i, 120, 100, 420, g => drawJetski(g, col))),
   pontoon: [sprite('pontoon0', 220, 150, 900, drawPontoon)]
 };
@@ -1474,10 +1567,13 @@ function decorateOffroad(n, h, h2, side) {
   if (n % 29 === 10) { const lane = pick([-0.6, 0, 0.6]), red = h < 0.4; for (let k = 0; k < 5; k++) addSprite(n + k * 3, red ? 'ballR' : 'ballG', lane, { pickup: red ? 'red' : 'green' }); }
   if (n % 61 === 30) addSprite(n, 'bone', pick([-0.5, 0, 0.5]), { pickup: 'bone' });
 }
+// the fun traffic: about a third of the cars. No tractors in Miami.
+const CAR_FUN = ['cement', 'cement', 'bus', 'icecream', 'fire', 'camper', 'moto', 'moto', 'tractor'], CAR_FUN_CITY = ['cement', 'bus', 'icecream', 'icecream', 'fire', 'camper', 'moto', 'moto'];
+const CAR_SPEED = { semi: [0.26, 0.36], cement: [0.26, 0.34], bus: [0.3, 0.4], icecream: [0.26, 0.36], fire: [0.5, 0.62], camper: [0.3, 0.4], moto: [0.5, 0.66], tractor: [0.14, 0.2] };
 function addCars(from, to, count) {
   for (let i = 0; i < count; i++) {
-    const lane = pick([-0.66, 0, 0.66]); let zi = Math.floor(rnd(from, to)); for (let tries = 0; tries < 12 && (segments[zi].fork || segments[zi].merge || segments[zi].offroad || segments[zi].buffer || segments[zi].lake || segments[zi].airport); tries++) zi = Math.floor(rnd(from, to)); if (segments[zi].fork || segments[zi].merge || segments[zi].offroad || segments[zi].buffer || segments[zi].lake || segments[zi].airport) continue; const z = zi * TUNE.segLen; const kind = Math.random() < 0.15 ? 'semi' : Math.random() < 0.4 ? 'pickup' : 'sedan';
-    const s = pick(carSprites[kind]); const sp = TUNE.maxSpeed * (kind === 'semi' ? rnd(0.26, 0.36) : rnd(TUNE.trafficSpeed[0], TUNE.trafficSpeed[1]));
+    const lane = pick([-0.66, 0, 0.66]); let zi = Math.floor(rnd(from, to)); for (let tries = 0; tries < 12 && (segments[zi].fork || segments[zi].merge || segments[zi].offroad || segments[zi].buffer || segments[zi].lake || segments[zi].airport); tries++) zi = Math.floor(rnd(from, to)); if (segments[zi].fork || segments[zi].merge || segments[zi].offroad || segments[zi].buffer || segments[zi].lake || segments[zi].airport) continue; const z = zi * TUNE.segLen; const r0 = Math.random(), kind = r0 < 0.1 ? 'semi' : r0 < 0.42 ? pick(route.id === 1 ? CAR_FUN_CITY : CAR_FUN) : Math.random() < 0.4 ? 'pickup' : 'sedan';
+    const s = pick(carSprites[kind]), band = CAR_SPEED[kind] || TUNE.trafficSpeed, sp = TUNE.maxSpeed * rnd(band[0], band[1]);
     const car = { offset: lane, z, s, speed: sp, kind, w: s.ww / TUNE.roadW, dodge: 0, passed: false }; segments[findSegment(z).index].cars.push(car); cars.push(car);
   }
 }
@@ -1548,7 +1644,7 @@ function buildStory() {
   segments[N - 150].finishLine = true; for (let k = N - 118; k < N - 40; k++) segments[k].lot = true;
   addSprite(N - 80, 'home', 2.3, { solid: 1 }); addSprite(N - 110, 'signJewel', -1.4, { solid: 1 }); for (let k = N - 160; k < N - 150; k += 3) addSprite(k, 'ballG', 0.66, { pickup: 'green' });
   for (let k = N - 140; k < N; k += 7) { addSprite(k, pick(['house1', 'house2', 'house3', 'house4']), -2.2 - hash(k, 3) * 0.6, { solid: 1 }); if (k < N - 118 || k > N - 40) addSprite(k + 3, 'sapling', 1.4 + hash(k, 4) * 0.4, { solid: 1 }); else if (k + 3 < N - 100 || k + 3 > N - 62) addSprite(k + 3, pick(['house1', 'house2', 'house3', 'house4']), 2.3 + hash(k, 5) * 0.4, { solid: 1 }); }
-  addCars(20, stageStarts[1] - 80, 115); addCars(stageStarts[1], stageStarts[2] - 80, 125); addCars(stageStarts[2], N - 170, 140);
+  addCars(20, stageStarts[1] - 80, 135); addCars(stageStarts[1], stageStarts[2] - 80, 150); addCars(stageStarts[2], N - 170, 165);
 }
 let events = [], marinaFork = null, LAKE = {};
 function buildLake() { // the MARINA branch: a lot by the water, then Lake Lewisville itself, then the dock back on shore
@@ -1743,7 +1839,7 @@ function finishTrack() {
   decorate(stageStarts[0] + 10, stageStarts[1], 0); decorate(stageStarts[1], stageStarts[2], 1); decorate(stageStarts[2], N - 150, 2); decorateWork(); placePolice();
   addSprite(N - 150, 'finish', 0, { finish: 1 }); for (let k = 0; k < 6; k++) { addSprite(N - 148 + k * 2, 'ballG', -0.66, { pickup: 'green' }); addSprite(N - 148 + k * 2, 'ballR', 0.66, { pickup: 'red' }); }
   for (let k = N - 140; k < N; k += 6) { addSprite(k, route.park, -2.2 - hash(k, 3), {}); addSprite(k + 3, route.park, 2.2 + hash(k, 4), {}); }
-  addCars(30, stageStarts[1], 100); addCars(stageStarts[1], stageStarts[2], 85); addCars(stageStarts[2], N - 170, 115);
+  addCars(30, stageStarts[1], 120); addCars(stageStarts[1], stageStarts[2], 100); addCars(stageStarts[2], N - 170, 135);
 }
 
 /* =====================================================================
@@ -1802,9 +1898,13 @@ const STATIONS = [
   { title: 'Radio Off', off: true }
 ];
 const Radio = {
-  idx: 0, el: null, elIdx: -1, wanted: false, duckV: 1, level: 0.55, chipT: 0, blocked: false, retry: 0,
-  load() { try { const v = localStorage.getItem('brt_radio'); if (v !== null && v !== '' && STATIONS[+v]) this.idx = +v; } catch (e) { } },
-  save() { try { localStorage.setItem('brt_radio', String(this.idx)); } catch (e) { } },
+  idx: 4, last: 0, el: null, elIdx: -1, wanted: false, duckV: 1, level: 0.55, chipT: 0, blocked: false, retry: 0,
+  // the radio is off every time the game opens; `last` is the station it comes back on to
+  load() { try { const v = localStorage.getItem('brt_radio'); if (v !== null && v !== '' && STATIONS[+v] && !STATIONS[+v].off) this.last = +v; } catch (e) { } },
+  save() { if (this.st().off) return; this.last = this.idx; try { localStorage.setItem('brt_radio', String(this.idx)); } catch (e) { } },
+  isOn() { return !this.st().off; },
+  off() { return STATIONS.findIndex(q => q.off); },
+  toggle() { this.idx = this.isOn() ? this.off() : this.last; sfx.static(); this.show(); this.apply(); },
   st() { return STATIONS[this.idx]; },
   show() { this.chipT = 260; },
   // make the sound match the station: called when the game starts / stops music and when the station changes
@@ -1824,7 +1924,7 @@ const Radio = {
   // a song that will not load falls back to the chiptune (the saved station is left alone)
   songFailed(at) { if (at !== this.idx || !this.st().src) return; this.idx = STATIONS.findIndex(q => q.chip); this.elIdx = -1; this.show(); this.apply(); },
   songEnded() { const n = STATIONS.length; for (let k = 1; k <= n; k++) { const j = (this.idx + k) % n; if (STATIONS[j].src) { this.idx = j; break; } } this.elIdx = -1; this.save(); this.show(); this.apply(); },
-  change(dir) { const n = STATIONS.length; this.idx = (this.idx + dir + n) % n; this.save(); sfx.static(); this.show(); this.apply(); },
+  change(dir) { const n = STATIONS.length; if (!this.isOn()) this.idx = this.last; else this.idx = (this.idx + dir + n) % n; this.save(); sfx.static(); this.show(); this.apply(); },
   // same rules as the chiptune: ducked in scenes and menus, silent with Sound Off
   sync() { if (!this.el) return; this.el.volume = clamp(this.level * this.duckV, 0, 1); this.el.muted = !Audio_.on; },
   // browsers hold a song back until the first key, tap or button press; keep trying until it starts
@@ -1835,7 +1935,7 @@ Radio.load();
 function drawRadioChip() {
   if (Radio.chipT <= 0) return; const s = Radio.st(), a = clamp(Math.min(Radio.chipT, 260 - Radio.chipT) / 18, 0, 1);
   const driving = !(state === 'title' || state === 'route' || state === 'setup' || state === 'intro');
-  const label = s.off ? 'Radio Off' : '\u266A  ' + s.title; ctx.font = font(15, 700); const w = Math.max(190, ctx.measureText(label).width + 110), x = W / 2 - w / 2, y = driving ? 74 : 4;
+  const label = s.off ? 'Radio Off  ·  L / R turns it on' : '\u266A  ' + s.title; ctx.font = font(15, 700); const w = Math.max(190, ctx.measureText(label).width + 110), x = W / 2 - w / 2, y = driving ? 74 : 4;
   ctx.globalAlpha = a; panel(x, y, w, 28, 10);
   textO(ctx, label, W / 2, y + 14, 15, s.off ? 'rgba(255,244,214,.7)' : '#FFE680', null, 'center', 0);
   textO(ctx, '\u25C0 L', x + 12, y + 14, 11, 'rgba(255,244,214,.6)', null, 'left', 0, 600); textO(ctx, 'R \u25B6', x + w - 12, y + 14, 11, 'rgba(255,244,214,.6)', null, 'right', 0, 600);
@@ -1927,7 +2027,7 @@ function planeLift() { return plane ? flyLiftAt(findSegment(position + playerZ).
 try { best = +localStorage.getItem('brt_best') || 0; } catch (e) { }
 
 function setMenu(items) { menu = { items, idx: 0 }; }
-function goTitle() { Music.play(route.id === 2 ? 0 : route.id); Music.duck(0.7); state = 'title'; setMenu(['Start Road Trip', 'Controller Setup', 'Sound: ' + (Audio_.on ? 'On' : 'Off')]); titleT = 0; position = 0; playerX = 0; speed = 0; Audio_.engineSet(0, false); }
+function goTitle() { Music.play(route.id === 2 ? 0 : route.id); Music.duck(0.7); state = 'title'; setMenu(['Start Road Trip', 'Controller Setup', 'Sound: ' + (Audio_.on ? 'On' : 'Off'), 'Radio: Off']); titleT = 0; position = 0; playerX = 0; speed = 0; Audio_.engineSet(0, false); }
 /* ---- WEATHER: in the story, a shower rolls in on the road home (after the marina fork, or after the boat ride) and clears up ---- */
 // rainTrip counts the segments driven since the last stage began; the shower builds, holds, then thins out
 const RAIN = { build: 90, hold: 1500, fade: 1100, bow: 1400 };
@@ -2201,7 +2301,7 @@ function gamePress() {
 function startTinGame(i) {
   sfx.check(); tinGame = i === 0 ? 'slush' : 'hoops';
   if (i === 0) { state = 'slush'; slush = { phase: 'intro', t: 0, round: 0, rounds: 6, marker: 0, dir: 1, speed: 1.15, result: null, total: 0, who: 'nic', cups: [] }; }
-  else { state = 'hoops'; hoops = { phase: 'intro', t: 0, left: HOOPS_TIME, x: 0, ph: 0, balls: [], total: 0, streak: 0, best: 0, made: 0, shots: 0, who: 'nic', cool: 0, flash: 0, msg: null, lastTick: 99 }; }
+  else { state = 'hoops'; hoops = newHoops(); }
 }
 function updateTinPick(dt) {
   const T = tin; T.t += dt; time += dt; frame++; updateFx();
@@ -2210,46 +2310,75 @@ function updateTinPick(dt) {
   if (hit.tap) { startTinGame(touch.tapX < 0.5 ? 0 : 1); return; }
   if (hit.gas || hit.start || hit.horn) startTinGame(T.idx);
 }
-const HOOPS_TIME = 30, HOOP_AMP = 190, HOOP_Y = 208, BALL_FLY = 0.55;
+// HOOPS: 30 seconds on the basketball machine. The hoop slides side to side; the kid whose turn it is runs left / right
+// along the bottom and shoots straight up. The ball takes half a second to get there, so aim a little ahead of the hoop.
+const HOOPS_TIME = 30, HOOP_AMP = 190, HOOP_Y = 196, BALL_FLY = 0.5, AIM_MAX = 232, AIM_SPEED = 430, SHOOT_Y = 372;
+let hoopsBest = 0; try { hoopsBest = +localStorage.getItem('brt_hoops_best') || 0; } catch (e) { }
 function hoopXAt(ph) { return Math.sin(ph) * HOOP_AMP; }
-function updateHoops(dt) {
-  const S = hoops; S.t += dt; time += dt; frame++; updateFx(); if (S.flash > 0) S.flash -= dt; if (S.msg) { S.msg.life -= dt; if (S.msg.life <= 0) S.msg = null; }
-  if (S.phase === 'intro') { if (S.t > 3 || (S.t > 0.4 && gamePress())) { S.phase = 'play'; S.t = 0; sfx.ding(); } return; }
-  if (S.phase === 'done') { if (S.t > 3 || (S.t > 0.9 && gamePress())) { hoopsScore = S.total; score += S.total; state = 'playing'; Music.duck(1); timer += 20; floatText(W / 2, 250, 'HOOPS +' + S.total + ' · +20s', C.gold); say(pick(['SWISH!! SWISH!!', 'Can I chew the ball??'])); titaBubble = { text: 'Home before sunset, everybody!', life: 170 }; steer = 0; } return; }
-  // the hoop slides side to side, a little quicker as the clock runs down
-  S.ph += dt * (1.9 + (1 - S.left / HOOPS_TIME) * 1.5); S.x = hoopXAt(S.ph);
-  S.cool = Math.max(0, S.cool - dt);
-  if (S.left > 0 && S.cool <= 0 && gamePress()) { S.balls.push({ t: 0, who: S.who, state: 'fly', x: 0, vx: 0 }); S.cool = 0.32; S.shots++; S.who = S.who === 'nic' ? 'giulia' : 'nic'; Audio_.tone(300, 620, 0.16, 'triangle', 0.1); }
-  for (const b of S.balls) {
-    b.t += dt;
-    if (b.state === 'fly' && b.t >= BALL_FLY) {
-      const d = Math.abs(S.x);
-      if (d < 40) { // through the hoop
-        b.state = 'made'; b.t = 0; S.made++; S.streak++; S.best = Math.max(S.best, S.streak);
-        const bonus = Math.min(60, 20 * (S.streak - 1)), pts = 60 + bonus; S.total += pts; S.flash = 0.25;
-        S.msg = { text: (S.streak >= 3 ? 'ON FIRE!  ' : d < 14 ? 'SWISH!  ' : '') + '+' + pts + (bonus ? '  (streak x' + S.streak + ')' : ''), col: S.streak >= 3 ? '#FFB53A' : '#FFE680', life: 0.9 };
-        Audio_.noise(0.12, 0.1); Audio_.tone(880, 1320, 0.12, 'sine', 0.14); if (S.streak >= 3) Audio_.tone(1320, 1760, 0.14, 'sine', 0.1, 0.1);
-        sparkle(W / 2, HOOP_Y + 10, 10, '#FFE680'); if (S.streak === 3) say(pick(['WOOF!! THREE IN A ROW!!', 'ON FIRE!!']));
-      } else { b.state = 'miss'; b.t = 0; b.vx = (d < 78 ? (S.x > 0 ? -1 : 1) : (S.x > 0 ? 1 : -1) * 0.3) * 220; if (S.streak >= 3) say('Awww!!'); S.streak = 0;
-        if (d < 78) { S.msg = { text: 'OFF THE RIM!', col: '#FF8A8A', life: 0.7 }; Audio_.tone(190, 120, 0.12, 'square', 0.12); Audio_.tone(260, 150, 0.1, 'square', 0.08, 0.08); } else { S.msg = { text: 'AIR BALL', col: '#FFFFFF', life: 0.6 }; Audio_.tone(240, 120, 0.2, 'sine', 0.08); } }
-    }
-  }
-  S.balls = S.balls.filter(b => b.state === 'fly' || b.t < 0.6);
-  if (S.left > 0) { S.left = Math.max(0, S.left - dt); const sec = Math.ceil(S.left); if (sec <= 5 && sec < S.lastTick && sec > 0) { S.lastTick = sec; Audio_.tone(1000, 1000, 0.06, 'square', 0.08); } }
-  if (S.left <= 0 && !S.balls.some(b => b.state === 'fly')) { S.phase = 'done'; S.t = 0; S.balls = []; Audio_.tone(196, 196, 0.7, 'sawtooth', 0.12); Audio_.tone(147, 147, 0.7, 'square', 0.08); setTimeout(() => { if (state === 'hoops') sfx.win(); }, 750); }
+function hoopSpeed(left) { return 1.25 + (1 - left / HOOPS_TIME) * 1.15; }
+function newHoops() { return { phase: 'intro', t: 0, left: HOOPS_TIME, x: 0, ph: 0, aim: 0, balls: [], pops: [], total: 0, streak: 0, best: 0, made: 0, shots: 0, who: 'nic', cool: 0, flash: 0, net: 0, shake: 0, cheer: 0, msg: null, lastTick: 99, newBest: false, said10: false }; }
+function hoopsShoot(S) {
+  S.shots++; const money = S.shots % 5 === 0;
+  S.balls.push({ t: 0, who: S.who, state: 'fly', x: S.aim, money, fire: S.streak >= 3, vx: 0 });
+  S.cool = 0.36; Audio_.tone(300, 620, 0.16, 'triangle', 0.1);
+  // they swap after every money ball (every 5 shots)
+  if (money && S.left > 0.5) { S.who = S.who === 'nic' ? 'giulia' : 'nic'; S.pops.push({ x: S.aim, y: SHOOT_Y - 96, text: (S.who === 'nic' ? 'NICK' : 'GIULIA') + "'S TURN!", col: '#9EE8FF', life: 1.1 }); }
 }
-function basketball(g, x, y, r, spin) {
-  ell(g, x, y, r, r); fs(g, '#F08A2A', C.out, Math.max(1.5, r * 0.12));
-  g.save(); g.beginPath(); g.arc(x, y, r, 0, TAU); g.clip(); g.translate(x, y); g.rotate(spin); g.strokeStyle = '#3A1E0E'; g.lineWidth = Math.max(1.2, r * 0.09);
+function hoopsLand(S, b) {
+  const d = Math.abs(b.x - S.x), hot = S.left <= 10;
+  if (d < 46) { // through the hoop
+    b.state = 'made'; b.t = 0; b.hx = S.x; S.made++; S.streak++; S.best = Math.max(S.best, S.streak);
+    const swish = d < 14, bonus = Math.min(50, 10 * (S.streak - 1)); let pts = 50 + bonus + (swish ? 25 : 0); if (b.money) pts *= 2; if (hot) pts *= 2;
+    S.total += pts; S.flash = 0.25; S.net = 0.35; S.cheer = 0.5;
+    S.pops.push({ x: S.x, y: HOOP_Y - 20, text: '+' + pts, col: b.money ? '#FFD23F' : '#9CFF9C', life: 0.9 });
+    S.msg = { text: S.streak >= 3 ? 'ON FIRE!  x' + S.streak : swish ? 'SWISH!' : b.money ? 'MONEY BALL!' : pick(['NICE!', 'BUCKET!', 'YES!']), col: S.streak >= 3 ? '#FFB53A' : '#FFE680', life: 0.8 };
+    Audio_.noise(0.12, 0.1); Audio_.tone(880, 1320, 0.12, 'sine', 0.14); if (S.streak >= 3) Audio_.tone(1320, 1760, 0.14, 'sine', 0.1, 0.1); if (b.money) Audio_.tone(1760, 2200, 0.16, 'triangle', 0.08, 0.16);
+    sparkle(W / 2 + S.x, HOOP_Y + 10, b.money ? 18 : 10, b.money ? '#FFD23F' : '#FFE680'); if (S.streak === 3) { say('WOOF!! THREE IN A ROW!!'); sfx.bark(); }
+  } else {
+    b.state = 'miss'; b.t = 0; const rim = d < 86, side = b.x > S.x ? 1 : -1; b.vx = rim ? side * 240 : side * 60; if (S.streak >= 3) say('Awww!!'); S.streak = 0;
+    if (rim) { S.shake = 0.3; S.msg = { text: 'OFF THE RIM!', col: '#FF8A8A', life: 0.7 }; Audio_.tone(190, 120, 0.12, 'square', 0.12); Audio_.tone(260, 150, 0.1, 'square', 0.08, 0.08); }
+    else { S.msg = { text: b.x > S.x ? '◀ TOO FAR RIGHT' : 'TOO FAR LEFT ▶', col: '#FFFFFF', life: 0.7 }; Audio_.tone(240, 120, 0.2, 'sine', 0.08); }
+  }
+}
+function updateHoops(dt) {
+  const S = hoops; S.t += dt; time += dt; frame++; updateFx();
+  for (const k of ['flash', 'net', 'shake', 'cheer']) if (S[k] > 0) S[k] -= dt;
+  if (S.msg) { S.msg.life -= dt; if (S.msg.life <= 0) S.msg = null; } for (const q of S.pops) { q.life -= dt; q.y -= dt * 46; } S.pops = S.pops.filter(q => q.life > 0);
+  if (S.phase === 'intro') { S.ph += dt * 1.25; S.x = hoopXAt(S.ph); if (S.t > 6 || (S.t > 0.4 && gamePress())) { S.phase = 'count'; S.t = 0; S.lastTick = 4; } return; }
+  if (S.phase === 'count') { S.ph += dt * 1.25; S.x = hoopXAt(S.ph); const n = 3 - Math.floor(S.t); if (n < S.lastTick && n > 0) { S.lastTick = n; Audio_.tone(660, 660, 0.1, 'square', 0.1); } if (S.t >= 3) { S.phase = 'play'; S.t = 0; S.lastTick = 99; Audio_.tone(990, 990, 0.3, 'square', 0.12); } }
+  if (S.phase === 'done') { if (S.t > 4.5 || (S.t > 1.2 && gamePress())) { hoopsScore = S.total; score += S.total; state = 'playing'; Music.duck(1); timer += 20; floatText(W / 2, 250, 'HOOPS +' + S.total + ' · +20s', C.gold); say(pick(['SWISH!! SWISH!!', 'Can I chew the ball??'])); titaBubble = { text: 'Home before sunset, everybody!', life: 170 }; steer = 0; } return; }
+  // run left / right along the bottom; a tap runs straight to that spot and shoots
+  if (inp.left) S.aim -= AIM_SPEED * dt; if (inp.right) S.aim += AIM_SPEED * dt; S.aim = clamp(S.aim, -AIM_MAX, AIM_MAX);
+  if (S.phase !== 'play') return;
+  S.ph += dt * hoopSpeed(S.left) * (S.left <= 10 ? 1.12 : 1); S.x = hoopXAt(S.ph);
+  S.cool = Math.max(0, S.cool - dt);
+  if (S.left > 0 && S.cool <= 0) {
+    if (hit.tap) { S.aim = clamp((touch.tapX - 0.5) * W, -AIM_MAX, AIM_MAX); hoopsShoot(S); }
+    else if (hit.gas || hit.brake || hit.horn || hit.boost || hit.start || hit.up || hoopsPadPress()) hoopsShoot(S);
+  }
+  for (const b of S.balls) { b.t += dt; if (b.state === 'fly' && b.t >= BALL_FLY) hoopsLand(S, b); }
+  S.balls = S.balls.filter(b => b.state === 'fly' || b.t < 0.7);
+  if (S.left > 0) { S.left = Math.max(0, S.left - dt); const sec = Math.ceil(S.left);
+    if (S.left <= 10 && !S.said10) { S.said10 = true; S.msg = { text: 'DOUBLE POINTS!', col: '#FF7FB1', life: 1.4 }; sfx.ding(); }
+    if (sec <= 5 && sec < S.lastTick && sec > 0) { S.lastTick = sec; Audio_.tone(1000, 1000, 0.06, 'square', 0.08); } }
+  if (S.left <= 0 && !S.balls.some(b => b.state === 'fly')) { S.phase = 'done'; S.t = 0; S.balls = []; S.msg = null;
+    if (S.total > hoopsBest) { hoopsBest = S.total; S.newBest = true; try { localStorage.setItem('brt_hoops_best', String(hoopsBest)); } catch (e) { } }
+    Audio_.tone(196, 196, 0.7, 'sawtooth', 0.12); Audio_.tone(147, 147, 0.7, 'square', 0.08); setTimeout(() => { if (state === 'hoops') sfx.win(); }, 750); }
+}
+// any face button on the pad shoots (not the d-pad, which runs, and not the radio's L / R)
+function hoopsPadPress() { for (let i = 0; i < pad.buttons.length; i++) if (pad.buttons[i] && !pad.prevButtons[i] && i !== padMap.radioPrev && i !== padMap.radioNext && !(i >= 12 && i <= 15)) return true; return false; }
+function basketball(g, x, y, r, spin, gold) {
+  ell(g, x, y, r, r); fs(g, gold ? '#FFD23F' : '#F08A2A', C.out, Math.max(1.5, r * 0.12));
+  g.save(); g.beginPath(); g.arc(x, y, r, 0, TAU); g.clip(); g.translate(x, y); g.rotate(spin); g.strokeStyle = gold ? '#8A5A00' : '#3A1E0E'; g.lineWidth = Math.max(1.2, r * 0.09);
   g.beginPath(); g.moveTo(-r, 0); g.lineTo(r, 0); g.moveTo(0, -r); g.lineTo(0, r); g.stroke(); g.beginPath(); g.arc(-r * 1.25, 0, r, -1, 1); g.stroke(); g.beginPath(); g.arc(r * 1.25, 0, r, Math.PI - 1, Math.PI + 1); g.stroke(); g.restore();
-  ell(g, x - r * 0.35, y - r * 0.4, r * 0.22, r * 0.14); fs(g, 'rgba(255,255,255,.35)', null);
+  ell(g, x - r * 0.35, y - r * 0.4, r * 0.22, r * 0.14); fs(g, 'rgba(255,255,255,.4)', null);
 }
 function arcadeRoom() { dim(0.62); const bg = ctx.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, 'rgba(40,16,70,.9)'); bg.addColorStop(1, 'rgba(12,8,30,.95)'); ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H); }
 function drawTinPick() {
   const T = tin, cx = W / 2; arcadeRoom();
   textO(ctx, 'TINMAN SOCIAL', cx, 58, 44, C.gold, C.out, 'center', 9);
   textO(ctx, 'One game before we go home. Which one?', cx, 100, 17, C.cream, null, 'center', 0, 600);
-  [['SLUSH RUSH', 'Stop the pour at the fill line', '6 pours'], ['HOOPS', 'Time your shots at the moving hoop', '30 seconds']].forEach(([name, line, len], i) => {
+  [['SLUSH RUSH', 'Stop the pour at the fill line', '6 pours'], ['HOOPS', 'Run under the moving hoop and shoot', '30 seconds']].forEach(([name, line, len], i) => {
     const sel = T.idx === i, w = 330, h = 300, x = cx - w - 20 + i * (w + 40), y = 130, mx = x + w / 2, bob = sel ? Math.sin(time * 5) * 3 : 0;
     rr(ctx, x, y + bob, w, h, 20); fs(ctx, sel ? 'rgba(43,26,16,.95)' : 'rgba(43,26,16,.6)', sel ? C.gold : 'rgba(242,193,78,.35)', sel ? 6 : 3);
     ctx.save(); ctx.translate(0, bob); ctx.globalAlpha = sel ? 1 : 0.7;
@@ -2263,34 +2392,60 @@ function drawTinPick() {
   if (Math.floor(time * 2.5) % 2 === 0) textO(ctx, '◀ ▶ choose   ·   B / Enter to play   ·   or tap a game', cx, 478, 17, '#C9F24D', C.out, 'center', 4);
 }
 function drawHoops() {
-  const S = hoops, cx = W / 2; arcadeRoom();
+  const S = hoops, cx = W / 2, hot = S.phase === 'play' && S.left <= 10, playing = S.phase === 'play' || S.phase === 'count'; arcadeRoom();
   // the machine: cabinet, cage, scoreboard
-  rr(ctx, cx - 300, 26, 600, 498, 22); fs(ctx, '#2A1846', C.out, 4); rr(ctx, cx - 284, 110, 568, 330, 12); fs(ctx, '#140A26', '#6E3FD0', 3);
+  rr(ctx, cx - 300, 26, 600, 498, 22); fs(ctx, '#2A1846', C.out, 4);
+  rr(ctx, cx - 284, 110, 568, 330, 12); fs(ctx, '#140A26', hot ? (Math.floor(time * 6) % 2 ? '#FF7FB1' : '#FFD23F') : '#6E3FD0', hot ? 5 : 3);
   ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 1.5; for (let x = cx - 270; x < cx + 284; x += 26) { ctx.beginPath(); ctx.moveTo(x, 112); ctx.lineTo(x, 438); ctx.stroke(); } for (let y = 126; y < 438; y += 26) { ctx.beginPath(); ctx.moveTo(cx - 282, y); ctx.lineTo(cx + 282, y); ctx.stroke(); }
+  // court floor inside the cage, with a painted free-throw arc
+  ctx.fillStyle = '#B8743A'; ctx.fillRect(cx - 282, 404, 564, 34); ctx.fillStyle = 'rgba(0,0,0,.12)'; for (let x = cx - 282; x < cx + 282; x += 47) ctx.fillRect(x, 404, 2, 34);
+  ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(cx, 404, 150, 22, 0, 0, Math.PI); ctx.stroke();
   rr(ctx, cx - 284, 38, 568, 62, 10); fs(ctx, '#0A0612', '#F2622A', 3);
   const led = (lab, val, x, col) => { textO(ctx, lab, x, 54, 11, 'rgba(255,244,214,.7)', null, 'center', 0, 600); textO(ctx, val, x, 78, 28, col, null, 'center', 0); };
-  led('TIME', String(Math.ceil(S.phase === 'intro' ? HOOPS_TIME : S.left)), cx - 190, S.left <= 5 && S.phase === 'play' ? '#FF5A4A' : '#FFE680'); led('SCORE', String(S.total), cx, '#9CFF9C'); led('STREAK', S.streak ? 'x' + S.streak : '-', cx + 190, S.streak >= 3 ? '#FFB53A' : '#9EE8FF');
+  led('TIME', String(Math.ceil(S.phase === 'intro' || S.phase === 'count' ? HOOPS_TIME : S.left)), cx - 213, S.left <= 5 && S.phase === 'play' ? '#FF5A4A' : '#FFE680'); led('SCORE', String(S.total), cx - 71, '#9CFF9C'); led('STREAK', S.streak ? 'x' + S.streak : '-', cx + 71, S.streak >= 3 ? '#FFB53A' : '#9EE8FF'); led('BEST', String(Math.max(hoopsBest, S.total)), cx + 213, '#FFFFFF');
+  if (hot) textO(ctx, 'x2', cx - 160, 78, 18, Math.floor(time * 6) % 2 ? '#FF7FB1' : '#FFD23F', null, 'center', 0);
+  // where the ball will come down, and whether the hoop will be there: the ring turns green when it is time to shoot
+  const ax = cx + S.aim, nextMoney = (S.shots + 1) % 5 === 0;
+  if (playing) {
+    const ahead = hoopXAt(S.ph + BALL_FLY * hoopSpeed(S.left) * (S.left <= 10 ? 1.12 : 1)), good = S.phase === 'play' && Math.abs(S.aim - ahead) < 40;
+    ctx.setLineDash([6, 10]); ctx.strokeStyle = good ? 'rgba(140,255,140,.75)' : 'rgba(255,255,255,.25)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(ax, SHOOT_Y - 76); ctx.lineTo(ax, HOOP_Y + 12); ctx.stroke(); ctx.setLineDash([]);
+    ell(ctx, ax, HOOP_Y, 40, 10); fs(ctx, good ? 'rgba(140,255,140,.22)' : null, good ? '#8CFF8C' : 'rgba(255,255,255,.4)', good ? 5 : 2.5);
+    if (good) textO(ctx, 'SHOOT!', ax, HOOP_Y + 74, 15, '#8CFF8C', C.out, 'center', 4);
+  }
   // backboard + hoop
-  const hx = cx + (S.phase === 'intro' ? Math.sin(time * 1.9) * HOOP_AMP : S.x);
-  rr(ctx, hx - 70, HOOP_Y - 92, 140, 84, 6); fs(ctx, S.flash > 0 ? '#FFF6C9' : '#F4F4F2', C.out, 3); rr(ctx, hx - 26, HOOP_Y - 62, 52, 40, 3); fs(ctx, null, '#D8303A', 4);
-  // balls behind the rim (still coming down into it), then rim + net, then balls in front
-  const drawBall = b => { let x = cx, y, r; if (b.state === 'fly') { const p = b.t / BALL_FLY; y = 470 - (470 - HOOP_Y + 30) * p - Math.sin(p * Math.PI) * 70 + p * p * 30; r = lerp(30, 17, p); } else if (b.state === 'made') { x = cx + (hx - cx) * 0.0; y = HOOP_Y + 6 + b.t * 260; r = 17; x = b.hx === undefined ? (b.hx = hx) : b.hx; } else { x = cx + b.vx * b.t; y = HOOP_Y - 6 + b.t * b.t * 700 - b.t * 120; r = 17; } ctx.globalAlpha = b.state === 'fly' ? 1 : clamp(1 - (b.t - 0.3) / 0.3, 0, 1); basketball(ctx, x, y, r, b.t * 9); ctx.globalAlpha = 1; };
+  const hx = cx + S.x + (S.shake > 0 ? Math.sin(time * 70) * 5 * (S.shake / 0.3) : 0);
+  rr(ctx, hx - 70, HOOP_Y - 84, 140, 78, 6); fs(ctx, S.flash > 0 ? '#FFF6C9' : '#F4F4F2', C.out, 3); rr(ctx, hx - 26, HOOP_Y - 58, 52, 38, 3); fs(ctx, null, '#D8303A', 4);
+  const drawBall = b => { let x, y, r; if (b.state === 'fly') { const p = b.t / BALL_FLY; x = cx + b.x; y = lerp(SHOOT_Y - 62, HOOP_Y - 8, p) - Math.sin(p * Math.PI) * 46; r = lerp(24, 17, p); if (b.fire) for (let k = 3; k >= 1; k--) { ell(ctx, x, y + k * 11, r * (1 - k * 0.2), r * (1 - k * 0.2)); fs(ctx, 'rgba(255,' + (120 + k * 30) + ',40,' + (0.5 - k * 0.12) + ')', null); } }
+    else if (b.state === 'made') { x = cx + b.hx; y = HOOP_Y + 4 + b.t * 250; r = 17; } else { x = cx + b.x + b.vx * b.t; y = HOOP_Y - 8 + b.t * b.t * 680 - b.t * 140; r = 17; }
+    ctx.globalAlpha = b.state === 'fly' ? 1 : clamp(1 - (b.t - 0.35) / 0.35, 0, 1); basketball(ctx, x, y, r, b.t * 9, b.money); ctx.globalAlpha = 1; };
   for (const b of S.balls) if (b.state !== 'fly' || b.t / BALL_FLY > 0.6) drawBall(b);
   ell(ctx, hx, HOOP_Y, 40, 10); fs(ctx, null, C.out, 9); ell(ctx, hx, HOOP_Y, 40, 10); fs(ctx, null, '#F2622A', 5);
-  ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2; for (let k = -4; k <= 4; k++) { ctx.beginPath(); ctx.moveTo(hx + k * 9.5, HOOP_Y + 6); ctx.lineTo(hx + k * 6, HOOP_Y + 48); ctx.stroke(); } for (const yy of [18, 32]) { ell(ctx, hx, HOOP_Y + yy, 34 - yy * 0.25, 5); ctx.stroke(); }
+  const drop = S.net > 0 ? Math.sin((S.net / 0.35) * Math.PI) * 16 : 0;
+  ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2; for (let k = -4; k <= 4; k++) { ctx.beginPath(); ctx.moveTo(hx + k * 9.5, HOOP_Y + 6); ctx.lineTo(hx + k * 6, HOOP_Y + 46 + drop); ctx.stroke(); } for (const yy of [18, 32]) { ell(ctx, hx, HOOP_Y + yy + drop * yy / 46, 34 - yy * 0.25, 5); ctx.stroke(); }
   for (const b of S.balls) if (b.state === 'fly' && b.t / BALL_FLY <= 0.6) drawBall(b);
-  // the aim line and the next ball waiting on the rack
-  ctx.setLineDash([6, 10]); ctx.strokeStyle = 'rgba(255,255,255,.22)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cx, 440); ctx.lineTo(cx, HOOP_Y + 14); ctx.stroke(); ctx.setLineDash([]);
-  rr(ctx, cx - 120, 452, 240, 24, 8); fs(ctx, '#3B2A5E', C.out, 3); for (const dx of [-70, 70]) basketball(ctx, cx + dx, 452, 20, 0.4); if (S.cool <= 0 && S.phase === 'play' && S.left > 0) basketball(ctx, cx, 448, 26, time * 2);
-  // kids either side
-  drawKid(ctx, 'nic', cx - 372, 330, 1.25, 0); drawKid(ctx, 'giulia', cx + 372, 330, 1.25, 0);
-  if (S.phase === 'play') { const kx = S.who === 'nic' ? cx - 372 : cx + 372; textO(ctx, (S.who === 'nic' ? 'NICK' : 'GIULIA') + "'S SHOT", kx, 388, 15, C.gold, C.out, 'center', 4); }
-  ctx.save(); ctx.translate(cx + 372, 150); bernardHead(ctx, 0, 0, 1.1, Math.sin(time * 6) * 0.6, true, false); ctx.restore();
-  if (S.msg) { ctx.globalAlpha = clamp(S.msg.life * 3, 0, 1); textO(ctx, S.msg.text, cx, 322 - (0.9 - S.msg.life) * 30, 26, S.msg.col, C.out, 'center', 6); ctx.globalAlpha = 1; }
-  if (S.phase === 'intro') { panel(cx - 240, 280, 480, 110, 16); textO(ctx, 'HOOPS', cx, 310, 34, C.gold, C.out, 'center', 7); textO(ctx, 'The ball flies straight up the middle.', cx, 344, 15, C.cream, null, 'center', 0, 600); textO(ctx, 'Shoot just before the hoop gets there!  3 in a row = ON FIRE', cx, 366, 14, '#FFE680', null, 'center', 0, 600); }
-  if (S.phase === 'done') { panel(cx - 240, 272, 480, 140, 16); textO(ctx, 'TIME!', cx, 302, 30, '#FF8A8A', C.out, 'center', 6); textO(ctx, 'TOTAL +' + S.total, cx, 344, 36, '#FFE680', C.out, 'center', 7); textO(ctx, S.made + ' of ' + S.shots + ' shots   ·   best streak ' + S.best, cx, 384, 15, C.cream, null, 'center', 0, 600); }
-  const prompt = S.phase === 'intro' ? 'Press any button to start' : S.phase === 'done' ? 'Press any button to get back in the Jeep' : 'Press any button (or tap) to shoot!';
-  textO(ctx, prompt, cx, 502, 15, C.cream, C.out, 'center', 4);
+  for (const q of S.pops) { ctx.globalAlpha = clamp(q.life * 3, 0, 1); textO(ctx, q.text, cx + q.x, q.y, 24, q.col, C.out, 'center', 5); ctx.globalAlpha = 1; }
+  // the shooter runs along the bottom with the next ball over their head; the other kid waits at the side
+  const hop = S.cheer > 0 ? Math.abs(Math.sin(time * 18)) * -10 : 0, shooter = playing ? S.who : null;
+  if (shooter !== 'nic') drawKid(ctx, 'nic', cx - 372, 330 + hop, 1.25, 0); if (shooter !== 'giulia') drawKid(ctx, 'giulia', cx + 372, 330 + hop, 1.25, 0);
+  if (shooter) { const moving = inp.left || inp.right; ell(ctx, ax, SHOOT_Y + 46, 24, 5); fs(ctx, 'rgba(0,0,0,.3)', null); drawKid(ctx, shooter, ax, SHOOT_Y, 1.0, moving ? time : 0);
+    if (S.phase === 'count' || (S.cool <= 0 && S.left > 0)) basketball(ctx, ax, SHOOT_Y - 62, 22, time * 2, nextMoney);
+    textO(ctx, shooter === 'nic' ? 'NICK' : 'GIULIA', ax, SHOOT_Y + 60, 12, C.gold, C.out, 'center', 3); }
+  ctx.save(); ctx.translate(cx + 372, 150 + hop * 1.5); bernardHead(ctx, 0, 0, 1.1, Math.sin(time * 6) * 0.6, true, false); ctx.restore();
+  // ball rack: the gold one is the money ball
+  rr(ctx, cx - 120, 462, 240, 22, 8); fs(ctx, '#3B2A5E', C.out, 3); for (let k = 0; k < 4; k++) basketball(ctx, cx - 78 + k * 52, 462, 17, 0.4 + k, (S.shots + 2 + k) % 5 === 0);
+  if (S.msg) { ctx.globalAlpha = clamp(S.msg.life * 3, 0, 1); textO(ctx, S.msg.text, cx, 150, 24, S.msg.col, C.out, 'center', 6); ctx.globalAlpha = 1; }
+  if (S.phase === 'intro') { panel(cx - 250, 262, 500, 150, 16); textO(ctx, 'HOOPS', cx, 292, 34, C.gold, C.out, 'center', 7);
+    textO(ctx, '◀ ▶  run under the hoop     ·     any button shoots', cx, 328, 16, C.cream, null, 'center', 0, 600);
+    textO(ctx, 'The ball takes a moment: shoot when the ring turns GREEN', cx, 352, 15, '#8CFF8C', null, 'center', 0, 600);
+    textO(ctx, 'Gold MONEY BALL = double   ·   3 in a row = ON FIRE   ·   last 10 seconds = double', cx, 376, 12, '#FFE680', null, 'center', 0, 600);
+    textO(ctx, 'Nick and Giulia take turns', cx, 396, 12, 'rgba(255,244,214,.7)', null, 'center', 0, 600); }
+  if (S.phase === 'count') { const n = 3 - Math.floor(S.t), f = S.t % 1; ctx.globalAlpha = clamp(1.4 - f, 0, 1); textO(ctx, String(Math.max(1, n)), cx, 300, 110 + f * 40, C.gold, C.out, 'center', 12); ctx.globalAlpha = 1; }
+  if (S.phase === 'done') { panel(cx - 250, 232, 500, 176, 16); textO(ctx, 'TIME!', cx, 260, 28, '#FF8A8A', C.out, 'center', 6); textO(ctx, 'TOTAL +' + S.total, cx, 302, 38, '#FFE680', C.out, 'center', 7);
+    textO(ctx, S.total >= 1500 ? 'MVP!!' : S.total >= 800 ? 'ALL-STARS!' : S.total >= 300 ? 'NICE SHOOTING!' : 'GOOD GAME!', cx, 340, 18, '#9CFF9C', C.out, 'center', 4);
+    textO(ctx, S.made + ' of ' + S.shots + ' shots   ·   best streak ' + S.best, cx, 368, 15, C.cream, null, 'center', 0, 600);
+    if (S.newBest) { if (Math.floor(time * 4) % 2 === 0) textO(ctx, '★ NEW BEST! ★', cx, 392, 16, '#FFD23F', C.out, 'center', 4); } else textO(ctx, 'Best: ' + hoopsBest, cx, 392, 13, 'rgba(255,244,214,.7)', null, 'center', 0, 600); }
+  const prompt = S.phase === 'intro' ? 'Press any button to start' : S.phase === 'done' ? 'Press any button to get back in the Jeep' : S.phase === 'count' ? 'Get ready…' : '◀ ▶ run  ·  any button shoots  ·  or tap where to shoot';
+  textO(ctx, prompt, cx, 506, 15, C.cream, C.out, 'center', 4);
 }
 const SLUSH_LAG = 0.06; // seconds of TV/controller delay to forgive
 // any face button, Start, the gas/brake keys or a touch: whatever the kids mash stops the pour
@@ -2334,7 +2489,8 @@ function update(dt) {
   Radio.tick(); if (state !== 'setup') { if (hit.radioPrev) Radio.change(-1); else if (hit.radioNext) Radio.change(1); }
   switch (state) {
     case 'title': titleT += dt; time += dt; position = increase(position, dt * 1800, trackLength); skyOff = increase(skyOff, 0.0004, 1);
-      updateMenuNav(i => { if (i === 0) { state = 'route'; routeIdx = route.id; sfx.menu(); } else if (i === 1) { state = 'setup'; setup = { step: 0, list: ['gas', 'brake', 'horn', 'boost', 'start', 'select', 'radioPrev', 'radioNext'], labels: { gas: 'GAS (B)', brake: 'BRAKE (Y)', horn: 'HONK / BARK (A)', boost: 'ZOOMIES (X)', start: 'START', select: 'SELECT', radioPrev: 'RADIO \u25C0 (L)', radioNext: 'RADIO \u25B6 (R)' }, temp: {}, done: 0, wait: 10 }; } else { Audio_.on = !Audio_.on; menu.items[2] = 'Sound: ' + (Audio_.on ? 'On' : 'Off'); } });
+      updateMenuNav(i => { if (i === 0) { state = 'route'; routeIdx = route.id; sfx.menu(); } else if (i === 1) { state = 'setup'; setup = { step: 0, list: ['gas', 'brake', 'horn', 'boost', 'start', 'select', 'radioPrev', 'radioNext'], labels: { gas: 'GAS (B)', brake: 'BRAKE (Y)', horn: 'HONK / BARK (A)', boost: 'ZOOMIES (X)', start: 'START', select: 'SELECT', radioPrev: 'RADIO \u25C0 (L)', radioNext: 'RADIO \u25B6 (R)' }, temp: {}, done: 0, wait: 10 }; } else if (i === 2) { Audio_.on = !Audio_.on; menu.items[2] = 'Sound: ' + (Audio_.on ? 'On' : 'Off'); } else Radio.toggle(); });
+      menu.items[3] = 'Radio: ' + (Radio.isOn() ? Radio.st().title : 'Off');
       if (hit.gas || hit.start || hit.left || hit.right) Audio_.init(); break;
     case 'setup': { const s = setup; time += dt; if (s.wait > 0) { s.wait--; break; } if (keys.Escape) { padMap = { ...DEFAULT_PAD }; savePadMap(); goTitle(); keys.Escape = false; break; } if (s.done > 0) { s.done--; if (s.done === 0) goTitle(); break; } const b = anyPadPress(); if (b >= 0) { s.temp[s.list[s.step]] = b; s.step++; s.wait = 14; sfx.menu(); if (s.step >= s.list.length) { padMap = Object.assign({ ...DEFAULT_PAD }, s.temp); savePadMap(); s.done = 90; sfx.check(); } } break; }
     case 'route': time += dt; {
@@ -2681,7 +2837,7 @@ function drawGuide() {
   label(px - 24, py + 8, px - 70, py - 118, 'SELECT', 'quit', C.cream, 'right');
   // tips + go
   textO(ctx, 'Grab balls to fill ZOOMIES  ·  bones fill it right up  ·  stay on the road!', cx, 414, 14, '#FFE89A', null, 'center', 0, 600);
-  textO(ctx, 'L / R: change the radio station   ·   L + R together: full screen', cx, 433, 13, '#9EE8FF', null, 'center', 0, 600);
+  textO(ctx, 'L / R: turn the radio on, change station   ·   L + R together: full screen', cx, 433, 13, '#9EE8FF', null, 'center', 0, 600);
   textO(ctx, 'Keyboard: ← → steer · ↑ / Space gas · ↓ brake · C honk · Shift Zoomies · Q / E radio · Esc quit', cx, 451, 12, 'rgba(255,244,214,.6)', null, 'center', 0, 500);
   if (Math.floor(time * 2.5) % 2 === 0) textO(ctx, 'PRESS B TO DRIVE!', cx, 482, 22, '#C9F24D', C.out, 'center', 5);
 }
@@ -2695,8 +2851,8 @@ function drawTitle() {
   ctx.restore();
   textO(ctx, 'Dog park, Miami, or the school run — Nick & Giulia included.', W / 2, 190, 17, C.cream, C.out, 'center', 4, 600);
   drawMenu(262, 40, 24, 70, 'left');
-  if (best > 0) textO(ctx, 'Best score: ' + best, 70, 392, 15, '#FFE89A', C.out, 'left', 4, 600);
-  if (Math.floor(time * 2) % 2 === 0) textO(ctx, pad.connected ? 'PRESS START' : 'PRESS ENTER / START', 70, 430, 16, '#FFE89A', C.out, 'left', 4, 600);
+  if (best > 0) textO(ctx, 'Best score: ' + best, 70, 424, 15, '#FFE89A', C.out, 'left', 4, 600);
+  if (Math.floor(time * 2) % 2 === 0) textO(ctx, pad.connected ? 'PRESS START' : 'PRESS ENTER / START', 70, 452, 16, '#FFE89A', C.out, 'left', 4, 600);
   hintBar();
 }
 function drawSetup() {
@@ -2977,7 +3133,7 @@ function start() {
 function stop() { running = false; cancelAnimationFrame(raf); Music.stop(); Audio_.engineSet(0, false); Audio_.sirenSet(0, 0); window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp); window.removeEventListener('blur', onBlur); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('gamepadconnected', onGpc); }
 const onVis = () => { if (document.hidden && state === 'playing') { state = 'paused'; setMenu(['Resume', 'Restart Trip', 'Quit to Arcade']); Audio_.engineSet(0, false); } };
 const onGpc = () => { Audio_.init(); Audio_.engineOn(); };
-window.BRT = { start, stop, onQuit: null, get state() { return state; }, teleport(segIndex) { position = segIndex * TUNE.segLen; playerX = 0; }, cheat(v) { speed = v; }, stageStarts() { return stageStarts.concat([segments.length]); }, stops() { return stops.map(q => q.n); }, swaps() { return swaps.map(q => q.n); }, ride() { return ride; }, events() { return events.map(q => ({ kind: q.kind, n: q.n })); }, forks() { return forks.map(f => ({ decision: f.decision, L0: f.L0, Lb: f.Lb, L1: f.L1, R0: f.R0, Rb: f.Rb, R1: f.R1, off: f.offroadSide, chosen: f.chosen })); }, routeId() { return route.id; }, setRoute(i) { route = ROUTES[i]; STAGES = route.stages; }, setX(x) { playerX = x; }, lake() { return Object.assign({ boat, skiers, air: !!air, airJumps, skisGot, fork: marinaFork && { decision: marinaFork.decision, chosen: marinaFork.chosen } }, LAKE); }, skipScene() { if (state === 'scene') scene.t = 99; if (state === 'tinpick') startTinGame(0); if (state === 'slush' && slush) { slush.phase = 'done'; slush.t = 99; } if (state === 'hoops' && hoops) { hoops.phase = 'done'; hoops.t = 99; hoops.left = 0; } }, lakeItems() { const out = []; if (LAKE.from === undefined) return out; for (let n = LAKE.from; n < LAKE.to; n++) for (const sp of segments[n].sprites) if (sp.ramp || sp.pickup === 'skis' || sp.obstacle) out.push({ n, key: sp.key, offset: sp.offset }); return out; }, setBoat(v) { boat = v; }, airport() { return Object.assign({ plane, flyAlt, rings, lift: flyLiftAt(findSegment(position + playerZ).index), fork: airportFork && { decision: airportFork.decision, chosen: airportFork.chosen } }, AIR); }, setPlane(v) { plane = v; }, weather() { return { rain: +rain.toFixed(2), rainTrip: Math.round(rainTrip), bow: +rainbowAmt().toFixed(2) }; }, setRainTrip(v) { rainTrip = v; }, police() { return { stops: POLICE, vol: +sirenVol.toFixed(3), gain: Audio_.sirenGain ? +Audio_.sirenGain.gain.value.toFixed(4) : null, freq: Audio_.siren ? Math.round(Audio_.siren.frequency.value) : null }; }, hoopAhead(sec) { if (!hoops) return 999; let ph = hoops.ph, left = hoops.left; for (let t = 0; t < sec; t += 1 / 60) { ph += (1 / 60) * (1.9 + (1 - left / HOOPS_TIME) * 1.5); left = Math.max(0, left - 1 / 60); } return hoopXAt(ph); }, fast(n) { dbgFast = n; }, clock(v) { if (v !== undefined) timer = v; return timer; }, cars(a, b) { const out = []; for (const c of cars) { const i = Math.floor(c.z / TUNE.segLen); if (i >= a && i <= b && !c.wreck) out.push({ i, x: +c.offset.toFixed(2), v: Math.round(c.speed) }); } return out; }, info() { return { state, stage, score, timer, seg: findSegment(position + playerZ).index, N: segments.length, x: +playerX.toFixed(2), speed: Math.round(speed), boat, plane, rain: +rain.toFixed(2), scene: scene && scene.kind, passes, balls, bridgeJumps, rings, airJumps }; }, tin() { return { state, pick: tin && tin.idx, game: tinGame, hoopsScore, slushScore, score, hoops: hoops && { phase: hoops.phase, left: +hoops.left.toFixed(1), x: Math.round(hoops.x), total: hoops.total, streak: hoops.streak, made: hoops.made, shots: hoops.shots, who: hoops.who, balls: hoops.balls.length } }; }, radio() { return { idx: Radio.idx, title: Radio.st().title, wanted: Radio.wanted, chip: Music.on, duck: Radio.duckV, chipT: Radio.chipT, el: Radio.el ? { src: Radio.el.src.split('/').pop(), paused: Radio.el.paused, t: +Radio.el.currentTime.toFixed(2), vol: +Radio.el.volume.toFixed(2), muted: Radio.el.muted, dur: Radio.el.duration } : null }; }, radioEl() { return Radio.el; }, sound(v) { Audio_.on = v; }, rainOn() { return rainOn; }, work() { return { zones: WORK, bridgeJumps, air: !!air, airH: air ? Math.round(air.h) : 0, onRamp: !!onRamp, lift: Math.round(rampLift), rampLen: RAMP_LEN }; }, setAlt(v) { flyAlt = v; }, setSkiers(v) { skiers = v; }, setSpeed(v) { speed = v; }, dbg() { const sg = findSegment(position + playerZ); return { playerX: +playerX.toFixed(3), seg: sg.index, merge: sg.merge || null, mp: sg.mp1, mergeShift: mergeShift(sg, ((position + playerZ) % TUNE.segLen) / TUNE.segLen), speed: Math.round(speed), state, dizzy: +dizzy.toFixed(2), boat, skiers, airJumps }; }, wrecks() { return cars.filter(c => c.wreck).map(c => ({ seg: Math.floor(c.z / TUNE.segLen), offset: +c.offset.toFixed(2), t: +c.wreck.t.toFixed(2), speed: Math.round(c.speed) })); }, firstCar() { let b = null; for (const c of cars) if (!b || c.z < b.z) b = c; return { seg: Math.floor(b.z / TUNE.segLen), offset: b.offset, kind: b.kind }; } };
+window.BRT = { start, stop, onQuit: null, get state() { return state; }, teleport(segIndex) { position = segIndex * TUNE.segLen; playerX = 0; }, cheat(v) { speed = v; }, stageStarts() { return stageStarts.concat([segments.length]); }, stops() { return stops.map(q => q.n); }, swaps() { return swaps.map(q => q.n); }, ride() { return ride; }, events() { return events.map(q => ({ kind: q.kind, n: q.n })); }, forks() { return forks.map(f => ({ decision: f.decision, L0: f.L0, Lb: f.Lb, L1: f.L1, R0: f.R0, Rb: f.Rb, R1: f.R1, off: f.offroadSide, chosen: f.chosen })); }, routeId() { return route.id; }, setRoute(i) { route = ROUTES[i]; STAGES = route.stages; }, setX(x) { playerX = x; }, lake() { return Object.assign({ boat, skiers, air: !!air, airJumps, skisGot, fork: marinaFork && { decision: marinaFork.decision, chosen: marinaFork.chosen } }, LAKE); }, skipScene() { if (state === 'scene') scene.t = 99; if (state === 'tinpick') startTinGame(0); if (state === 'slush' && slush) { slush.phase = 'done'; slush.t = 99; } if (state === 'hoops' && hoops) { hoops.phase = 'done'; hoops.t = 99; hoops.left = 0; } }, lakeItems() { const out = []; if (LAKE.from === undefined) return out; for (let n = LAKE.from; n < LAKE.to; n++) for (const sp of segments[n].sprites) if (sp.ramp || sp.pickup === 'skis' || sp.obstacle) out.push({ n, key: sp.key, offset: sp.offset }); return out; }, setBoat(v) { boat = v; }, airport() { return Object.assign({ plane, flyAlt, rings, lift: flyLiftAt(findSegment(position + playerZ).index), fork: airportFork && { decision: airportFork.decision, chosen: airportFork.chosen } }, AIR); }, setPlane(v) { plane = v; }, weather() { return { rain: +rain.toFixed(2), rainTrip: Math.round(rainTrip), bow: +rainbowAmt().toFixed(2) }; }, setRainTrip(v) { rainTrip = v; }, police() { return { stops: POLICE, vol: +sirenVol.toFixed(3), gain: Audio_.sirenGain ? +Audio_.sirenGain.gain.value.toFixed(4) : null, freq: Audio_.siren ? Math.round(Audio_.siren.frequency.value) : null }; }, hoopAhead(sec) { if (!hoops) return 999; let ph = hoops.ph, left = hoops.left; for (let t = 0; t < sec; t += 1 / 60) { ph += (1 / 60) * hoopSpeed(left) * (left <= 10 ? 1.12 : 1); left = Math.max(0, left - 1 / 60); } return hoopXAt(ph); }, fast(n) { dbgFast = n; }, clock(v) { if (v !== undefined) timer = v; return timer; }, carKinds() { const c = {}; for (const q of cars) c[q.kind] = (c[q.kind] || 0) + 1; return c; }, cars(a, b) { const out = []; for (const c of cars) { const i = Math.floor(c.z / TUNE.segLen); if (i >= a && i <= b && !c.wreck) out.push({ i, x: +c.offset.toFixed(2), v: Math.round(c.speed) }); } return out; }, info() { return { state, stage, score, timer, seg: findSegment(position + playerZ).index, N: segments.length, x: +playerX.toFixed(2), speed: Math.round(speed), boat, plane, rain: +rain.toFixed(2), scene: scene && scene.kind, passes, balls, bridgeJumps, rings, airJumps }; }, tin() { return { state, pick: tin && tin.idx, game: tinGame, hoopsScore, slushScore, score, hoops: hoops && { aim: Math.round(hoops.aim), phase: hoops.phase, left: +hoops.left.toFixed(1), x: Math.round(hoops.x), total: hoops.total, streak: hoops.streak, made: hoops.made, shots: hoops.shots, who: hoops.who, balls: hoops.balls.length } }; }, radio() { return { idx: Radio.idx, title: Radio.st().title, wanted: Radio.wanted, chip: Music.on, duck: Radio.duckV, chipT: Radio.chipT, el: Radio.el ? { src: Radio.el.src.split('/').pop(), paused: Radio.el.paused, t: +Radio.el.currentTime.toFixed(2), vol: +Radio.el.volume.toFixed(2), muted: Radio.el.muted, dur: Radio.el.duration } : null }; }, radioEl() { return Radio.el; }, sound(v) { Audio_.on = v; }, rainOn() { return rainOn; }, work() { return { zones: WORK, bridgeJumps, air: !!air, airH: air ? Math.round(air.h) : 0, onRamp: !!onRamp, lift: Math.round(rampLift), rampLen: RAMP_LEN }; }, setAlt(v) { flyAlt = v; }, setSkiers(v) { skiers = v; }, setSpeed(v) { speed = v; }, dbg() { const sg = findSegment(position + playerZ); return { playerX: +playerX.toFixed(3), seg: sg.index, merge: sg.merge || null, mp: sg.mp1, mergeShift: mergeShift(sg, ((position + playerZ) % TUNE.segLen) / TUNE.segLen), speed: Math.round(speed), state, dizzy: +dizzy.toFixed(2), boat, skiers, airJumps }; }, wrecks() { return cars.filter(c => c.wreck).map(c => ({ seg: Math.floor(c.z / TUNE.segLen), offset: +c.offset.toFixed(2), t: +c.wreck.t.toFixed(2), speed: Math.round(c.speed) })); }, firstCar() { let b = null; for (const c of cars) if (!b || c.z < b.z) b = c; return { seg: Math.floor(b.z / TUNE.segLen), offset: b.offset, kind: b.kind }; } };
 
 if (location.hash === '#sprites') {
   buildSprites(); ctx.fillStyle = '#9fd'; ctx.fillRect(0, 0, W, H);
