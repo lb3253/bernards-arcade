@@ -32,7 +32,7 @@
   .rb:active, .rb.held { background: rgba(242,193,78,.75); color: var(--ink); }
   #r-left { left: 18px; bottom: 22px; } #r-right { left: 96px; bottom: 22px; }
   #r-gas { right: 18px; bottom: 30px; width: 78px; height: 78px; } #r-brake { right: 108px; bottom: 18px; } #r-horn { right: 70px; bottom: 116px; } #r-boost { right: 150px; bottom: 96px; width: 56px; height: 56px; font-size: 12px; }
-  .rb.rs { width: 46px; height: 46px; font-size: 13px; } #r-rprev { left: 22px; bottom: 100px; } #r-rnext { left: 104px; bottom: 100px; }
+  .rb.rs { width: 44px; height: 44px; font-size: 13px; } #r-rprev { left: 30%; top: 12%; } #r-rnext { right: 30%; top: 12%; }
   #r-start { left: 50%; transform: translateX(-50%); bottom: 14px; width: 84px; height: 36px; border-radius: 18px; font-size: 13px; }
   /* Stay off the picker until this cabinet is opened. */
   #brt-root:not(.on){display:none !important}
@@ -1868,7 +1868,7 @@ const DEFAULT_PAD = { gas: 0, brake: 2, horn: 1, boost: 3, start: 9, select: 8, 
 let padMap = loadPadMap();
 function loadPadMap() { try { const s = localStorage.getItem('brt_padmap'); if (s) return Object.assign({}, DEFAULT_PAD, JSON.parse(s)); } catch (e) { } return { ...DEFAULT_PAD }; }
 function savePadMap() { try { localStorage.setItem('brt_padmap', JSON.stringify(padMap)); } catch (e) { } }
-const keys = {}, latch = {}, touch = {}, pad = { connected: false, buttons: [], prevButtons: [], left: false, right: false, up: false, down: false, name: '' };
+const keys = {}, latch = {}, touch = {}, tapLatch = {}, pad = { connected: false, buttons: [], prevButtons: [], left: false, right: false, up: false, down: false, name: '' };
 let inp = {}, prevInp = {}, hit = {}, padToast = 0, shL = false, shR = false, shCombo = false;
 function readPad() {
   let gp = null; try { const gps = navigator.getGamepads ? navigator.getGamepads() : []; for (const g of gps) if (g && g.connected) { gp = g; break; } } catch (e) { }
@@ -1882,7 +1882,7 @@ function readPad() {
   Object.assign(pad, { left, right, up, down });
 }
 function pollInput() {
-  readPad(); const b = pad.buttons, m = padMap, pb = i => !!b[i]; const k = {}; for (const c in keys) if (keys[c]) k[c] = true; for (const c in latch) { if (latch[c]) k[c] = true; latch[c] = false; }
+  readPad(); const b = pad.buttons, m = padMap, pb = i => !!b[i]; const k = {}; for (const c in tapLatch) { if (tapLatch[c]) touch[c] = true; } for (const c in keys) if (keys[c]) k[c] = true; for (const c in latch) { if (latch[c]) k[c] = true; latch[c] = false; }
   const n = {
     left: !!(k.ArrowLeft || k.KeyA || pad.left || touch.left), right: !!(k.ArrowRight || k.KeyD || pad.right || touch.right),
     up: !!(k.ArrowUp || k.KeyW || pad.up), down: !!(k.ArrowDown || k.KeyS || pad.down),
@@ -1893,7 +1893,7 @@ function pollInput() {
     start: !!(k.Enter || pb(m.start) || touch.start), select: !!(k.Escape || k.Backspace || pb(m.select)),
     radioPrev: !!(k.KeyQ || k.BracketLeft || touch.radioPrev), radioNext: !!(k.KeyE || k.BracketRight || touch.radioNext), tap: !!touch.tap
   };
-  touch.tap = false;
+  touch.tap = false; for (const c in tapLatch) { if (tapLatch[c]) { tapLatch[c] = false; const el = document.querySelector('#brt-touch [data-k="' + c + '"]'); if (el && !el.classList.contains('held')) touch[c] = false; } }
   prevInp = inp; inp = n; hit = {}; for (const key in n) hit[key] = n[key] && !prevInp[key];
   // shoulder buttons change station when let go, so holding L + R together (full screen) does not also retune the radio
   { const l = pb(m.radioPrev), r = pb(m.radioNext); if (l && r) shCombo = true; if (shL && !l && !shCombo) hit.radioPrev = true; if (shR && !r && !shCombo) hit.radioNext = true; if (!l && !r) shCombo = false; shL = l; shR = r; }
@@ -1907,7 +1907,7 @@ function setupTouch() {
   // TV browsers often claim touch support with no touchscreen, so the on-screen buttons wait for an actual touch
   window.addEventListener('touchstart', () => box.classList.add('on'), { passive: true, once: true });
   canvas.addEventListener('pointerdown', ev => { const r = canvas.getBoundingClientRect(); touch.tap = true; touch.tapX = (ev.clientX - r.left) / r.width; Audio_.init(); });
-  box.querySelectorAll('.rb').forEach(el => { const k = el.dataset.k; const dn = ev => { ev.preventDefault(); touch[k] = true; el.classList.add('held'); Audio_.init(); Audio_.engineOn(); }; const upf = ev => { ev.preventDefault(); touch[k] = false; el.classList.remove('held'); }; el.addEventListener('pointerdown', dn); el.addEventListener('pointerup', upf); el.addEventListener('pointercancel', upf); el.addEventListener('pointerleave', upf); });
+  box.querySelectorAll('.rb').forEach(el => { const k = el.dataset.k; const dn = ev => { ev.preventDefault(); touch[k] = true; tapLatch[k] = true; el.classList.add('held'); Audio_.init(); Audio_.engineOn(); }; const upf = ev => { ev.preventDefault(); touch[k] = false; el.classList.remove('held'); }; el.addEventListener('pointerdown', dn); el.addEventListener('pointerup', upf); el.addEventListener('pointercancel', upf); el.addEventListener('pointerleave', upf); });
 }
 
 /* =====================================================================
@@ -1997,9 +1997,9 @@ function updateCars(dt, playerSeg) {
       if (oldSeg.work && car.offset > 0.3) car.offset = Math.max(0, car.offset - dt * 1.2); // merge out of the closed lane
       car.offset = clamp(car.offset, -0.85, 0.85);
     }
-    const wasAhead = car.z > position + playerZ;
     car.z = increase(car.z, dt * car.speed, trackLength);
-    if (!car.wreck && wasAhead && !(car.z > position + playerZ) && car.z > position - 2000 && speed > car.speed) { passes++; score += 20; sfx.pass(); floatText(W / 2 + rnd(-80, 80), 330, 'Pass!', '#CFE8FF'); }
+    const wasAhead = car.ahead, aheadNow = car.z > position + playerZ; car.ahead = aheadNow; // remembered from the last frame, so the Jeep's own move counts
+    if (!car.wreck && !plane && wasAhead && !aheadNow && car.z > position - 2000 && speed > car.speed) { passes++; score += 20; sfx.pass(); floatText(W / 2 + rnd(-80, 80), 330, 'Pass!', '#CFE8FF'); }
     const newSeg = findSegment(car.z);
     if (oldSeg !== newSeg) { const i = oldSeg.cars.indexOf(car); if (i >= 0) oldSeg.cars.splice(i, 1); newSeg.cars.push(car); }
   }
@@ -2125,7 +2125,7 @@ function updatePlaying(dt) {
   // timer + stage/checkpoints
   timerAcc += dt; if (timerAcc >= 1) { timerAcc -= 1; timer--; if (timer === 10) say("Hurry, Tita!"); if (timer <= 0) { timer = 0; state = 'gameover'; setMenu(['Try Again', 'Quit to Arcade']); Music.stop(); sfx.lose(); Audio_.engineSet(0, false); return; } }
   const segIdx = playerSeg.index; const newStage = segIdx >= stageStarts[2] ? 2 : segIdx >= stageStarts[1] ? 1 : 0;
-  if (newStage !== stage) { stage = newStage; bannerOverride = null; timer += route.cpTime || TUNE.checkpointTime; stageBanner = 170; sfx.check(); floatText(W / 2, 200, '+' + (route.cpTime || TUNE.checkpointTime) + ' seconds', '#9CFF9C'); say(pick(['New stage!', 'Keep going!'])); }
+  if (newStage !== stage) { stage = newStage; bannerOverride = null; timer += route.cpTime || TUNE.checkpointTime; stageBanner = 170; sfx.check(); floatText(W / 2, 290, '+' + (route.cpTime || TUNE.checkpointTime) + ' seconds', '#9CFF9C'); say(pick(['New stage!', 'Keep going!'])); }
   if (stageBanner > 0) stageBanner--;
   // background scroll
   skyOff = increase(skyOff, 0.001 * playerSeg.curve * speedPct, 1); hillOff = increase(hillOff, 0.002 * playerSeg.curve * speedPct, 1);
@@ -2287,8 +2287,8 @@ function drawHoops() {
   if (S.phase === 'play') { const kx = S.who === 'nic' ? cx - 372 : cx + 372; textO(ctx, (S.who === 'nic' ? 'NICK' : 'GIULIA') + "'S SHOT", kx, 388, 15, C.gold, C.out, 'center', 4); }
   ctx.save(); ctx.translate(cx + 372, 150); bernardHead(ctx, 0, 0, 1.1, Math.sin(time * 6) * 0.6, true, false); ctx.restore();
   if (S.msg) { ctx.globalAlpha = clamp(S.msg.life * 3, 0, 1); textO(ctx, S.msg.text, cx, 322 - (0.9 - S.msg.life) * 30, 26, S.msg.col, C.out, 'center', 6); ctx.globalAlpha = 1; }
-  if (S.phase === 'intro') { panel(cx - 240, 236, 480, 110, 16); textO(ctx, 'HOOPS', cx, 266, 34, C.gold, C.out, 'center', 7); textO(ctx, 'The ball flies straight up the middle.', cx, 300, 15, C.cream, null, 'center', 0, 600); textO(ctx, 'Shoot just before the hoop gets there!  3 in a row = ON FIRE', cx, 322, 14, '#FFE680', null, 'center', 0, 600); }
-  if (S.phase === 'done') { panel(cx - 240, 226, 480, 140, 16); textO(ctx, 'TIME!', cx, 256, 30, '#FF8A8A', C.out, 'center', 6); textO(ctx, 'TOTAL +' + S.total, cx, 298, 36, '#FFE680', C.out, 'center', 7); textO(ctx, S.made + ' of ' + S.shots + ' shots   ·   best streak ' + S.best, cx, 338, 15, C.cream, null, 'center', 0, 600); }
+  if (S.phase === 'intro') { panel(cx - 240, 280, 480, 110, 16); textO(ctx, 'HOOPS', cx, 310, 34, C.gold, C.out, 'center', 7); textO(ctx, 'The ball flies straight up the middle.', cx, 344, 15, C.cream, null, 'center', 0, 600); textO(ctx, 'Shoot just before the hoop gets there!  3 in a row = ON FIRE', cx, 366, 14, '#FFE680', null, 'center', 0, 600); }
+  if (S.phase === 'done') { panel(cx - 240, 272, 480, 140, 16); textO(ctx, 'TIME!', cx, 302, 30, '#FF8A8A', C.out, 'center', 6); textO(ctx, 'TOTAL +' + S.total, cx, 344, 36, '#FFE680', C.out, 'center', 7); textO(ctx, S.made + ' of ' + S.shots + ' shots   ·   best streak ' + S.best, cx, 384, 15, C.cream, null, 'center', 0, 600); }
   const prompt = S.phase === 'intro' ? 'Press any button to start' : S.phase === 'done' ? 'Press any button to get back in the Jeep' : 'Press any button (or tap) to shoot!';
   textO(ctx, prompt, cx, 502, 15, C.cream, C.out, 'center', 4);
 }
@@ -2353,13 +2353,13 @@ function update(dt) {
         if (scene.t > 7.2) { state = 'playing'; storyKids = true; score += 500; timer += 15; Music.duck(1); floatText(W / 2, 250, 'PASSENGERS ABOARD  +500 · +15s', C.gold); say('BEST. DAY. EVER.'); titaBubble = { text: 'Seatbelts! Next stop: Tinman Social.', life: 170 }; steer = 0; }
       } else if (scene.kind === 'marina') { // pull into the marina lot, everybody onto the boat
         if (scene.t > 1.4 && !scene.b1) { scene.b1 = 1; sfx.bark(); } if (scene.t > 3.2 && !scene.b2) { scene.b2 = 1; sfx.splash(); }
-        if (scene.t > 6.4) { state = 'playing'; boat = true; skiers = 0; air = null; position = (LAKE.from + 12) * TUNE.segLen; playerX = 0; steer = 0; speed = TUNE.maxSpeed * 0.25; timer += 75; stageBanner = 170; bannerOverride = ['BONUS STAGE', 'LAKE LEWISVILLE']; Music.duck(1); sfx.check(); floatText(W / 2, 250, 'ALL ABOARD  +75s', C.gold); say('BOAT!! BOAT!! BOAT!!'); titaBubble = { text: 'Life jackets on. Find the jet skis!', life: 200 }; }
+        if (scene.t > 6.4) { state = 'playing'; boat = true; skiers = 0; air = null; position = (LAKE.from + 12) * TUNE.segLen; playerX = 0; steer = 0; speed = TUNE.maxSpeed * 0.25; timer += 75; stageBanner = 170; bannerOverride = ['BONUS STAGE', 'LAKE LEWISVILLE']; Music.duck(1); sfx.check(); floatText(W / 2, 290, 'ALL ABOARD  +75s', C.gold); say('BOAT!! BOAT!! BOAT!!'); titaBubble = { text: 'Life jackets on. Find the jet skis!', life: 200 }; }
       } else if (scene.kind === 'dock') { // tie up at the dock, back into the Jeep
         if (scene.t > 1.2 && !scene.b1) { scene.b1 = 1; sfx.splash(); } if (scene.t > 2.6 && !scene.b2) { scene.b2 = 1; sfx.check(); }
         if (scene.t > 5.2) { state = 'playing'; boat = false; rainOn = true; const bonus = 100 * skiers; skiers = 0; air = null; position = (LAKE.dock + 30) * TUNE.segLen; playerX = 0; steer = 0; speed = TUNE.maxSpeed * 0.3; score += bonus; Music.duck(1); floatText(W / 2, 250, 'BACK IN THE JEEP' + (bonus ? '  +' + bonus : ''), C.gold); say('THAT WAS THE BEST!!'); titaBubble = { text: 'Home stretch. Everybody buckled?', life: 170 }; }
       } else if (scene.kind === 'airport') { // pull up at the airfield, everybody into the plane
         if (scene.t > 1.6 && !scene.b1) { scene.b1 = 1; sfx.bark(); } if (scene.t > 4.2 && !scene.b2) { scene.b2 = 1; sfx.boost(); }
-        if (scene.t > 6.6) { state = 'playing'; plane = true; flyAlt = 0.5; position = (AIR.from + 2) * TUNE.segLen; playerX = 0; steer = 0; speed = TUNE.maxSpeed * 0.35; timer += 75; stageBanner = 170; bannerOverride = ['BONUS STAGE', 'FLYING OVER LITTLE ELM']; Music.duck(1); sfx.check(); floatText(W / 2, 250, 'WHEELS UP  +75s', C.gold); say('I CAN SEE OUR HOUSE!!'); titaBubble = { text: '▲ climb, ▼ dive. Fly through the rings!', life: 240 }; }
+        if (scene.t > 6.6) { state = 'playing'; plane = true; flyAlt = 0.5; position = (AIR.from + 2) * TUNE.segLen; playerX = 0; steer = 0; speed = TUNE.maxSpeed * 0.35; timer += 75; stageBanner = 170; bannerOverride = ['BONUS STAGE', 'FLYING OVER LITTLE ELM']; Music.duck(1); sfx.check(); floatText(W / 2, 290, 'WHEELS UP  +75s', C.gold); say('I CAN SEE OUR HOUSE!!'); titaBubble = { text: '▲ climb, ▼ dive. Fly through the rings!', life: 240 }; }
       } else if (scene.kind === 'landing') { // taxi in, everybody back into the Jeep
         if (scene.t > 0.8 && !scene.b1) { scene.b1 = 1; sfx.bump(); } if (scene.t > 3.6 && !scene.b2) { scene.b2 = 1; sfx.check(); }
         if (scene.t > 5.2) { state = 'playing'; plane = false; const bonus = 50 * rings; position = (AIR.hangar + 12) * TUNE.segLen; playerX = 0; steer = 0; speed = TUNE.maxSpeed * 0.3; score += bonus; Music.duck(1); floatText(W / 2, 250, 'BACK IN THE JEEP' + (bonus ? '  +' + bonus : ''), C.gold); say('AGAIN!! AGAIN!!'); titaBubble = { text: 'Okay, now slushies. Tinman Social!', life: 170 }; }
@@ -2640,7 +2640,7 @@ function drawFx() {
     else { ctx.globalAlpha = a * 0.8; ell(ctx, q.x, q.y, q.r, q.r * 0.8); fs(ctx, q.color, null); }
     ctx.globalAlpha = 1;
   }
-  for (const t of texts) { ctx.globalAlpha = clamp(t.life / 15, 0, 1); textO(ctx, t.str, t.x, t.y, 20, t.color, C.out, 'center', 4); ctx.globalAlpha = 1; }
+  for (const t of texts) { if (stageBanner > 0 && state === 'playing' && t.y < 240 && t.y > 150 && Math.abs(t.x - W / 2) < 330) continue; ctx.globalAlpha = clamp(t.life / 15, 0, 1); textO(ctx, t.str, t.x, t.y, 20, t.color, C.out, 'center', 4); ctx.globalAlpha = 1; }
 }
 function drawMenu(y, gap = 40, size = 26, x = W / 2, align = 'center') { menu.items.forEach((it, i) => { const sel = i === menu.idx; const yy = y + i * gap; if (sel) { ctx.save(); ctx.translate(align === 'left' ? x - 34 : W / 2 - 170, yy + Math.sin(time * 6) * 2); ctx.scale(0.55, 0.55); pawPrint(ctx, C.gold); ctx.restore(); } textO(ctx, it, x, yy, sel ? size + 2 : size, sel ? C.gold : C.cream, C.out, align, 5); }); }
 function pawPrint(g, color) { ell(g, 0, 8, 13, 10); fs(g, color, C.out, 2); for (const [dx, dy] of [[-15, -4], [-6, -13], [6, -13], [15, -4]]) { ell(g, dx, dy, 5.5, 6.5); fs(g, color, C.out, 2); } }
@@ -2680,10 +2680,10 @@ function drawGuide() {
   label(px + 24, py + 8, px + 70, py - 118, 'START', 'pause', C.cream, 'left');
   label(px - 24, py + 8, px - 70, py - 118, 'SELECT', 'quit', C.cream, 'right');
   // tips + go
-  textO(ctx, 'Grab balls to fill ZOOMIES  ·  bones fill it right up  ·  stay on the road!', cx, 404, 14, '#FFE89A', null, 'center', 0, 600);
-  textO(ctx, 'L / R: change the radio station   ·   L + R together: full screen', cx, 424, 13, '#9EE8FF', null, 'center', 0, 600);
-  textO(ctx, 'Keyboard: ← → steer · ↑ / Space gas · ↓ brake · C honk · Shift Zoomies · Q / E radio · Esc quit', cx, 442, 12, 'rgba(255,244,214,.6)', null, 'center', 0, 500);
-  if (Math.floor(time * 2.5) % 2 === 0) textO(ctx, 'PRESS B TO DRIVE!', cx, 478, 24, '#C9F24D', C.out, 'center', 5);
+  textO(ctx, 'Grab balls to fill ZOOMIES  ·  bones fill it right up  ·  stay on the road!', cx, 414, 14, '#FFE89A', null, 'center', 0, 600);
+  textO(ctx, 'L / R: change the radio station   ·   L + R together: full screen', cx, 433, 13, '#9EE8FF', null, 'center', 0, 600);
+  textO(ctx, 'Keyboard: ← → steer · ↑ / Space gas · ↓ brake · C honk · Shift Zoomies · Q / E radio · Esc quit', cx, 451, 12, 'rgba(255,244,214,.6)', null, 'center', 0, 500);
+  if (Math.floor(time * 2.5) % 2 === 0) textO(ctx, 'PRESS B TO DRIVE!', cx, 482, 22, '#C9F24D', C.out, 'center', 5);
 }
 function hintBar() { ctx.fillStyle = 'rgba(20,12,8,.55)'; ctx.fillRect(0, H - 54, W, 54); textO(ctx, 'SNES: D-pad steer · B gas · Y brake · A honk (Bernard barks!) · X Zoomies · START pause · SELECT quit', W / 2, H - 36, 14, C.cream, null, 'center', 0, 600); textO(ctx, 'Keyboard: ← → steer · ↑ / Space gas · ↓ brake · C honk · Shift Zoomies · Q / E radio · Enter start · Esc quit · M mute', W / 2, H - 17, 13, 'rgba(255,244,214,.75)', null, 'center', 0, 500); }
 function drawTitle() {

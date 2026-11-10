@@ -54,3 +54,7 @@ Your SNES pad on the Onn 4K Pro talks to the browser’s Gamepad API — no extr
 | Select | Back | Pause | Quit to arcade |
 
 In Bernard Says the d-pad and A, B, X, Y are the game. On a keyboard use the arrows and the A, B, X, Y keys.
+
+## Road Trip radio
+
+The songs in `public/music/` are the radio stations in Bernard's Road Trip, plus the built-in chiptune and "Radio Off". L / R on the SNES pad (or Q / E on a keyboard) change station. To add a song, drop the `.mp3` in `public/music/` with a lowercase, no-spaces name and add a line to `STATIONS` in `index.html` and `arcade.html`.
