@@ -32,6 +32,7 @@
   .rb:active, .rb.held { background: rgba(242,193,78,.75); color: var(--ink); }
   #r-left { left: 18px; bottom: 22px; } #r-right { left: 96px; bottom: 22px; }
   #r-gas { right: 18px; bottom: 30px; width: 78px; height: 78px; } #r-brake { right: 108px; bottom: 18px; } #r-horn { right: 70px; bottom: 116px; } #r-boost { right: 150px; bottom: 96px; width: 56px; height: 56px; font-size: 12px; }
+  .rb.rs { width: 46px; height: 46px; font-size: 13px; } #r-rprev { left: 22px; bottom: 100px; } #r-rnext { left: 104px; bottom: 100px; }
   #r-start { left: 50%; transform: translateX(-50%); bottom: 14px; width: 84px; height: 36px; border-radius: 18px; font-size: 13px; }
   /* Stay off the picker until this cabinet is opened. */
   #brt-root:not(.on){display:none !important}
@@ -402,6 +403,8 @@
       <div class="rb" id="r-horn" data-k="horn">HONK</div>
       <div class="rb" id="r-boost" data-k="boost">ZOOM</div>
       <div class="rb" id="r-start" data-k="start">START</div>
+      <div class="rb rs" id="r-rprev" data-k="radioPrev" aria-label="Previous radio station">♪◀</div>
+      <div class="rb rs" id="r-rnext" data-k="radioNext" aria-label="Next radio station">▶♪</div>
     </div>
   </div>
 </div>
@@ -1688,7 +1691,7 @@ function finishTrack() {
    ===================================================================== */
 const Audio_ = {
   ctx: null, on: true, engine: null, engineGain: null,
-  init() { if (!this.ctx) { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { this.ctx = null; } } if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); if (this.ctx) Music.ensure(); },
+  init() { if (!this.ctx) { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { this.ctx = null; } } if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); if (this.ctx) Music.ensure(); Radio.kick(); },
   tone(f0, f1, dur, type = 'square', gain = 0.16, delay = 0) { if (!this.on || !this.ctx) return; const a = this.ctx, t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain(); o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur); g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.02); },
   noise(dur, gain = 0.12, delay = 0) { if (!this.on || !this.ctx) return; const a = this.ctx, n = Math.floor(a.sampleRate * dur), b = a.createBuffer(1, n, a.sampleRate), d = b.getChannelData(0); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n); const s = a.createBufferSource(); s.buffer = b; const g = a.createGain(); g.gain.value = gain; s.connect(g).connect(a.destination); s.start(a.currentTime + delay); },
   engineOn() { if (!this.ctx || this.engine) return; const a = this.ctx; const o = a.createOscillator(), g = a.createGain(), f = a.createBiquadFilter(); o.type = 'sawtooth'; o.frequency.value = 50; f.type = 'lowpass'; f.frequency.value = 400; g.gain.value = 0; o.connect(f).connect(g).connect(a.destination); o.start(); this.engine = o; this.engineGain = g; },
@@ -1703,10 +1706,13 @@ const Music = {
     { bpm: 120, base: 45, prog: [[0, 3, 7], [8, 12, 15], [10, 14, 17], [7, 11, 14]], scale: [0, 3, 5, 7, 10, 12, 15, 17, 19, 22], lead: 'sawtooth', bass: 'sawtooth', swing: 0,
       melody: [0, -1, -1, 0, 3, -1, 2, -1, 0, -1, -1, 0, 5, -1, 4, -1, 7, -1, -1, 7, 5, -1, 4, -1, 3, -1, 2, -1, 0, -1, -1, -1, 5, -1, -1, 5, 7, -1, 8, -1, 7, -1, -1, 5, 4, -1, 3, -1, 2, -1, -1, 2, 3, -1, 4, -1, 5, -1, 3, -1, 2, -1, -1, -1], kick: [0, 8, 10], snare: [4, 12], hat: 1 }
   ],
-  ensure() { if (!Audio_.ctx) return; if (!this.gain) { this.gain = Audio_.ctx.createGain(); this.gain.gain.value = this.level; this.gain.connect(Audio_.ctx.destination); } if (this.on && !this.timer) { this.next = Audio_.ctx.currentTime + 0.05; this.timer = setInterval(() => this.tick(), 25); } },
-  play(song) { if (this.song !== song) this.step = 0; this.song = song; this.on = true; this.ensure(); },
-  stop() { this.on = false; if (this.timer) { clearInterval(this.timer); this.timer = null; } },
-  duck(v) { if (this.gain && Audio_.ctx) this.gain.gain.setTargetAtTime(this.level * v, Audio_.ctx.currentTime, 0.1); },
+  ensure() { if (!Audio_.ctx) return; if (!this.gain) { this.gain = Audio_.ctx.createGain(); this.gain.gain.value = this.level * Radio.duckV; this.gain.connect(Audio_.ctx.destination); } if (this.on && !this.timer) { this.next = Audio_.ctx.currentTime + 0.05; this.timer = setInterval(() => this.tick(), 25); } },
+  // play / stop / duck are what the game calls; the radio decides whether that means a song, the chiptune or silence
+  play(song) { if (this.song !== song) this.step = 0; this.song = song; Radio.wanted = true; Radio.apply(); },
+  stop() { Radio.wanted = false; Radio.apply(); },
+  duck(v) { Radio.duckV = v; if (this.gain && Audio_.ctx) this.gain.gain.setTargetAtTime(this.level * v, Audio_.ctx.currentTime, 0.1); Radio.sync(); },
+  chipStart() { this.on = true; this.ensure(); },
+  chipStop() { this.on = false; if (this.timer) { clearInterval(this.timer); this.timer = null; } },
   note(f, t, dur, type, g, slideTo) { const a = Audio_.ctx, o = a.createOscillator(), e = a.createGain(); o.type = type; o.frequency.setValueAtTime(f, t); if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur); e.gain.setValueAtTime(0.0001, t); e.gain.linearRampToValueAtTime(g, t + 0.008); e.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(e).connect(this.gain); o.start(t); o.stop(t + dur + 0.02); },
   noise(t, dur, g) { const a = Audio_.ctx, n = Math.floor(a.sampleRate * dur), b = a.createBuffer(1, n, a.sampleRate), d = b.getChannelData(0); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n); const src = a.createBufferSource(); src.buffer = b; const e = a.createGain(); e.gain.value = g; src.connect(e).connect(this.gain); src.start(t); },
   tick() { if (!Audio_.ctx || !this.on) return; const S = this.songs[this.song], spb = 60 / S.bpm / 4; while (this.next < Audio_.ctx.currentTime + 0.15) { if (Audio_.on) this.schedule(this.step, this.next + ((this.step % 2) ? spb * S.swing : 0), spb); this.next += spb; this.step++; } },
@@ -1720,7 +1726,56 @@ const Music = {
     const m = S.melody[step % S.melody.length]; if (m >= 0) { const len = (S.melody[(step + 1) % S.melody.length] === -1 ? 1.9 : 0.95) * spb; this.note(f(S.base + 24 + S.scale[m]), t, len, S.lead, 0.32); if (this.song === 1) this.note(f(S.base + 24 + S.scale[m]) * 1.005, t, len, 'sawtooth', 0.14); }
   }
 };
+/* ---------- The radio: each song is a station, plus the chiptune and Radio Off. L / R change station ---------- */
+const STATIONS = [
+  { title: 'Bernana', src: 'public/music/bernana.mp3' },
+  { title: 'Ti-Ti-Ti, Ta-Ta-Ta', src: 'public/music/ti-ti-ti-ta-ta-ta.mp3' },
+  { title: 'Tita\u2019s Farm', src: 'public/music/titas-farm.mp3' },
+  { title: 'Chiptune', chip: true },
+  { title: 'Radio Off', off: true }
+];
+const Radio = {
+  idx: 0, el: null, elIdx: -1, wanted: false, duckV: 1, level: 0.55, chipT: 0, blocked: false, retry: 0,
+  load() { try { const v = localStorage.getItem('brt_radio'); if (v !== null && v !== '' && STATIONS[+v]) this.idx = +v; } catch (e) { } },
+  save() { try { localStorage.setItem('brt_radio', String(this.idx)); } catch (e) { } },
+  st() { return STATIONS[this.idx]; },
+  show() { this.chipT = 260; },
+  // make the sound match the station: called when the game starts / stops music and when the station changes
+  apply() {
+    const s = this.st();
+    if (this.wanted && s.chip) Music.chipStart(); else Music.chipStop();
+    if (this.wanted && s.src) this.playSong(); else if (this.el) this.el.pause();
+  },
+  playSong() {
+    const s = this.st();
+    if (!this.el) { this.el = new Audio(); this.el.preload = 'auto'; this.el.addEventListener('ended', () => this.songEnded()); this.el.addEventListener('error', () => this.songFailed(this.elIdx)); }
+    if (this.elIdx !== this.idx) { this.elIdx = this.idx; this.el.src = s.src; }
+    this.sync(); const at = this.idx;
+    let p = null; try { p = this.el.play(); } catch (e) { this.songFailed(at); }
+    if (p && p.catch) p.then(() => { this.blocked = false; }, err => { if (err && err.name === 'NotAllowedError') this.blocked = true; else if (!err || err.name !== 'AbortError') this.songFailed(at); });
+  },
+  // a song that will not load falls back to the chiptune (the saved station is left alone)
+  songFailed(at) { if (at !== this.idx || !this.st().src) return; this.idx = STATIONS.findIndex(q => q.chip); this.elIdx = -1; this.show(); this.apply(); },
+  songEnded() { const n = STATIONS.length; for (let k = 1; k <= n; k++) { const j = (this.idx + k) % n; if (STATIONS[j].src) { this.idx = j; break; } } this.elIdx = -1; this.save(); this.show(); this.apply(); },
+  change(dir) { const n = STATIONS.length; this.idx = (this.idx + dir + n) % n; this.save(); sfx.static(); this.show(); this.apply(); },
+  // same rules as the chiptune: ducked in scenes and menus, silent with Sound Off
+  sync() { if (!this.el) return; this.el.volume = clamp(this.level * this.duckV, 0, 1); this.el.muted = !Audio_.on; },
+  // browsers hold a song back until the first key, tap or button press; keep trying until it starts
+  tick() { if (this.chipT > 0) this.chipT--; this.sync(); if (this.wanted && this.st().src && this.el && this.el.paused && ++this.retry >= 45) { this.retry = 0; this.playSong(); } },
+  kick() { if (this.wanted && this.st().src && (!this.el || this.el.paused)) this.playSong(); }
+};
+Radio.load();
+function drawRadioChip() {
+  if (Radio.chipT <= 0) return; const s = Radio.st(), a = clamp(Math.min(Radio.chipT, 260 - Radio.chipT) / 18, 0, 1);
+  const driving = !(state === 'title' || state === 'route' || state === 'setup' || state === 'intro');
+  const label = s.off ? 'Radio Off' : '\u266A  ' + s.title; ctx.font = font(15, 700); const w = Math.max(190, ctx.measureText(label).width + 110), x = W / 2 - w / 2, y = driving ? 74 : 4;
+  ctx.globalAlpha = a; panel(x, y, w, 28, 10);
+  textO(ctx, label, W / 2, y + 14, 15, s.off ? 'rgba(255,244,214,.7)' : '#FFE680', null, 'center', 0);
+  textO(ctx, '\u25C0 L', x + 12, y + 14, 11, 'rgba(255,244,214,.6)', null, 'left', 0, 600); textO(ctx, 'R \u25B6', x + w - 12, y + 14, 11, 'rgba(255,244,214,.6)', null, 'right', 0, 600);
+  ctx.globalAlpha = 1;
+}
 const sfx = {
+  static() { Audio_.noise(0.3, 0.1); Audio_.tone(2400, 500, 0.1, 'sine', 0.03); Audio_.tone(700, 1900, 0.12, 'sine', 0.025, 0.12); },
   bark() { Audio_.tone(320, 130, 0.14, 'sawtooth', 0.22); Audio_.noise(0.06, 0.1); Audio_.tone(360, 150, 0.14, 'sawtooth', 0.22, 0.16); Audio_.noise(0.06, 0.1, 0.16); },
   horn() { Audio_.tone(392, 392, 0.35, 'square', 0.12); Audio_.tone(494, 494, 0.35, 'square', 0.1); },
   ball() { Audio_.tone(900, 1500, 0.07, 'sine', 0.16); Audio_.tone(1300, 1900, 0.06, 'sine', 0.1, 0.05); },
@@ -1742,12 +1797,12 @@ const sfx = {
 /* =====================================================================
    INPUT — keyboard, SNES gamepad, touch
    ===================================================================== */
-const DEFAULT_PAD = { gas: 0, brake: 2, horn: 1, boost: 3, start: 9, select: 8 }; // standard mapping ≈ SNES B, Y, A, X, Start, Select
+const DEFAULT_PAD = { gas: 0, brake: 2, horn: 1, boost: 3, start: 9, select: 8, radioPrev: 4, radioNext: 5 }; // standard mapping ≈ SNES B, Y, A, X, Start, Select
 let padMap = loadPadMap();
 function loadPadMap() { try { const s = localStorage.getItem('brt_padmap'); if (s) return Object.assign({}, DEFAULT_PAD, JSON.parse(s)); } catch (e) { } return { ...DEFAULT_PAD }; }
 function savePadMap() { try { localStorage.setItem('brt_padmap', JSON.stringify(padMap)); } catch (e) { } }
 const keys = {}, latch = {}, touch = {}, pad = { connected: false, buttons: [], prevButtons: [], left: false, right: false, up: false, down: false, name: '' };
-let inp = {}, prevInp = {}, hit = {}, padToast = 0;
+let inp = {}, prevInp = {}, hit = {}, padToast = 0, shL = false, shR = false, shCombo = false;
 function readPad() {
   let gp = null; try { const gps = navigator.getGamepads ? navigator.getGamepads() : []; for (const g of gps) if (g && g.connected) { gp = g; break; } } catch (e) { }
   const was = pad.connected; pad.connected = !!gp; pad.prevButtons = pad.buttons;
@@ -1768,9 +1823,13 @@ function pollInput() {
     brake: !!(k.ArrowDown || k.KeyS || k.KeyX || pb(m.brake) || touch.brake),
     horn: !!(k.KeyC || k.KeyH || pb(m.horn) || touch.horn),
     boost: !!(k.ShiftLeft || k.ShiftRight || k.KeyV || pb(m.boost) || touch.boost),
-    start: !!(k.Enter || pb(m.start) || touch.start), select: !!(k.Escape || k.Backspace || pb(m.select))
+    start: !!(k.Enter || pb(m.start) || touch.start), select: !!(k.Escape || k.Backspace || pb(m.select)),
+    radioPrev: !!(k.KeyQ || k.BracketLeft || touch.radioPrev), radioNext: !!(k.KeyE || k.BracketRight || touch.radioNext), tap: !!touch.tap
   };
+  touch.tap = false;
   prevInp = inp; inp = n; hit = {}; for (const key in n) hit[key] = n[key] && !prevInp[key];
+  // shoulder buttons change station when let go, so holding L + R together (full screen) does not also retune the radio
+  { const l = pb(m.radioPrev), r = pb(m.radioNext); if (l && r) shCombo = true; if (shL && !l && !shCombo) hit.radioPrev = true; if (shR && !r && !shCombo) hit.radioNext = true; if (!l && !r) shCombo = false; shL = l; shR = r; }
 }
 function anyPadPress() { for (let i = 0; i < pad.buttons.length; i++) if (pad.buttons[i] && !pad.prevButtons[i]) return i; return -1; }
 const onKeyDown = e => { if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'Backspace'].includes(e.code)) e.preventDefault(); if (e.repeat) return; keys[e.code] = true; latch[e.code] = true; Audio_.init(); Audio_.engineOn(); if (e.code === 'KeyM') Audio_.on = !Audio_.on; };
@@ -1780,6 +1839,7 @@ function setupTouch() {
   const box = document.getElementById('brt-touch');
   // TV browsers often claim touch support with no touchscreen, so the on-screen buttons wait for an actual touch
   window.addEventListener('touchstart', () => box.classList.add('on'), { passive: true, once: true });
+  canvas.addEventListener('pointerdown', ev => { const r = canvas.getBoundingClientRect(); touch.tap = true; touch.tapX = (ev.clientX - r.left) / r.width; Audio_.init(); });
   box.querySelectorAll('.rb').forEach(el => { const k = el.dataset.k; const dn = ev => { ev.preventDefault(); touch[k] = true; el.classList.add('held'); Audio_.init(); Audio_.engineOn(); }; const upf = ev => { ev.preventDefault(); touch[k] = false; el.classList.remove('held'); }; el.addEventListener('pointerdown', dn); el.addEventListener('pointerup', upf); el.addEventListener('pointercancel', upf); el.addEventListener('pointerleave', upf); });
 }
 
@@ -1848,7 +1908,7 @@ function drawRain() {
   ctx.fillStyle = 'rgba(220,235,255,' + (0.5 * rain).toFixed(3) + ')';
   for (let i = 0; i < 18 * rain; i++) { const d = DROPS[i + 100], ph = (time * 3 + d.v * 7) % 1; ell(ctx, d.x * W, H * 0.62 + d.y * H * 0.36, 4 + ph * 8, 1.5 + ph * 2); ctx.fill(); }
 }
-function startGame() { Music.play(route.id === 2 ? 0 : route.id); Music.duck(1); ride = 'jeep'; swapScene = null; pupCups = 0; pup = null; storyKids = false; scene = null; slush = null; slushScore = 0; boat = false; skiers = 0; air = null; airJumps = 0; skisGot = 0; marinaNoticed = false; bannerOverride = null; rain = 0; rainTrip = 0; rainSaid = 0; rainOn = false; bridgeJumps = 0; workYelled = 0; plane = false; flyAlt = 0.5; rings = 0; airportNoticed = false; buildTrack(); position = 0; speed = 0; playerX = 0; steer = 0; score = 0; balls = 0; timer = route.time || TUNE.startTime; timerAcc = 0; stage = 0; stageBanner = 150; boostMeter = 0; boosting = 0; dizzy = 0; bubble = null; titaBubble = { text: route.story ? 'School\'s out in 10 minutes. ¡Vamos!' : '¡Vamos, Bernard!', life: 180 }; passes = 0; particles = []; texts = []; state = 'intro'; introTimer = 0; }
+function startGame() { Music.play(route.id === 2 ? 0 : route.id); Music.duck(1); Radio.show(); ride = 'jeep'; swapScene = null; pupCups = 0; pup = null; storyKids = false; scene = null; slush = null; slushScore = 0; boat = false; skiers = 0; air = null; airJumps = 0; skisGot = 0; marinaNoticed = false; bannerOverride = null; rain = 0; rainTrip = 0; rainSaid = 0; rainOn = false; bridgeJumps = 0; workYelled = 0; plane = false; flyAlt = 0.5; rings = 0; airportNoticed = false; buildTrack(); position = 0; speed = 0; playerX = 0; steer = 0; score = 0; balls = 0; timer = route.time || TUNE.startTime; timerAcc = 0; stage = 0; stageBanner = 150; boostMeter = 0; boosting = 0; dizzy = 0; bubble = null; titaBubble = { text: route.story ? 'School\'s out in 10 minutes. ¡Vamos!' : '¡Vamos, Bernard!', life: 180 }; passes = 0; particles = []; texts = []; state = 'intro'; introTimer = 0; }
 function quitToArcade() { if (typeof window.BRT.onQuit === 'function') { stop(); window.BRT.onQuit(); } else goTitle(); }
 function say(text, who = 'b') { if (who === 'b') bubble = { text, life: 90 }; else titaBubble = { text, life: 110 }; }
 function floatText(x, y, str, color = C.cream) { texts.push({ x, y, str, color, life: 50 }); }
@@ -2087,9 +2147,10 @@ function updateMenuNav(onPick, onBack) {
 }
 function update(dt) {
   pollInput(); if (padToast > 0) padToast--;
+  Radio.tick(); if (state !== 'setup') { if (hit.radioPrev) Radio.change(-1); else if (hit.radioNext) Radio.change(1); }
   switch (state) {
     case 'title': titleT += dt; time += dt; position = increase(position, dt * 1800, trackLength); skyOff = increase(skyOff, 0.0004, 1);
-      updateMenuNav(i => { if (i === 0) { state = 'route'; routeIdx = route.id; sfx.menu(); } else if (i === 1) { state = 'setup'; setup = { step: 0, list: ['gas', 'brake', 'horn', 'boost', 'start', 'select'], labels: { gas: 'GAS (B)', brake: 'BRAKE (Y)', horn: 'HONK / BARK (A)', boost: 'ZOOMIES (X)', start: 'START', select: 'SELECT' }, temp: {}, done: 0, wait: 10 }; } else { Audio_.on = !Audio_.on; menu.items[2] = 'Sound: ' + (Audio_.on ? 'On' : 'Off'); } });
+      updateMenuNav(i => { if (i === 0) { state = 'route'; routeIdx = route.id; sfx.menu(); } else if (i === 1) { state = 'setup'; setup = { step: 0, list: ['gas', 'brake', 'horn', 'boost', 'start', 'select', 'radioPrev', 'radioNext'], labels: { gas: 'GAS (B)', brake: 'BRAKE (Y)', horn: 'HONK / BARK (A)', boost: 'ZOOMIES (X)', start: 'START', select: 'SELECT', radioPrev: 'RADIO \u25C0 (L)', radioNext: 'RADIO \u25B6 (R)' }, temp: {}, done: 0, wait: 10 }; } else { Audio_.on = !Audio_.on; menu.items[2] = 'Sound: ' + (Audio_.on ? 'On' : 'Off'); } });
       if (hit.gas || hit.start || hit.left || hit.right) Audio_.init(); break;
     case 'setup': { const s = setup; time += dt; if (s.wait > 0) { s.wait--; break; } if (keys.Escape) { padMap = { ...DEFAULT_PAD }; savePadMap(); goTitle(); keys.Escape = false; break; } if (s.done > 0) { s.done--; if (s.done === 0) goTitle(); break; } const b = anyPadPress(); if (b >= 0) { s.temp[s.list[s.step]] = b; s.step++; s.wait = 14; sfx.menu(); if (s.step >= s.list.length) { padMap = Object.assign({ ...DEFAULT_PAD }, s.temp); savePadMap(); s.done = 90; sfx.check(); } } break; }
     case 'route': time += dt; {
@@ -2431,11 +2492,12 @@ function drawGuide() {
   label(px + 24, py + 8, px + 70, py - 118, 'START', 'pause', C.cream, 'left');
   label(px - 24, py + 8, px - 70, py - 118, 'SELECT', 'quit', C.cream, 'right');
   // tips + go
-  textO(ctx, 'Grab balls to fill ZOOMIES  ·  bones fill it right up  ·  stay on the road!', cx, 418, 14, '#FFE89A', null, 'center', 0, 600);
-  textO(ctx, 'Keyboard: ← → steer · ↑ / Space gas · ↓ brake · C honk · Shift Zoomies · Esc quit  ·  L + R: full screen', cx, 442, 12, 'rgba(255,244,214,.6)', null, 'center', 0, 500);
+  textO(ctx, 'Grab balls to fill ZOOMIES  ·  bones fill it right up  ·  stay on the road!', cx, 404, 14, '#FFE89A', null, 'center', 0, 600);
+  textO(ctx, 'L / R: change the radio station   ·   L + R together: full screen', cx, 424, 13, '#9EE8FF', null, 'center', 0, 600);
+  textO(ctx, 'Keyboard: ← → steer · ↑ / Space gas · ↓ brake · C honk · Shift Zoomies · Q / E radio · Esc quit', cx, 442, 12, 'rgba(255,244,214,.6)', null, 'center', 0, 500);
   if (Math.floor(time * 2.5) % 2 === 0) textO(ctx, 'PRESS B TO DRIVE!', cx, 478, 24, '#C9F24D', C.out, 'center', 5);
 }
-function hintBar() { ctx.fillStyle = 'rgba(20,12,8,.55)'; ctx.fillRect(0, H - 54, W, 54); textO(ctx, 'SNES: D-pad steer · B gas · Y brake · A honk (Bernard barks!) · X Zoomies · START pause · SELECT quit', W / 2, H - 36, 14, C.cream, null, 'center', 0, 600); textO(ctx, 'Keyboard: ← → steer · ↑ / Space gas · ↓ brake · C honk · Shift Zoomies · Enter start · Esc quit · M mute', W / 2, H - 17, 13, 'rgba(255,244,214,.75)', null, 'center', 0, 500); }
+function hintBar() { ctx.fillStyle = 'rgba(20,12,8,.55)'; ctx.fillRect(0, H - 54, W, 54); textO(ctx, 'SNES: D-pad steer · B gas · Y brake · A honk (Bernard barks!) · X Zoomies · START pause · SELECT quit', W / 2, H - 36, 14, C.cream, null, 'center', 0, 600); textO(ctx, 'Keyboard: ← → steer · ↑ / Space gas · ↓ brake · C honk · Shift Zoomies · Q / E radio · Enter start · Esc quit · M mute', W / 2, H - 17, 13, 'rgba(255,244,214,.75)', null, 'center', 0, 500); }
 function drawTitle() {
   drawRoad(); dim(0.25);
   ctx.save(); ctx.translate(W / 2, 110); ctx.rotate(-0.03);
@@ -2452,8 +2514,8 @@ function drawTitle() {
 function drawSetup() {
   drawRoad(); dim(0.7); textO(ctx, 'CONTROLLER SETUP', W / 2, 70, 38, C.gold, C.out, 'center', 7); const s = setup;
   if (!pad.connected) textO(ctx, 'No controller detected — press any button on it to wake it up', W / 2, 120, 16, '#FFB3B3', null, 'center', 0, 600); else textO(ctx, 'Using: ' + pad.name, W / 2, 120, 15, C.cream, null, 'center', 0, 600);
-  s.list.forEach((act, i) => { const y = 170 + i * 38, cur = i === s.step && s.done === 0, done = i < s.step; textO(ctx, s.labels[act], W / 2 - 40, y, 22, cur ? C.gold : C.cream, C.out, 'right', 4); const val = done ? 'button ' + s.temp[act] : cur ? (Math.floor(time * 3) % 2 ? 'press it now…' : '') : 'button ' + padMap[act]; textO(ctx, val, W / 2 - 10, y, 20, done ? '#9CFF9C' : cur ? C.gold : 'rgba(255,244,214,.6)', null, 'left', 0, 600); });
-  if (s.done > 0) textO(ctx, 'Saved! ✓', W / 2, 440, 28, '#9CFF9C', C.out, 'center', 5); else textO(ctx, 'Press each button on your controller when it lights up.  Esc = reset to default and go back', W / 2, 460, 14, 'rgba(255,244,214,.8)', null, 'center', 0, 500);
+  s.list.forEach((act, i) => { const y = 162 + i * 33, cur = i === s.step && s.done === 0, done = i < s.step; textO(ctx, s.labels[act], W / 2 - 40, y, 22, cur ? C.gold : C.cream, C.out, 'right', 4); const val = done ? 'button ' + s.temp[act] : cur ? (Math.floor(time * 3) % 2 ? 'press it now…' : '') : 'button ' + padMap[act]; textO(ctx, val, W / 2 - 10, y, 20, done ? '#9CFF9C' : cur ? C.gold : 'rgba(255,244,214,.6)', null, 'left', 0, 600); });
+  if (s.done > 0) textO(ctx, 'Saved! ✓', W / 2, 444, 28, '#9CFF9C', C.out, 'center', 5); else textO(ctx, 'Press each button on your controller when it lights up.  Esc = reset to default and go back', W / 2, 470, 14, 'rgba(255,244,214,.8)', null, 'center', 0, 500);
 }
 function drawRouteSelect() {
   drawRoad(); dim(0.6);
@@ -2684,7 +2746,8 @@ function drawPupScene(t) {
   textO(ctx, t < 1.2 ? 'Bernard: !!!!!' : cream > 0 ? 'slurp slurp slurp…' : 'ALL GONE.  +500 · +10 seconds · ZOOMIES full', W / 2 + 170, 440, 16, cream > 0 || t < 1.2 ? C.cream : '#FFE680', null, 'center', 0, 600);
   ctx.globalAlpha = 1;
 }
-function render() {
+function render() { renderScene(); drawRadioChip(); }
+function renderScene() {
   ctx.clearRect(0, 0, W, H);
   if (state === 'title') { drawTitle(); return; }
   if (state === 'setup') { drawSetup(); return; }
@@ -2724,7 +2787,7 @@ function start() {
 function stop() { running = false; cancelAnimationFrame(raf); Music.stop(); Audio_.engineSet(0, false); window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp); window.removeEventListener('blur', onBlur); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('gamepadconnected', onGpc); }
 const onVis = () => { if (document.hidden && state === 'playing') { state = 'paused'; setMenu(['Resume', 'Restart Trip', 'Quit to Arcade']); Audio_.engineSet(0, false); } };
 const onGpc = () => { Audio_.init(); Audio_.engineOn(); };
-window.BRT = { start, stop, onQuit: null, get state() { return state; }, teleport(segIndex) { position = segIndex * TUNE.segLen; playerX = 0; }, cheat(v) { speed = v; }, stageStarts() { return stageStarts.concat([segments.length]); }, stops() { return stops.map(q => q.n); }, swaps() { return swaps.map(q => q.n); }, ride() { return ride; }, events() { return events.map(q => ({ kind: q.kind, n: q.n })); }, forks() { return forks.map(f => ({ decision: f.decision, L0: f.L0, Lb: f.Lb, L1: f.L1, R0: f.R0, Rb: f.Rb, R1: f.R1, off: f.offroadSide, chosen: f.chosen })); }, routeId() { return route.id; }, setRoute(i) { route = ROUTES[i]; STAGES = route.stages; }, setX(x) { playerX = x; }, lake() { return Object.assign({ boat, skiers, air: !!air, airJumps, skisGot, fork: marinaFork && { decision: marinaFork.decision, chosen: marinaFork.chosen } }, LAKE); }, skipScene() { if (state === 'scene') scene.t = 99; if (state === 'slush' && slush) { slush.phase = 'done'; slush.t = 99; } }, lakeItems() { const out = []; if (LAKE.from === undefined) return out; for (let n = LAKE.from; n < LAKE.to; n++) for (const sp of segments[n].sprites) if (sp.ramp || sp.pickup === 'skis' || sp.obstacle) out.push({ n, key: sp.key, offset: sp.offset }); return out; }, setBoat(v) { boat = v; }, airport() { return Object.assign({ plane, flyAlt, rings, lift: flyLiftAt(findSegment(position + playerZ).index), fork: airportFork && { decision: airportFork.decision, chosen: airportFork.chosen } }, AIR); }, setPlane(v) { plane = v; }, weather() { return { rain: +rain.toFixed(2), rainTrip: Math.round(rainTrip), bow: +rainbowAmt().toFixed(2) }; }, setRainTrip(v) { rainTrip = v; }, rainOn() { return rainOn; }, work() { return { zones: WORK, bridgeJumps, air: !!air }; }, setAlt(v) { flyAlt = v; }, setSkiers(v) { skiers = v; }, setSpeed(v) { speed = v; }, dbg() { const sg = findSegment(position + playerZ); return { playerX: +playerX.toFixed(3), seg: sg.index, merge: sg.merge || null, mp: sg.mp1, mergeShift: mergeShift(sg, ((position + playerZ) % TUNE.segLen) / TUNE.segLen), speed: Math.round(speed), state, dizzy: +dizzy.toFixed(2), boat, skiers, airJumps }; }, wrecks() { return cars.filter(c => c.wreck).map(c => ({ seg: Math.floor(c.z / TUNE.segLen), offset: +c.offset.toFixed(2), t: +c.wreck.t.toFixed(2), speed: Math.round(c.speed) })); }, firstCar() { let b = null; for (const c of cars) if (!b || c.z < b.z) b = c; return { seg: Math.floor(b.z / TUNE.segLen), offset: b.offset, kind: b.kind }; } };
+window.BRT = { start, stop, onQuit: null, get state() { return state; }, teleport(segIndex) { position = segIndex * TUNE.segLen; playerX = 0; }, cheat(v) { speed = v; }, stageStarts() { return stageStarts.concat([segments.length]); }, stops() { return stops.map(q => q.n); }, swaps() { return swaps.map(q => q.n); }, ride() { return ride; }, events() { return events.map(q => ({ kind: q.kind, n: q.n })); }, forks() { return forks.map(f => ({ decision: f.decision, L0: f.L0, Lb: f.Lb, L1: f.L1, R0: f.R0, Rb: f.Rb, R1: f.R1, off: f.offroadSide, chosen: f.chosen })); }, routeId() { return route.id; }, setRoute(i) { route = ROUTES[i]; STAGES = route.stages; }, setX(x) { playerX = x; }, lake() { return Object.assign({ boat, skiers, air: !!air, airJumps, skisGot, fork: marinaFork && { decision: marinaFork.decision, chosen: marinaFork.chosen } }, LAKE); }, skipScene() { if (state === 'scene') scene.t = 99; if (state === 'slush' && slush) { slush.phase = 'done'; slush.t = 99; } }, lakeItems() { const out = []; if (LAKE.from === undefined) return out; for (let n = LAKE.from; n < LAKE.to; n++) for (const sp of segments[n].sprites) if (sp.ramp || sp.pickup === 'skis' || sp.obstacle) out.push({ n, key: sp.key, offset: sp.offset }); return out; }, setBoat(v) { boat = v; }, airport() { return Object.assign({ plane, flyAlt, rings, lift: flyLiftAt(findSegment(position + playerZ).index), fork: airportFork && { decision: airportFork.decision, chosen: airportFork.chosen } }, AIR); }, setPlane(v) { plane = v; }, weather() { return { rain: +rain.toFixed(2), rainTrip: Math.round(rainTrip), bow: +rainbowAmt().toFixed(2) }; }, setRainTrip(v) { rainTrip = v; }, radio() { return { idx: Radio.idx, title: Radio.st().title, wanted: Radio.wanted, chip: Music.on, duck: Radio.duckV, chipT: Radio.chipT, el: Radio.el ? { src: Radio.el.src.split('/').pop(), paused: Radio.el.paused, t: +Radio.el.currentTime.toFixed(2), vol: +Radio.el.volume.toFixed(2), muted: Radio.el.muted, dur: Radio.el.duration } : null }; }, radioEl() { return Radio.el; }, sound(v) { Audio_.on = v; }, rainOn() { return rainOn; }, work() { return { zones: WORK, bridgeJumps, air: !!air }; }, setAlt(v) { flyAlt = v; }, setSkiers(v) { skiers = v; }, setSpeed(v) { speed = v; }, dbg() { const sg = findSegment(position + playerZ); return { playerX: +playerX.toFixed(3), seg: sg.index, merge: sg.merge || null, mp: sg.mp1, mergeShift: mergeShift(sg, ((position + playerZ) % TUNE.segLen) / TUNE.segLen), speed: Math.round(speed), state, dizzy: +dizzy.toFixed(2), boat, skiers, airJumps }; }, wrecks() { return cars.filter(c => c.wreck).map(c => ({ seg: Math.floor(c.z / TUNE.segLen), offset: +c.offset.toFixed(2), t: +c.wreck.t.toFixed(2), speed: Math.round(c.speed) })); }, firstCar() { let b = null; for (const c of cars) if (!b || c.z < b.z) b = c; return { seg: Math.floor(b.z / TUNE.segLen), offset: b.offset, kind: b.kind }; } };
 
 if (location.hash === '#sprites') {
   buildSprites(); ctx.fillStyle = '#9fd'; ctx.fillRect(0, 0, W, H);
