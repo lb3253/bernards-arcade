@@ -1975,7 +1975,7 @@ function drawRain() {
   ctx.fillStyle = 'rgba(220,235,255,' + (0.5 * rain).toFixed(3) + ')';
   for (let i = 0; i < 18 * rain; i++) { const d = DROPS[i + 100], ph = (time * 3 + d.v * 7) % 1; ell(ctx, d.x * W, H * 0.62 + d.y * H * 0.36, 4 + ph * 8, 1.5 + ph * 2); ctx.fill(); }
 }
-function startGame() { Music.play(route.id === 2 ? 0 : route.id); Music.duck(1); Radio.show(); ride = 'jeep'; swapScene = null; pupCups = 0; pup = null; storyKids = false; scene = null; slush = null; slushScore = 0; boat = false; skiers = 0; air = null; airJumps = 0; skisGot = 0; marinaNoticed = false; bannerOverride = null; rain = 0; rainTrip = 0; rainSaid = 0; rainOn = false; bridgeJumps = 0; workYelled = 0; onRamp = null; rampLift = 0; plane = false; flyAlt = 0.5; rings = 0; airportNoticed = false; buildTrack(); position = 0; speed = 0; playerX = 0; steer = 0; score = 0; balls = 0; timer = route.time || TUNE.startTime; timerAcc = 0; stage = 0; stageBanner = 150; boostMeter = 0; boosting = 0; dizzy = 0; bubble = null; titaBubble = { text: route.story ? 'School\'s out in 10 minutes. ¡Vamos!' : '¡Vamos, Bernard!', life: 180 }; passes = 0; particles = []; texts = []; state = 'intro'; introTimer = 0; }
+function startGame() { Music.play(route.id === 2 ? 0 : route.id); Music.duck(1); Radio.show(); ride = 'jeep'; swapScene = null; pupCups = 0; pup = null; storyKids = false; scene = null; slush = null; slushScore = 0; tin = null; hoops = null; hoopsScore = 0; tinGame = null; boat = false; skiers = 0; air = null; airJumps = 0; skisGot = 0; marinaNoticed = false; bannerOverride = null; rain = 0; rainTrip = 0; rainSaid = 0; rainOn = false; bridgeJumps = 0; workYelled = 0; onRamp = null; rampLift = 0; plane = false; flyAlt = 0.5; rings = 0; airportNoticed = false; buildTrack(); position = 0; speed = 0; playerX = 0; steer = 0; score = 0; balls = 0; timer = route.time || TUNE.startTime; timerAcc = 0; stage = 0; stageBanner = 150; boostMeter = 0; boosting = 0; dizzy = 0; bubble = null; titaBubble = { text: route.story ? 'School\'s out in 10 minutes. ¡Vamos!' : '¡Vamos, Bernard!', life: 180 }; passes = 0; particles = []; texts = []; state = 'intro'; introTimer = 0; }
 function quitToArcade() { if (typeof window.BRT.onQuit === 'function') { stop(); window.BRT.onQuit(); } else goTitle(); }
 function say(text, who = 'b') { if (who === 'b') bubble = { text, life: 90 }; else titaBubble = { text, life: 110 }; }
 function floatText(x, y, str, color = C.cream) { texts.push({ x, y, str, color, life: 50 }); }
@@ -2190,9 +2190,111 @@ function crash(kind) {
   if (kind === 'car') { sfx.crash(); dizzy = 1.2; say(pick(['YIPE!', 'Ruff!!', 'Whoa!'])); titaBubble = { text: pick(['¡Cuidado!', 'Oops!', 'Sorry!']), life: 90 }; bounce = 6; } else { sfx.bump(); dizzy = 0.6; say(pick(['Bonk!', 'Oof!'])); }
 }
 function finishRun() { Music.stop(); state = 'finish'; finishTimer = 0; if (route.story) { say('HOME!! HOME!! HOME!!'); } tally = { time: timer * 15, balls: balls * 10 + pupCups * 250, timeTotal: timer * 15, ballsTotal: balls * 10, cupsTotal: pupCups * 250, shown: 0 }; sfx.win(); say('WE MADE IT!!'); titaBubble = { text: '¡Llegamos!', life: 300 }; }
+/* ---- TINMAN SOCIAL: pick a game (Slush Rush or the basketball machine), then HOOPS itself ---- */
+let tin = null, hoops = null, hoopsScore = 0, tinGame = null;
+// any face button, Start, the gas / brake keys, the d-pad up / down or a tap. The radio's L / R are left alone.
+function gamePress() {
+  if (hit.gas || hit.brake || hit.horn || hit.boost || hit.start || hit.up || hit.down || hit.tap) return true;
+  for (let i = 0; i < pad.buttons.length; i++) if (pad.buttons[i] && !pad.prevButtons[i] && i !== padMap.radioPrev && i !== padMap.radioNext) return true;
+  return false;
+}
+function startTinGame(i) {
+  sfx.check(); tinGame = i === 0 ? 'slush' : 'hoops';
+  if (i === 0) { state = 'slush'; slush = { phase: 'intro', t: 0, round: 0, rounds: 6, marker: 0, dir: 1, speed: 1.15, result: null, total: 0, who: 'nic', cups: [] }; }
+  else { state = 'hoops'; hoops = { phase: 'intro', t: 0, left: HOOPS_TIME, x: 0, ph: 0, balls: [], total: 0, streak: 0, best: 0, made: 0, shots: 0, who: 'nic', cool: 0, flash: 0, msg: null, lastTick: 99 }; }
+}
+function updateTinPick(dt) {
+  const T = tin; T.t += dt; time += dt; frame++; updateFx();
+  if (hit.left || hit.right || hit.up || hit.down) { T.idx = 1 - T.idx; sfx.menu(); }
+  if (T.t < 0.35) return;
+  if (hit.tap) { startTinGame(touch.tapX < 0.5 ? 0 : 1); return; }
+  if (hit.gas || hit.start || hit.horn) startTinGame(T.idx);
+}
+const HOOPS_TIME = 30, HOOP_AMP = 190, HOOP_Y = 208, BALL_FLY = 0.55;
+function hoopXAt(ph) { return Math.sin(ph) * HOOP_AMP; }
+function updateHoops(dt) {
+  const S = hoops; S.t += dt; time += dt; frame++; updateFx(); if (S.flash > 0) S.flash -= dt; if (S.msg) { S.msg.life -= dt; if (S.msg.life <= 0) S.msg = null; }
+  if (S.phase === 'intro') { if (S.t > 3 || (S.t > 0.4 && gamePress())) { S.phase = 'play'; S.t = 0; sfx.ding(); } return; }
+  if (S.phase === 'done') { if (S.t > 3 || (S.t > 0.9 && gamePress())) { hoopsScore = S.total; score += S.total; state = 'playing'; Music.duck(1); timer += 20; floatText(W / 2, 250, 'HOOPS +' + S.total + ' · +20s', C.gold); say(pick(['SWISH!! SWISH!!', 'Can I chew the ball??'])); titaBubble = { text: 'Home before sunset, everybody!', life: 170 }; steer = 0; } return; }
+  // the hoop slides side to side, a little quicker as the clock runs down
+  S.ph += dt * (1.9 + (1 - S.left / HOOPS_TIME) * 1.5); S.x = hoopXAt(S.ph);
+  S.cool = Math.max(0, S.cool - dt);
+  if (S.left > 0 && S.cool <= 0 && gamePress()) { S.balls.push({ t: 0, who: S.who, state: 'fly', x: 0, vx: 0 }); S.cool = 0.32; S.shots++; S.who = S.who === 'nic' ? 'giulia' : 'nic'; Audio_.tone(300, 620, 0.16, 'triangle', 0.1); }
+  for (const b of S.balls) {
+    b.t += dt;
+    if (b.state === 'fly' && b.t >= BALL_FLY) {
+      const d = Math.abs(S.x);
+      if (d < 40) { // through the hoop
+        b.state = 'made'; b.t = 0; S.made++; S.streak++; S.best = Math.max(S.best, S.streak);
+        const bonus = Math.min(60, 20 * (S.streak - 1)), pts = 60 + bonus; S.total += pts; S.flash = 0.25;
+        S.msg = { text: (S.streak >= 3 ? 'ON FIRE!  ' : d < 14 ? 'SWISH!  ' : '') + '+' + pts + (bonus ? '  (streak x' + S.streak + ')' : ''), col: S.streak >= 3 ? '#FFB53A' : '#FFE680', life: 0.9 };
+        Audio_.noise(0.12, 0.1); Audio_.tone(880, 1320, 0.12, 'sine', 0.14); if (S.streak >= 3) Audio_.tone(1320, 1760, 0.14, 'sine', 0.1, 0.1);
+        sparkle(W / 2, HOOP_Y + 10, 10, '#FFE680'); if (S.streak === 3) say(pick(['WOOF!! THREE IN A ROW!!', 'ON FIRE!!']));
+      } else { b.state = 'miss'; b.t = 0; b.vx = (d < 78 ? (S.x > 0 ? -1 : 1) : (S.x > 0 ? 1 : -1) * 0.3) * 220; if (S.streak >= 3) say('Awww!!'); S.streak = 0;
+        if (d < 78) { S.msg = { text: 'OFF THE RIM!', col: '#FF8A8A', life: 0.7 }; Audio_.tone(190, 120, 0.12, 'square', 0.12); Audio_.tone(260, 150, 0.1, 'square', 0.08, 0.08); } else { S.msg = { text: 'AIR BALL', col: '#FFFFFF', life: 0.6 }; Audio_.tone(240, 120, 0.2, 'sine', 0.08); } }
+    }
+  }
+  S.balls = S.balls.filter(b => b.state === 'fly' || b.t < 0.6);
+  if (S.left > 0) { S.left = Math.max(0, S.left - dt); const sec = Math.ceil(S.left); if (sec <= 5 && sec < S.lastTick && sec > 0) { S.lastTick = sec; Audio_.tone(1000, 1000, 0.06, 'square', 0.08); } }
+  if (S.left <= 0 && !S.balls.some(b => b.state === 'fly')) { S.phase = 'done'; S.t = 0; S.balls = []; Audio_.tone(196, 196, 0.7, 'sawtooth', 0.12); Audio_.tone(147, 147, 0.7, 'square', 0.08); setTimeout(() => { if (state === 'hoops') sfx.win(); }, 750); }
+}
+function basketball(g, x, y, r, spin) {
+  ell(g, x, y, r, r); fs(g, '#F08A2A', C.out, Math.max(1.5, r * 0.12));
+  g.save(); g.beginPath(); g.arc(x, y, r, 0, TAU); g.clip(); g.translate(x, y); g.rotate(spin); g.strokeStyle = '#3A1E0E'; g.lineWidth = Math.max(1.2, r * 0.09);
+  g.beginPath(); g.moveTo(-r, 0); g.lineTo(r, 0); g.moveTo(0, -r); g.lineTo(0, r); g.stroke(); g.beginPath(); g.arc(-r * 1.25, 0, r, -1, 1); g.stroke(); g.beginPath(); g.arc(r * 1.25, 0, r, Math.PI - 1, Math.PI + 1); g.stroke(); g.restore();
+  ell(g, x - r * 0.35, y - r * 0.4, r * 0.22, r * 0.14); fs(g, 'rgba(255,255,255,.35)', null);
+}
+function arcadeRoom() { dim(0.62); const bg = ctx.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, 'rgba(40,16,70,.9)'); bg.addColorStop(1, 'rgba(12,8,30,.95)'); ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H); }
+function drawTinPick() {
+  const T = tin, cx = W / 2; arcadeRoom();
+  textO(ctx, 'TINMAN SOCIAL', cx, 58, 44, C.gold, C.out, 'center', 9);
+  textO(ctx, 'One game before we go home. Which one?', cx, 100, 17, C.cream, null, 'center', 0, 600);
+  [['SLUSH RUSH', 'Stop the pour at the fill line', '6 pours'], ['HOOPS', 'Time your shots at the moving hoop', '30 seconds']].forEach(([name, line, len], i) => {
+    const sel = T.idx === i, w = 330, h = 300, x = cx - w - 20 + i * (w + 40), y = 130, mx = x + w / 2, bob = sel ? Math.sin(time * 5) * 3 : 0;
+    rr(ctx, x, y + bob, w, h, 20); fs(ctx, sel ? 'rgba(43,26,16,.95)' : 'rgba(43,26,16,.6)', sel ? C.gold : 'rgba(242,193,78,.35)', sel ? 6 : 3);
+    ctx.save(); ctx.translate(0, bob); ctx.globalAlpha = sel ? 1 : 0.7;
+    if (i === 0) { slushCup(ctx, mx - 60, y + 172, 0.62, 0.74, SLUSH_FLAVORS[0][1]); slushCup(ctx, mx, y + 172, 0.7, 0.74, SLUSH_FLAVORS[2][1]); slushCup(ctx, mx + 60, y + 172, 0.62, 0.74, SLUSH_FLAVORS[4][1]); }
+    else { rr(ctx, mx - 62, y + 34, 124, 80, 6); fs(ctx, '#F4F4F2', C.out, 3); rr(ctx, mx - 24, y + 62, 48, 36, 3); fs(ctx, null, '#D8303A', 4); ell(ctx, mx, y + 122, 36, 9); fs(ctx, null, '#F2622A', 6); ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2; for (let k = -3; k <= 3; k++) { ctx.beginPath(); ctx.moveTo(mx + k * 10, y + 126); ctx.lineTo(mx + k * 6, y + 160); ctx.stroke(); } basketball(ctx, mx + (sel ? Math.sin(time * 3) * 26 : 0), y + 92 - (sel ? Math.abs(Math.sin(time * 3)) * 26 : 0), 22, time * 2); }
+    textO(ctx, name, mx, y + 212, 32, sel ? C.gold : C.cream, C.out, 'center', 7);
+    textO(ctx, line, mx, y + 246, 15, C.cream, null, 'center', 0, 600); textO(ctx, len, mx, y + 270, 13, '#9EE8FF', null, 'center', 0, 600);
+    ctx.restore();
+  });
+  drawKid(ctx, 'nic', 62, 470, 1.0, 0); drawKid(ctx, 'giulia', W - 62, 470, 1.0, 0);
+  if (Math.floor(time * 2.5) % 2 === 0) textO(ctx, '◀ ▶ choose   ·   B / Enter to play   ·   or tap a game', cx, 478, 17, '#C9F24D', C.out, 'center', 4);
+}
+function drawHoops() {
+  const S = hoops, cx = W / 2; arcadeRoom();
+  // the machine: cabinet, cage, scoreboard
+  rr(ctx, cx - 300, 26, 600, 498, 22); fs(ctx, '#2A1846', C.out, 4); rr(ctx, cx - 284, 110, 568, 330, 12); fs(ctx, '#140A26', '#6E3FD0', 3);
+  ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 1.5; for (let x = cx - 270; x < cx + 284; x += 26) { ctx.beginPath(); ctx.moveTo(x, 112); ctx.lineTo(x, 438); ctx.stroke(); } for (let y = 126; y < 438; y += 26) { ctx.beginPath(); ctx.moveTo(cx - 282, y); ctx.lineTo(cx + 282, y); ctx.stroke(); }
+  rr(ctx, cx - 284, 38, 568, 62, 10); fs(ctx, '#0A0612', '#F2622A', 3);
+  const led = (lab, val, x, col) => { textO(ctx, lab, x, 54, 11, 'rgba(255,244,214,.7)', null, 'center', 0, 600); textO(ctx, val, x, 78, 28, col, null, 'center', 0); };
+  led('TIME', String(Math.ceil(S.phase === 'intro' ? HOOPS_TIME : S.left)), cx - 190, S.left <= 5 && S.phase === 'play' ? '#FF5A4A' : '#FFE680'); led('SCORE', String(S.total), cx, '#9CFF9C'); led('STREAK', S.streak ? 'x' + S.streak : '-', cx + 190, S.streak >= 3 ? '#FFB53A' : '#9EE8FF');
+  // backboard + hoop
+  const hx = cx + (S.phase === 'intro' ? Math.sin(time * 1.9) * HOOP_AMP : S.x);
+  rr(ctx, hx - 70, HOOP_Y - 92, 140, 84, 6); fs(ctx, S.flash > 0 ? '#FFF6C9' : '#F4F4F2', C.out, 3); rr(ctx, hx - 26, HOOP_Y - 62, 52, 40, 3); fs(ctx, null, '#D8303A', 4);
+  // balls behind the rim (still coming down into it), then rim + net, then balls in front
+  const drawBall = b => { let x = cx, y, r; if (b.state === 'fly') { const p = b.t / BALL_FLY; y = 470 - (470 - HOOP_Y + 30) * p - Math.sin(p * Math.PI) * 70 + p * p * 30; r = lerp(30, 17, p); } else if (b.state === 'made') { x = cx + (hx - cx) * 0.0; y = HOOP_Y + 6 + b.t * 260; r = 17; x = b.hx === undefined ? (b.hx = hx) : b.hx; } else { x = cx + b.vx * b.t; y = HOOP_Y - 6 + b.t * b.t * 700 - b.t * 120; r = 17; } ctx.globalAlpha = b.state === 'fly' ? 1 : clamp(1 - (b.t - 0.3) / 0.3, 0, 1); basketball(ctx, x, y, r, b.t * 9); ctx.globalAlpha = 1; };
+  for (const b of S.balls) if (b.state !== 'fly' || b.t / BALL_FLY > 0.6) drawBall(b);
+  ell(ctx, hx, HOOP_Y, 40, 10); fs(ctx, null, C.out, 9); ell(ctx, hx, HOOP_Y, 40, 10); fs(ctx, null, '#F2622A', 5);
+  ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2; for (let k = -4; k <= 4; k++) { ctx.beginPath(); ctx.moveTo(hx + k * 9.5, HOOP_Y + 6); ctx.lineTo(hx + k * 6, HOOP_Y + 48); ctx.stroke(); } for (const yy of [18, 32]) { ell(ctx, hx, HOOP_Y + yy, 34 - yy * 0.25, 5); ctx.stroke(); }
+  for (const b of S.balls) if (b.state === 'fly' && b.t / BALL_FLY <= 0.6) drawBall(b);
+  // the aim line and the next ball waiting on the rack
+  ctx.setLineDash([6, 10]); ctx.strokeStyle = 'rgba(255,255,255,.22)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cx, 440); ctx.lineTo(cx, HOOP_Y + 14); ctx.stroke(); ctx.setLineDash([]);
+  rr(ctx, cx - 120, 452, 240, 24, 8); fs(ctx, '#3B2A5E', C.out, 3); for (const dx of [-70, 70]) basketball(ctx, cx + dx, 452, 20, 0.4); if (S.cool <= 0 && S.phase === 'play' && S.left > 0) basketball(ctx, cx, 448, 26, time * 2);
+  // kids either side
+  drawKid(ctx, 'nic', cx - 372, 330, 1.25, 0); drawKid(ctx, 'giulia', cx + 372, 330, 1.25, 0);
+  if (S.phase === 'play') { const kx = S.who === 'nic' ? cx - 372 : cx + 372; textO(ctx, (S.who === 'nic' ? 'NICK' : 'GIULIA') + "'S SHOT", kx, 388, 15, C.gold, C.out, 'center', 4); }
+  ctx.save(); ctx.translate(cx + 372, 150); bernardHead(ctx, 0, 0, 1.1, Math.sin(time * 6) * 0.6, true, false); ctx.restore();
+  if (S.msg) { ctx.globalAlpha = clamp(S.msg.life * 3, 0, 1); textO(ctx, S.msg.text, cx, 322 - (0.9 - S.msg.life) * 30, 26, S.msg.col, C.out, 'center', 6); ctx.globalAlpha = 1; }
+  if (S.phase === 'intro') { panel(cx - 240, 236, 480, 110, 16); textO(ctx, 'HOOPS', cx, 266, 34, C.gold, C.out, 'center', 7); textO(ctx, 'The ball flies straight up the middle.', cx, 300, 15, C.cream, null, 'center', 0, 600); textO(ctx, 'Shoot just before the hoop gets there!  3 in a row = ON FIRE', cx, 322, 14, '#FFE680', null, 'center', 0, 600); }
+  if (S.phase === 'done') { panel(cx - 240, 226, 480, 140, 16); textO(ctx, 'TIME!', cx, 256, 30, '#FF8A8A', C.out, 'center', 6); textO(ctx, 'TOTAL +' + S.total, cx, 298, 36, '#FFE680', C.out, 'center', 7); textO(ctx, S.made + ' of ' + S.shots + ' shots   ·   best streak ' + S.best, cx, 338, 15, C.cream, null, 'center', 0, 600); }
+  const prompt = S.phase === 'intro' ? 'Press any button to start' : S.phase === 'done' ? 'Press any button to get back in the Jeep' : 'Press any button (or tap) to shoot!';
+  textO(ctx, prompt, cx, 502, 15, C.cream, C.out, 'center', 4);
+}
 const SLUSH_LAG = 0.06; // seconds of TV/controller delay to forgive
 // any face button, Start, the gas/brake keys or a touch: whatever the kids mash stops the pour
-function slushPress() { return !!(hit.gas || hit.brake || hit.horn || hit.boost || hit.start || hit.up || hit.down || anyPadPress() >= 0); }
+function slushPress() { return gamePress(); }
 function updateSlush(dt) {
   const S = slush; S.t += dt; time += dt; frame++; updateFx();
   if (S.phase === 'intro') { if (S.t > 2.4 || (S.t > 0.3 && slushPress())) { S.phase = 'play'; S.t = 0; S.marker = 0; S.dir = 1; } return; }
@@ -2261,13 +2363,15 @@ function update(dt) {
       } else if (scene.kind === 'landing') { // taxi in, everybody back into the Jeep
         if (scene.t > 0.8 && !scene.b1) { scene.b1 = 1; sfx.bump(); } if (scene.t > 3.6 && !scene.b2) { scene.b2 = 1; sfx.check(); }
         if (scene.t > 5.2) { state = 'playing'; plane = false; const bonus = 50 * rings; position = (AIR.hangar + 12) * TUNE.segLen; playerX = 0; steer = 0; speed = TUNE.maxSpeed * 0.3; score += bonus; Music.duck(1); floatText(W / 2, 250, 'BACK IN THE JEEP' + (bonus ? '  +' + bonus : ''), C.gold); say('AGAIN!! AGAIN!!'); titaBubble = { text: 'Okay, now slushies. Tinman Social!', life: 170 }; }
-      } else { // tinman: stop, then start the Slush Rush minigame
-        if (scene.t > 1.6) { state = 'slush'; slush = { phase: 'intro', t: 0, round: 0, rounds: 6, marker: 0, dir: 1, speed: 1.15, result: null, total: 0, who: 'nic', cups: [] }; sfx.ding(); }
+      } else { // tinman: stop, then choose Slush Rush or Hoops
+        if (scene.t > 1.6) { state = 'tinpick'; tin = { idx: 0, t: 0 }; sfx.ding(); }
       }
       updateFx(); updateCars(dt, findSegment(position + playerZ)); Audio_.engineSet(speed / TUNE.maxSpeed, speed > 0);
       break;
     }
     case 'slush': updateSlush(dt); break;
+    case 'tinpick': updateTinPick(dt); break;
+    case 'hoops': updateHoops(dt); break;
     case 'swap': {
       const S = swapScene; S.t += dt; time += dt; frame++;
       speed = Math.max(0, speed - TUNE.maxSpeed * 0.8 * dt); position = increase(position, dt * speed, trackLength);
@@ -2546,7 +2650,7 @@ function drawGuide() {
   dim(0.55); panel(W / 2 - 400, 34, 800, 472, 20);
   const story = route.story, cx = W / 2;
   textO(ctx, story ? 'THE SCHOOL RUN' : route.id === 1 ? 'MIAMI ROAD TRIP' : 'THE ROAD TRIP', cx, 72, 30, C.gold, C.out, 'center', 6);
-  textO(ctx, story ? 'Pick up Nick & Giulia at Oak Point Elementary, then Slush Rush at Tinman Social!' : 'Tita and Bernard are heading to the dog park. Get there before the sun goes down!', cx, 108, 16, C.cream, null, 'center', 0, 600);
+  textO(ctx, story ? 'Pick up Nick & Giulia at Oak Point Elementary, then pick a game at Tinman Social!' : 'Tita and Bernard are heading to the dog park. Get there before the sun goes down!', cx, 108, 16, C.cream, null, 'center', 0, 600);
   // the controller
   const px = cx, py = 262, g = ctx;
   g.save(); g.translate(px, py);
@@ -2836,7 +2940,7 @@ function renderScene() {
   if (state === 'title') { drawTitle(); return; }
   if (state === 'setup') { drawSetup(); return; }
   if (state === 'route') { drawRouteSelect(); return; }
-  drawRoad(); drawRain(); drawFx(); drawHUD();
+  drawRoad(); drawRain(); drawFx(); if (!(state === 'finish' && finishTimer > (route.story ? 4.2 : 0.8))) drawHUD();
   if (state === 'pupcup' && pup.t > 1) drawPupScene(pup.t - 1);
   if (state === 'scene' && scene.kind === 'school' && scene.t > 1) drawSceneSchool(scene.t - 1);
   if (state === 'scene' && scene.kind === 'marina' && scene.t > 0.8) drawSceneMarina(scene.t - 0.8);
@@ -2844,22 +2948,24 @@ function renderScene() {
   if (state === 'scene' && scene.kind === 'airport' && scene.t > 0.8) drawSceneAirport(scene.t - 0.8);
   if (state === 'scene' && scene.kind === 'landing' && scene.t > 0.6) drawSceneLanding(scene.t - 0.6);
   if (state === 'slush') drawSlush();
+  if (state === 'tinpick') drawTinPick();
+  if (state === 'hoops') drawHoops();
   if (state === 'swap' && swapScene.t > 0.9) drawSwapScene(swapScene.t - 0.9);
   if (state === 'intro') drawGuide();
   else if (state === 'paused') { dim(); textO(ctx, 'PAUSED', W / 2, 150, 48, C.gold, C.out, 'center', 9); drawMenu(240); }
   else if (state === 'quitconfirm') { dim(); textO(ctx, 'Quit to arcade?', W / 2, 170, 40, C.gold, C.out, 'center', 8); textO(ctx, 'Your trip will be lost.', W / 2, 220, 16, C.cream, null, 'center', 0, 600); drawMenu(280); }
   else if (state === 'gameover') { dim(0.7); textO(ctx, 'OUT OF TIME!', W / 2, 150, 56, '#FF8A8A', C.out, 'center', 9); textO(ctx, 'The sun went down on ' + STAGES[stage].name.toLowerCase() + '.', W / 2, 200, 18, C.cream, null, 'center', 0, 600); textO(ctx, 'Score ' + score, W / 2, 240, 24, C.cream, C.out, 'center', 5); drawMenu(300); }
-  else if (state === 'finish' && finishTimer > (route.story ? 4.2 : 0.8)) { const ft = finishTimer - (route.story ? 3.4 : 0); dim(Math.min(0.55, (ft - 0.8) / 1.5)); textO(ctx, route.story ? 'HOME SWEET HOME!' : 'YOU MADE IT!', W / 2, 120, 60, C.gold, C.out, 'center', 10); textO(ctx, route.story ? 'Nick & Giulia: "Best day ever!"  Bernard: zoomies in the backyard.' : 'Bernard is already running for the balls.', W / 2, 168, 18, C.cream, null, 'center', 0, 600); if (ft > 1.2) { textO(ctx, 'Time bonus', W / 2 - 40, 212, 22, C.cream, C.out, 'right', 4); textO(ctx, '+' + tally.timeTotal, W / 2, 212, 22, '#8ED8FF', C.out, 'left', 4); textO(ctx, 'Balls bonus', W / 2 - 40, 248, 22, C.cream, C.out, 'right', 4); textO(ctx, '+' + tally.ballsTotal, W / 2, 248, 22, '#DDFF8A', C.out, 'left', 4); textO(ctx, 'Cars passed: ' + passes + '   ·   Pup cups: ' + pupCups + ' (+' + tally.cupsTotal + ')' + (route.story ? '   ·   Slush Rush: +' + slushScore + (airJumps || skisGot ? '   ·   Boat jumps: ' + airJumps + '  Skis: ' + skisGot : '') + (rings ? '   ·   Rings: ' + rings : '') : ''), W / 2, 284, 16, C.cream, null, 'center', 0, 600); textO(ctx, 'SCORE  ' + score, W / 2, 326, 34, C.gold, C.out, 'center', 7); } if (tally.shown === 2) drawMenu(390); }
+  else if (state === 'finish' && finishTimer > (route.story ? 4.2 : 0.8)) { const ft = finishTimer - (route.story ? 3.4 : 0); dim(Math.min(0.55, (ft - 0.8) / 1.5)); textO(ctx, route.story ? 'HOME SWEET HOME!' : 'YOU MADE IT!', W / 2, 120, 60, C.gold, C.out, 'center', 10); textO(ctx, route.story ? 'Nick & Giulia: "Best day ever!"  Bernard: zoomies in the backyard.' : 'Bernard is already running for the balls.', W / 2, 168, 18, C.cream, null, 'center', 0, 600); if (ft > 1.2) { textO(ctx, 'Time bonus', W / 2 - 40, 212, 22, C.cream, C.out, 'right', 4); textO(ctx, '+' + tally.timeTotal, W / 2, 212, 22, '#8ED8FF', C.out, 'left', 4); textO(ctx, 'Balls bonus', W / 2 - 40, 248, 22, C.cream, C.out, 'right', 4); textO(ctx, '+' + tally.ballsTotal, W / 2, 248, 22, '#DDFF8A', C.out, 'left', 4); textO(ctx, 'Cars passed: ' + passes + '   ·   Pup cups: ' + pupCups + ' (+' + tally.cupsTotal + ')' + (route.story ? '   ·   ' + (tinGame === 'hoops' ? 'Hoops: +' + hoopsScore : 'Slush Rush: +' + slushScore) + (airJumps || skisGot ? '   ·   Boat jumps: ' + airJumps + '  Skis: ' + skisGot : '') + (rings ? '   ·   Rings: ' + rings : '') : ''), W / 2, 284, 16, C.cream, null, 'center', 0, 600); textO(ctx, 'SCORE  ' + score, W / 2, 326, 34, C.gold, C.out, 'center', 7); } if (tally.shown === 2) drawMenu(390); }
 }
 
 /* =====================================================================
    LOOP + PUBLIC API
    ===================================================================== */
-let raf = 0, last = 0, acc = 0, running = false;
+let raf = 0, last = 0, acc = 0, running = false, dbgFast = 1;
 function loop(ts) {
   if (!running) return; raf = requestAnimationFrame(loop);
   if (!last) last = ts; let dt = (ts - last) / 1000; last = ts; if (dt > 0.25) dt = 0.25; acc += dt;
-  let steps = 0; while (acc >= 1 / 60 && steps < 4) { update(1 / 60); acc -= 1 / 60; steps++; }
+  let steps = 0; while (acc >= 1 / 60 && steps < 4) { for (let q = 0; q < dbgFast; q++) update(1 / 60); acc -= 1 / 60; steps++; }
   render();
 }
 function start() {
@@ -2871,7 +2977,7 @@ function start() {
 function stop() { running = false; cancelAnimationFrame(raf); Music.stop(); Audio_.engineSet(0, false); Audio_.sirenSet(0, 0); window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp); window.removeEventListener('blur', onBlur); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('gamepadconnected', onGpc); }
 const onVis = () => { if (document.hidden && state === 'playing') { state = 'paused'; setMenu(['Resume', 'Restart Trip', 'Quit to Arcade']); Audio_.engineSet(0, false); } };
 const onGpc = () => { Audio_.init(); Audio_.engineOn(); };
-window.BRT = { start, stop, onQuit: null, get state() { return state; }, teleport(segIndex) { position = segIndex * TUNE.segLen; playerX = 0; }, cheat(v) { speed = v; }, stageStarts() { return stageStarts.concat([segments.length]); }, stops() { return stops.map(q => q.n); }, swaps() { return swaps.map(q => q.n); }, ride() { return ride; }, events() { return events.map(q => ({ kind: q.kind, n: q.n })); }, forks() { return forks.map(f => ({ decision: f.decision, L0: f.L0, Lb: f.Lb, L1: f.L1, R0: f.R0, Rb: f.Rb, R1: f.R1, off: f.offroadSide, chosen: f.chosen })); }, routeId() { return route.id; }, setRoute(i) { route = ROUTES[i]; STAGES = route.stages; }, setX(x) { playerX = x; }, lake() { return Object.assign({ boat, skiers, air: !!air, airJumps, skisGot, fork: marinaFork && { decision: marinaFork.decision, chosen: marinaFork.chosen } }, LAKE); }, skipScene() { if (state === 'scene') scene.t = 99; if (state === 'slush' && slush) { slush.phase = 'done'; slush.t = 99; } }, lakeItems() { const out = []; if (LAKE.from === undefined) return out; for (let n = LAKE.from; n < LAKE.to; n++) for (const sp of segments[n].sprites) if (sp.ramp || sp.pickup === 'skis' || sp.obstacle) out.push({ n, key: sp.key, offset: sp.offset }); return out; }, setBoat(v) { boat = v; }, airport() { return Object.assign({ plane, flyAlt, rings, lift: flyLiftAt(findSegment(position + playerZ).index), fork: airportFork && { decision: airportFork.decision, chosen: airportFork.chosen } }, AIR); }, setPlane(v) { plane = v; }, weather() { return { rain: +rain.toFixed(2), rainTrip: Math.round(rainTrip), bow: +rainbowAmt().toFixed(2) }; }, setRainTrip(v) { rainTrip = v; }, police() { return { stops: POLICE, vol: +sirenVol.toFixed(3), gain: Audio_.sirenGain ? +Audio_.sirenGain.gain.value.toFixed(4) : null, freq: Audio_.siren ? Math.round(Audio_.siren.frequency.value) : null }; }, radio() { return { idx: Radio.idx, title: Radio.st().title, wanted: Radio.wanted, chip: Music.on, duck: Radio.duckV, chipT: Radio.chipT, el: Radio.el ? { src: Radio.el.src.split('/').pop(), paused: Radio.el.paused, t: +Radio.el.currentTime.toFixed(2), vol: +Radio.el.volume.toFixed(2), muted: Radio.el.muted, dur: Radio.el.duration } : null }; }, radioEl() { return Radio.el; }, sound(v) { Audio_.on = v; }, rainOn() { return rainOn; }, work() { return { zones: WORK, bridgeJumps, air: !!air, airH: air ? Math.round(air.h) : 0, onRamp: !!onRamp, lift: Math.round(rampLift), rampLen: RAMP_LEN }; }, setAlt(v) { flyAlt = v; }, setSkiers(v) { skiers = v; }, setSpeed(v) { speed = v; }, dbg() { const sg = findSegment(position + playerZ); return { playerX: +playerX.toFixed(3), seg: sg.index, merge: sg.merge || null, mp: sg.mp1, mergeShift: mergeShift(sg, ((position + playerZ) % TUNE.segLen) / TUNE.segLen), speed: Math.round(speed), state, dizzy: +dizzy.toFixed(2), boat, skiers, airJumps }; }, wrecks() { return cars.filter(c => c.wreck).map(c => ({ seg: Math.floor(c.z / TUNE.segLen), offset: +c.offset.toFixed(2), t: +c.wreck.t.toFixed(2), speed: Math.round(c.speed) })); }, firstCar() { let b = null; for (const c of cars) if (!b || c.z < b.z) b = c; return { seg: Math.floor(b.z / TUNE.segLen), offset: b.offset, kind: b.kind }; } };
+window.BRT = { start, stop, onQuit: null, get state() { return state; }, teleport(segIndex) { position = segIndex * TUNE.segLen; playerX = 0; }, cheat(v) { speed = v; }, stageStarts() { return stageStarts.concat([segments.length]); }, stops() { return stops.map(q => q.n); }, swaps() { return swaps.map(q => q.n); }, ride() { return ride; }, events() { return events.map(q => ({ kind: q.kind, n: q.n })); }, forks() { return forks.map(f => ({ decision: f.decision, L0: f.L0, Lb: f.Lb, L1: f.L1, R0: f.R0, Rb: f.Rb, R1: f.R1, off: f.offroadSide, chosen: f.chosen })); }, routeId() { return route.id; }, setRoute(i) { route = ROUTES[i]; STAGES = route.stages; }, setX(x) { playerX = x; }, lake() { return Object.assign({ boat, skiers, air: !!air, airJumps, skisGot, fork: marinaFork && { decision: marinaFork.decision, chosen: marinaFork.chosen } }, LAKE); }, skipScene() { if (state === 'scene') scene.t = 99; if (state === 'tinpick') startTinGame(0); if (state === 'slush' && slush) { slush.phase = 'done'; slush.t = 99; } if (state === 'hoops' && hoops) { hoops.phase = 'done'; hoops.t = 99; hoops.left = 0; } }, lakeItems() { const out = []; if (LAKE.from === undefined) return out; for (let n = LAKE.from; n < LAKE.to; n++) for (const sp of segments[n].sprites) if (sp.ramp || sp.pickup === 'skis' || sp.obstacle) out.push({ n, key: sp.key, offset: sp.offset }); return out; }, setBoat(v) { boat = v; }, airport() { return Object.assign({ plane, flyAlt, rings, lift: flyLiftAt(findSegment(position + playerZ).index), fork: airportFork && { decision: airportFork.decision, chosen: airportFork.chosen } }, AIR); }, setPlane(v) { plane = v; }, weather() { return { rain: +rain.toFixed(2), rainTrip: Math.round(rainTrip), bow: +rainbowAmt().toFixed(2) }; }, setRainTrip(v) { rainTrip = v; }, police() { return { stops: POLICE, vol: +sirenVol.toFixed(3), gain: Audio_.sirenGain ? +Audio_.sirenGain.gain.value.toFixed(4) : null, freq: Audio_.siren ? Math.round(Audio_.siren.frequency.value) : null }; }, hoopAhead(sec) { if (!hoops) return 999; let ph = hoops.ph, left = hoops.left; for (let t = 0; t < sec; t += 1 / 60) { ph += (1 / 60) * (1.9 + (1 - left / HOOPS_TIME) * 1.5); left = Math.max(0, left - 1 / 60); } return hoopXAt(ph); }, fast(n) { dbgFast = n; }, clock(v) { if (v !== undefined) timer = v; return timer; }, cars(a, b) { const out = []; for (const c of cars) { const i = Math.floor(c.z / TUNE.segLen); if (i >= a && i <= b && !c.wreck) out.push({ i, x: +c.offset.toFixed(2), v: Math.round(c.speed) }); } return out; }, info() { return { state, stage, score, timer, seg: findSegment(position + playerZ).index, N: segments.length, x: +playerX.toFixed(2), speed: Math.round(speed), boat, plane, rain: +rain.toFixed(2), scene: scene && scene.kind, passes, balls, bridgeJumps, rings, airJumps }; }, tin() { return { state, pick: tin && tin.idx, game: tinGame, hoopsScore, slushScore, score, hoops: hoops && { phase: hoops.phase, left: +hoops.left.toFixed(1), x: Math.round(hoops.x), total: hoops.total, streak: hoops.streak, made: hoops.made, shots: hoops.shots, who: hoops.who, balls: hoops.balls.length } }; }, radio() { return { idx: Radio.idx, title: Radio.st().title, wanted: Radio.wanted, chip: Music.on, duck: Radio.duckV, chipT: Radio.chipT, el: Radio.el ? { src: Radio.el.src.split('/').pop(), paused: Radio.el.paused, t: +Radio.el.currentTime.toFixed(2), vol: +Radio.el.volume.toFixed(2), muted: Radio.el.muted, dur: Radio.el.duration } : null }; }, radioEl() { return Radio.el; }, sound(v) { Audio_.on = v; }, rainOn() { return rainOn; }, work() { return { zones: WORK, bridgeJumps, air: !!air, airH: air ? Math.round(air.h) : 0, onRamp: !!onRamp, lift: Math.round(rampLift), rampLen: RAMP_LEN }; }, setAlt(v) { flyAlt = v; }, setSkiers(v) { skiers = v; }, setSpeed(v) { speed = v; }, dbg() { const sg = findSegment(position + playerZ); return { playerX: +playerX.toFixed(3), seg: sg.index, merge: sg.merge || null, mp: sg.mp1, mergeShift: mergeShift(sg, ((position + playerZ) % TUNE.segLen) / TUNE.segLen), speed: Math.round(speed), state, dizzy: +dizzy.toFixed(2), boat, skiers, airJumps }; }, wrecks() { return cars.filter(c => c.wreck).map(c => ({ seg: Math.floor(c.z / TUNE.segLen), offset: +c.offset.toFixed(2), t: +c.wreck.t.toFixed(2), speed: Math.round(c.speed) })); }, firstCar() { let b = null; for (const c of cars) if (!b || c.z < b.z) b = c; return { seg: Math.floor(b.z / TUNE.segLen), offset: b.offset, kind: b.kind }; } };
 
 if (location.hash === '#sprites') {
   buildSprites(); ctx.fillStyle = '#9fd'; ctx.fillRect(0, 0, W, H);
