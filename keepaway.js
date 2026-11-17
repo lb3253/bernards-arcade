@@ -107,7 +107,7 @@ function fitStage() {
 
 /* ---------------- art helpers ---------------- */
 const IMG = {};
-for (const [k, src] of [['nic', '/art/spr-hop-nic.png'], ['nicHop', '/art/spr-hop-nic-hop.png'], ['giulia', '/art/spr-hop-giulia.png'], ['giuliaHop', '/art/spr-hop-giulia-hop.png'], ['bernard', '/art/spr-ka-bernard.png'], ['tennis', '/art/spr-hop-ball.png'], ['bone', '/art/spr-hop-bone.png']]) { const i = new Image(); i.src = src; IMG[k] = i; }
+for (const [k, src] of [['nic', '/art/spr-hop-nic.png'], ['nicHop', '/art/spr-hop-nic-hop.png'], ['giulia', '/art/spr-hop-giulia.png'], ['giuliaHop', '/art/spr-hop-giulia-hop.png'], ['bernard', '/art/spr-ka-bernard.png'], ['nicRun', '/art/spr-ka-nic-run.png'], ['giuliaRun', '/art/spr-ka-giulia-run.png'], ['tennis', '/art/spr-hop-ball.png'], ['bone', '/art/spr-hop-bone.png']]) { const i = new Image(); i.src = src; IMG[k] = i; }
 const ready = k => IMG[k] && IMG[k].complete && IMG[k].naturalWidth > 0;
 function rr(g, x, y, w, h, r) { r = Math.min(r, w / 2, h / 2); g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 function ell(g, x, y, rx, ry) { g.beginPath(); g.ellipse(x, y, Math.max(0, rx), Math.max(0, ry), 0, 0, TAU); }
@@ -651,6 +651,13 @@ function pix(key, h) { // a pixel-art copy of a smooth sprite, made once for eac
   return pixCache[id] = crunch(c, 24, true);
 }
 function sprite(key, x, y, h, flip, rot, alpha) { if (!ready(key)) return false; const c = pix(key, h), w = c.width / SX, gh = c.height / SY; ctx.save(); ctx.translate(snapX(x), snapY(y)); if (flip) ctx.scale(-1, 1); if (rot) ctx.rotate(rot); if (alpha != null) ctx.globalAlpha = alpha; ctx.imageSmoothingEnabled = false; ctx.drawImage(c, -w / 2, -gh + 1 / SY, w, gh); ctx.restore(); return true; }
+// The kids' running strips: 8 frames side by side. hs is how tall the standing kid is inside a frame, pb the empty space under the feet.
+const RUNS = { nic: { key: 'nicRun', fw: 211, fh: 331, hs: 324, pb: 4.5, n: 8 }, giulia: { key: 'giuliaRun', fw: 220, fh: 295, hs: 288, pb: 4.5, n: 8 } };
+function runSprite(who, f, x, y, h, flip, rot, alpha) { // same size and footing as sprite(who, ...) at height h
+  const R = RUNS[who]; if (!ready(R.key)) return false; const id = R.key + '|' + f + '|' + Math.round(h * 4), k = h / R.hs; let c = pixCache[id];
+  if (!c) { const bw = Math.max(2, Math.round(R.fw * k * SX)), bh = Math.max(2, Math.round(R.fh * k * SY)); c = document.createElement('canvas'); c.width = bw + 2; c.height = bh + 2; const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(IMG[R.key], f * R.fw, 0, R.fw, R.fh, 1, 1, bw, bh); pixCache[id] = crunch(c, 24, true); }
+  const w = c.width / SX, gh = c.height / SY; ctx.save(); ctx.translate(snapX(x), snapY(y)); if (flip) ctx.scale(-1, 1); if (rot) ctx.rotate(rot); if (alpha != null) ctx.globalAlpha = alpha; ctx.imageSmoothingEnabled = false; ctx.drawImage(c, -w / 2, -gh + 1 / SY + R.pb * k, w, gh); ctx.restore(); return true;
+}
 // Bernard is a pixel-art sheet: 5 across, frames 0-3 standing (tail wag), 4-11 walk, 12-19 run. He faces left in the art.
 const BSHEET = { fw: 690, fh: 504, cols: 5, feet: 80 / 84, tall: 468 }, BU = 468 / 5 / SX; // BU: the height at which one pixel of his art is exactly one page pixel
 function bern(frame, x, y, h, flip, rot, alpha, squat) { // (x, y) is the ground under his middle; h is ears-to-paws height
@@ -662,12 +669,13 @@ const bernWalk = t => 4 + (Math.floor(t * 8) % 8 + 8) % 8, bernRun = t => 12 + (
 // a round head cut out of a sprite, for the scoreboard
 function head(key, x, y, r, fy) { const img = IMG[key]; ell(ctx, x, y, r, r); fs(ctx, '#F4E9D8', INK, 2.5); if (!ready(key)) return; ctx.save(); ell(ctx, x, y, r - 1, r - 1); ctx.clip(); if (key === 'bernard') { ctx.drawImage(img, 36, 0, 212, 212, x - r, y - r, r * 2, r * 2); ctx.restore(); ell(ctx, x, y, r, r); fs(ctx, null, INK, 2.5); return; } const s = img.naturalWidth * (key === 'bernard' ? .62 : .9); ctx.drawImage(img, (img.naturalWidth - s) * (key === 'bernard' ? .12 : .5), img.naturalHeight * (fy || 0), s, s, x - r, y - r, r * 2, r * 2); ctx.restore(); ell(ctx, x, y, r, r); fs(ctx, null, INK, 2.5); }
 function drawKid(k) {
-  const moving = Math.hypot(k.vx, k.vy) > 30, jump = k.cheer > 0 ? Math.sin(Math.min(1, k.cheer / .35) * Math.PI) * 16 : 0, bob = moving ? Math.abs(Math.sin(k.run)) * 5 : Math.sin(time * 2 + k.i * 2) * 1.2;
-  const hopKey = k.who === 'nic' ? 'nicHop' : 'giuliaHop', useHop = (k.dashT > 0 || k.cheer > 0 || k.fakeT > 0 || (moving && Math.sin(k.run) > .3)) && ready(hopKey);
-  const tugging = tug && tug.k === k.i, lean = tugging ? -.22 + Math.sin(time * 30) * .04 : k.stun > 0 ? .5 : k.dashT > 0 ? .25 : moving ? Math.sin(k.run) * .05 : 0;
+  const moving = Math.hypot(k.vx, k.vy) > 30, jump = k.cheer > 0 ? Math.sin(Math.min(1, k.cheer / .35) * Math.PI) * 16 : 0, bob = moving ? Math.abs(Math.sin(k.run * 1.35)) * 3.5 : Math.sin(time * 2 + k.i * 2) * 1.2;
+  const hopKey = k.who === 'nic' ? 'nicHop' : 'giuliaHop', special = k.dashT > 0 || k.cheer > 0 || k.fakeT > 0, running = moving && !special && k.stun <= 0 && !(tug && tug.k === k.i) && ready(RUNS[k.who].key), useHop = (special || (moving && !running && Math.sin(k.run) > .3)) && ready(hopKey);
+  const rf = Math.floor(k.run * 1.35 / TAU * 8) % 8, body = (x, y, rot) => running ? runSprite(k.who, rf, x, y, 122, k.face < 0, rot) : sprite(useHop ? hopKey : k.who, x, y, 122, k.face < 0, rot);
+  const tugging = tug && tug.k === k.i, lean = tugging ? -.22 + Math.sin(time * 30) * .04 : k.stun > 0 ? .5 : k.dashT > 0 ? .25 : moving ? .04 : 0;
   shadow(k.x, k.y, 22, .3 - jump * .006);
-  if (k.speedT > 0) { ctx.globalAlpha = .3; sprite(useHop ? hopKey : k.who, k.x - k.vx * .05, k.y - bob, 122, k.face < 0, 0); ctx.globalAlpha = 1; }
-  if (!sprite(useHop ? hopKey : k.who, k.x + (tugging ? Math.sin(time * 34) * 2 : 0), k.y - bob - jump, 122, k.face < 0, lean)) { rr(ctx, k.x - 16, k.y - 90, 32, 60, 10); fs(ctx, KCOL[k.who]); ell(ctx, k.x, k.y - 96, 16, 16); fs(ctx, '#D9A77A'); }
+  if (k.speedT > 0) { ctx.globalAlpha = .3; body(k.x - k.vx * .05, k.y - bob, 0); ctx.globalAlpha = 1; }
+  if (!body(k.x + (tugging ? Math.sin(time * 34) * 2 : 0), k.y - bob - jump, lean)) { rr(ctx, k.x - 16, k.y - 90, 32, 60, 10); fs(ctx, KCOL[k.who]); ell(ctx, k.x, k.y - 96, 16, 16); fs(ctx, '#D9A77A'); }
   const tag = k.who === 'nic' ? 'NICK' : 'GIULIA'; ctx.font = font(12); const tw = ctx.measureText(tag).width + 14; rr(ctx, k.x - tw / 2, k.y + 8, tw, 18, 9); fs(ctx, KCOL[k.who]); text(ctx, tag, k.x, k.y + 17.5, 12, '#FFFFFF');
   if (k.ctl < 0 && !autoAll) text(ctx, 'CPU', k.x, k.y + 36, 10, 'rgba(255,255,255,.75)', 'rgba(0,0,0,.45)', 'center', 3);
   if (k.rattle > 0) text(ctx, '!!', k.x + Math.sin(time * 40) * 3, k.y - 134, 20, '#FFFFFF', INK, 'center', 4);
