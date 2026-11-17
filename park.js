@@ -1,11 +1,12 @@
 /* =====================================================================
    BERNARD IN THE PARK
    ---------------------------------------------------------------------
-   Bernard has the park to himself until Tita calls him home. His friends
+   Bernard has the park to himself, for as long as he likes: there is no
+   clock. "Go home" on the pause menu shows the score for the day. His friends
    (Nick, Giulia, Tita and Mama Duck) each want something built. The JOBS
    list says what each one needs: collect the pieces into his bag, take
    them to that friend, and the thing gets put together. Every job built
-   scores big and adds time.
+   scores big, and the friend then thinks of the next job.
 
    Things for the bag: ballies, sticks, flowers, apples (bark at an apple
    tree), feathers (round the pond), shells (in the sand), acorns (under
@@ -31,7 +32,6 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 function seeded(s) { return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
 const TUNE = {
-  time: 150, jobTime: 20,         // seconds in the park, and seconds added for every job built
   walk: 190, sprint: 335, accel: 1500, wade: .55,
   jumpV: 335, gravity: 1100,
   thirst: .009, sprintThirst: .15, drink: .55,   // water bar: drain walking, drain sprinting, refill while drinking
@@ -337,7 +337,7 @@ function bindTouch() {
 }
 
 /* ---------------- game state ---------------- */
-let state = 'title', time = 0, stateT = 0, pauseIdx = 0, timer = 0, score = 0, best = 0, newBest = false, lastTick = 99, autoPlay = false;
+let state = 'title', time = 0, stateT = 0, pauseIdx = 0, score = 0, best = 0, newBest = false, autoPlay = false;
 let dog = null, cam = { x: 0, y: 0 }, items = [], squirrels = [], flies = [], ducks = [], toss = null, tossCool = 4, boneT = 12;
 let particles = [], floats = [], banner = null, hintT = 0, tip = '', tipT = 0, jobsDone = 0;
 let bag = {}, tally = {}, sc = { jobs: 0, picks: 0, tricks: 0 };
@@ -366,7 +366,7 @@ function has(g) { const j = jobOf(g); for (const k in j.need) if ((bag[k] || 0) 
 function newOrder(g, quiet) { g.state = 'want'; g.t = 0; const j = jobOf(g); g.say = { s: j.ask, t: quiet ? 0 : 3 }; const k = Object.keys(j.need).find(k => TIPS[k]); if (k && !quiet) { tip = TIPS[k]; tipT = 7; } }
 function newGame() {
   dog = { x: START.x, y: START.y, z: 0, vx: 0, vy: 0, vz: 0, face: -1, fx: -1, sq: 0, anim: 0, water: 1, sprinting: false, drinking: false, barkT: 0, barkCool: 0, hopped: {}, pant: 0, gulp: 0, dipT: 0, idleT: 0, act: '', actT: 0, wetT: 0, wasWet: false, lean: 0, happy: 0 };
-  score = 0; jobsDone = 0; sc = { jobs: 0, picks: 0, tricks: 0 }; timer = TUNE.time; newBest = false; lastTick = 99; items = []; particles = []; floats = []; banner = null; toss = null; tossCool = 3; boneT = 14; hintT = 10; tip = ''; tipT = 0;
+  score = 0; jobsDone = 0; sc = { jobs: 0, picks: 0, tricks: 0 }; newBest = false; items = []; particles = []; floats = []; banner = null; toss = null; tossCool = 3; boneT = 14; hintT = 10; tip = ''; tipT = 0;
   bag = {}; tally = {}; for (const k of KINDS) bag[k] = 0;
   for (const w of waters) w.fresh = 0; for (const t of trees) { t.ready = 0; t.shakeT = 0; }
   for (const g of GIVERS) { g.idx = 0; g.built = {}; g.cheer = 0; g.parts = []; newOrder(g, true); }
@@ -375,7 +375,7 @@ function newGame() {
   flies = []; for (let i = 0; i < 6; i++) flies.push(newFly());
   ducks = []; for (let i = 0; i < 3; i++) ducks.push({ x: POND.x + rnd(-150, 150), y: POND.y + rnd(-60, 60), vx: rnd(-10, 10), vy: 0, face: 1, t: rnd(0, 3) });
   cam.x = clamp(dog.x - W / 2, 0, WW - W); cam.y = clamp(dog.y - H * .56, 0, WH - H);
-  state = 'play'; stateT = 0; setBanner('GO EXPLORE!', 'your friends need things built: check the JOBS list', '#C6FF3D', 2.6); sfx.go(); musicStart();
+  state = 'play'; stateT = 0; setBanner('GO EXPLORE!', 'no clock: take your time  ·  check the JOBS list', '#C6FF3D', 2.8); sfx.go(); musicStart();
 }
 function fx(x, y, n, col, o) { o = o || {}; for (let i = 0; i < n; i++) { const a = rnd(0, TAU), s = rnd(o.s0 || 30, o.s1 || 150); particles.push({ x, y, z: o.z || 0, vx: Math.cos(a) * s, vy: Math.sin(a) * s * .6, vz: rnd(o.up || 60, (o.up || 60) * 2.6), life: rnd(.35, o.life || .8), col: Array.isArray(col) ? pick(col) : col, r: rnd(o.r0 || 2, o.r1 || 4.5) }); } }
 function say(x, y, s, col, size) { floats.push({ x, y, text: s, col: col || '#FFFFFF', life: 1.3, max: 1.3, size: size || 20 }); }
@@ -447,8 +447,8 @@ function updateSquirrel(S, dt) {
 function updateGivers(dt) {
   for (const g of GIVERS) { if (g.say.t > 0) g.say.t -= dt; if (g.cheer > 0) g.cheer -= dt;
     if (g.state === 'want') { if (dist(dog, g) < 96 && has(g)) { const j = jobOf(g); g.parts = []; for (const k in j.need) { bag[k] -= j.need[k]; for (let i = 0; i < j.need[k]; i++) g.parts.push(k); } g.state = 'build'; g.t = 0; sfx.build(); g.say = { s: pick(['Thank you, Bernard!', 'Perfect!', 'Good boy, Bernard!']), t: 1.5 }; dog.happy = 3; } }
-    else if (g.state === 'build') { g.t += dt; if (g.t >= 1.5) { const j = jobOf(g), s = spotOf(g, j); g.built[j.art] = (g.built[j.art] || 0) + 1; const p = j.pts + (g.built[j.art] - 1) * 20; score += p; sc.jobs += p; jobsDone++; timer += TUNE.jobTime;
-      say(s.x, s.y - 100, '+' + p, '#FFD23F', 26); setBanner(j.name + ' BUILT!', '+' + p + ' points  ·  +' + TUNE.jobTime + ' seconds', '#FFD23F', 2.2); sfx.fanfare(); fx(s.x, s.y, 24, ['#FFD23F', '#FFFFFF', '#FF8AC0', '#9EE8FF'], { z: 20, up: 110, s1: 170, life: 1.2 });
+    else if (g.state === 'build') { g.t += dt; if (g.t >= 1.5) { const j = jobOf(g), s = spotOf(g, j); g.built[j.art] = (g.built[j.art] || 0) + 1; const p = j.pts + (g.built[j.art] - 1) * 20; score += p; sc.jobs += p; jobsDone++;
+      say(s.x, s.y - 100, '+' + p, '#FFD23F', 26); setBanner(j.name + ' BUILT!', '+' + p + ' points', '#FFD23F', 2.2); sfx.fanfare(); fx(s.x, s.y, 24, ['#FFD23F', '#FFFFFF', '#FF8AC0', '#9EE8FF'], { z: 20, up: 110, s1: 170, life: 1.2 });
       g.cheer = 2.6; g.state = 'rest'; g.t = 0; g.idx++; } }
     else if (g.state === 'rest') { g.t += dt; if (g.t >= 3) newOrder(g); } }
 }
@@ -485,17 +485,15 @@ function updateFx(dt) {
   for (const f of floats) { f.life -= dt; f.y -= 34 * dt; } floats = floats.filter(f => f.life > 0);
   if (banner) { banner.life -= dt; if (banner.life <= 0) banner = null; }
 }
-function finish() {
-  state = 'end'; stateT = 0; musicStop(); sfx.fanfare(); newBest = score > best && score > 0;
-  if (newBest) { best = score; try { localStorage.setItem('park_best', String(best)); } catch (e) { } }
-}
+function saveBest() { newBest = score > best && score > 0; if (newBest) { best = score; try { localStorage.setItem('park_best', String(best)); } catch (e) { } } }
+function finish() { state = 'end'; stateT = 0; musicStop(); sfx.fanfare(); saveBest(); }
 function update(dt) {
   time += dt; stateT += dt; readInput();
   if (state === 'title') { if (IN.hit.jump || IN.hit.bark || IN.hit.start) newGame(); else if (IN.hit.select) quit(); return; }
   if (state === 'pause') {
-    if (IN.hit.up) { pauseIdx = (pauseIdx + 2) % 3; sfx.menu(); } if (IN.hit.down) { pauseIdx = (pauseIdx + 1) % 3; sfx.menu(); }
+    if (IN.hit.up) { pauseIdx = (pauseIdx + 3) % 4; sfx.menu(); } if (IN.hit.down) { pauseIdx = (pauseIdx + 1) % 4; sfx.menu(); }
     if (IN.hit.start) { state = 'play'; musicStart(); } else if (IN.hit.select) quit();
-    else if (IN.hit.jump || IN.hit.bark) { if (pauseIdx === 0) { state = 'play'; musicStart(); } else if (pauseIdx === 1) newGame(); else quit(); }
+    else if (IN.hit.jump || IN.hit.bark) { if (pauseIdx === 0) { state = 'play'; musicStart(); } else if (pauseIdx === 1) finish(); else if (pauseIdx === 2) newGame(); else quit(); }
     return;
   }
   if (state === 'end') { updateFx(dt); if (stateT > 1.2) { if (IN.hit.jump || IN.hit.bark || IN.hit.start) newGame(); else if (IN.hit.select) quit(); } return; }
@@ -505,8 +503,6 @@ function update(dt) {
   updateDog(dt); updateWorld(dt); updateFx(dt); if (hintT > 0) hintT -= dt; if (tipT > 0) tipT -= dt;
   const cx = clamp(dog.x + dog.vx * .25 - W / 2, 0, WW - W), cy = clamp(dog.y + dog.vy * .2 - H * .56, 0, WH - H), k = 1 - Math.pow(.004, dt);
   cam.x += (cx - cam.x) * k; cam.y += (cy - cam.y) * k;
-  timer -= dt; const s = Math.ceil(timer); if (s <= 10 && s !== lastTick && s > 0) { lastTick = s; sfx.tick(); if (s === 10) setBanner('10 SECONDS!', 'finish a job for more time', '#FF9A6A', 1.4); } if (s > 10) lastTick = 99;
-  if (timer <= 0) { timer = 0; finish(); }
 }
 
 /* ---------------- drawing ---------------- */
@@ -622,8 +618,6 @@ function pointer(t, col, label) { // an arrow at the edge of the screen toward s
 function drawHUD() {
   // score
   panel(12, 10, 176, 62); head(42, 41, 22); text(ctx, 'SCORE', 74, 26, 12, '#B4C2E2', null, 'left'); text(ctx, String(score), 74, 50, 28, '#FFFFFF', INK, 'left', 5);
-  // time
-  const low = timer <= 10; panel(W / 2 - 62, 10, 124, 62, low ? '#FF8A70' : null); text(ctx, 'TIME', W / 2, 25, 12, '#B4C2E2'); const s = Math.ceil(timer); text(ctx, Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'), W / 2, 50, 28, low ? '#FF9A6A' : '#FFFFFF', INK, 'center', 5);
   // water
   const dry = dog.water < .25, blink = dry && Math.sin(time * 9) > 0; panel(W - 250, 10, 238, 62, blink ? '#63BCE8' : null);
   text(ctx, dry ? 'WATER  ·  thirsty!' : dog.sprinting ? 'WATER  ·  sprinting' : 'WATER', W - 236, 26, 12, dry ? '#9EE8FF' : '#B4C2E2', null, 'left');
@@ -668,13 +662,14 @@ function drawTitle() {
   text(ctx, 'SELECT: back to the arcade', 24, H - 16, 13, 'rgba(255,255,255,.8)', 'rgba(0,0,0,.5)', 'left', 3); if (best) text(ctx, 'Best ' + best, W - 130, H - 16, 14, '#FFE680', 'rgba(0,0,0,.5)', 'right', 3);
 }
 function drawPause() {
-  ctx.fillStyle = 'rgba(8,10,20,.6)'; ctx.fillRect(0, 0, W, H); text(ctx, 'PAUSED', W / 2, 170, 48, '#FFD23F', INK, 'center', 9);
-  ['Resume', 'Start over', 'Quit to Arcade'].forEach((s, i) => text(ctx, (i === pauseIdx ? '▶ ' : '') + s, W / 2, 250 + i * 46, 26, i === pauseIdx ? '#C6FF3D' : '#FFFFFF', INK, 'center', 5));
+  ctx.fillStyle = 'rgba(8,10,20,.76)'; ctx.fillRect(0, 0, W, H); text(ctx, 'PAUSED', W / 2, 170, 48, '#FFD23F', INK, 'center', 9);
+  text(ctx, 'No clock here: stay as long as you like', W / 2, 212, 16, '#B4C2E2');
+  ['Keep playing', 'Go home and see the score', 'Start a new day', 'Quit to Arcade'].forEach((s, i) => text(ctx, (i === pauseIdx ? '▶ ' : '') + s, W / 2, 262 + i * 44, 26, i === pauseIdx ? '#C6FF3D' : '#FFFFFF', INK, 'center', 5));
 }
 function drawEnd() {
   ctx.fillStyle = 'rgba(8,10,20,.62)'; ctx.fillRect(0, 0, W, H);
   rr(ctx, 190, 44, 580, 452, 22); fs(ctx, 'rgba(12,16,32,.94)', '#FFD23F', 4);
-  text(ctx, 'TIME TO GO HOME!', W / 2, 86, 38, '#FFD23F', INK, 'center', 7);
+  text(ctx, 'WHAT A DAY!', W / 2, 86, 38, '#FFD23F', INK, 'center', 7);
   const picked = KINDS.reduce((a, k) => a + (tally[k] || 0), 0) + (tally.bone || 0), tricks = ['squirrel', 'fly', 'air', 'hop', 'water'].reduce((a, k) => a + (tally[k] || 0), 0);
   [['Jobs done', jobsDone, sc.jobs], ['Things collected', picked, sc.picks], ['Squirrels, jumps and tricks', tricks, sc.tricks]].forEach(([name, n, p], i) => { const y = 138 + i * 38; if (stateT < .3 + i * .25) return;
     text(ctx, name, 236, y, 19, '#B4C2E2', null, 'left'); text(ctx, String(n), 560, y, 19, '#FFFFFF', null, 'right'); text(ctx, String(p), 724, y, 22, p ? '#C6FF3D' : '#667', INK, 'right', 4); });
@@ -699,7 +694,7 @@ function loop(ts) {
   if (!last) last = ts; let dt = (ts - last) / 1000; last = ts; if (dt > .1) dt = .1; acc += dt;
   try { let n = 0; while (acc >= 1 / 60 && n < 4) { update(1 / 60); acc -= 1 / 60; n++; } render(); } catch (err) { if (window.console) console.error('park frame', err); }
 }
-function quit() { musicStop(); if (typeof window.PK.onQuit === 'function') { stop(); window.PK.onQuit(); } else { state = 'title'; stateT = 0; } }
+function quit() { musicStop(); if (state === 'pause' || state === 'play') saveBest(); if (typeof window.PK.onQuit === 'function') { stop(); window.PK.onQuit(); } else { state = 'title'; stateT = 0; } }
 function start() {
   if (running) return; running = true; fitStage(); musicStop(); state = 'title'; stateT = 0; time = 0;
   IN.prev = { jump: true, bark: true, start: true, select: true, left: true, right: true, up: true, down: true };   // ignore the press that opened the game
@@ -711,8 +706,8 @@ bindTouch();
 window.PK = {
   start, stop, onQuit: null, get state() { return state; },
   // test hooks
-  dbg() { return { state, score, sc: { ...sc }, jobsDone, timer: +timer.toFixed(1), bag: { ...bag }, tally: { ...tally }, dog: dog && { x: Math.round(dog.x), y: Math.round(dog.y), z: Math.round(dog.z), water: +dog.water.toFixed(2), drinking: dog.drinking, act: dog.act }, items: items.filter(i => !i.dead).length, jobs: GIVERS.map(g => g.id + ':' + g.state + ':' + jobOf(g).art) }; },
-  begin() { newGame(); }, autoplay(on) { autoPlay = !!on; }, setTimer(t) { timer = t; }, tp(x, y) { dog.x = x; dog.y = y; cam.x = clamp(x - W / 2, 0, WW - W); cam.y = clamp(y - H * .56, 0, WH - H); }, thirst(v) { dog.water = v; }, give(k, n) { bag[k] = (bag[k] || 0) + (n || 1); },
+  dbg() { return { state, score, sc: { ...sc }, jobsDone, bag: { ...bag }, tally: { ...tally }, dog: dog && { x: Math.round(dog.x), y: Math.round(dog.y), z: Math.round(dog.z), water: +dog.water.toFixed(2), drinking: dog.drinking, act: dog.act }, items: items.filter(i => !i.dead).length, jobs: GIVERS.map(g => g.id + ':' + g.state + ':' + jobOf(g).art) }; },
+  begin() { newGame(); }, autoplay(on) { autoPlay = !!on; }, goHome() { finish(); }, tp(x, y) { dog.x = x; dog.y = y; cam.x = clamp(x - W / 2, 0, WW - W); cam.y = clamp(y - H * .56, 0, WH - H); }, thirst(v) { dog.water = v; }, give(k, n) { bag[k] = (bag[k] || 0) + (n || 1); },
   sim(sec) { for (let i = 0; i < sec * 60; i++) { update(1 / 60); if (state !== 'play') break; } return { score, jobsDone, bag: { ...bag } }; },
   spots() { return { givers: GIVERS.map(g => ({ id: g.id, x: g.x, y: g.y })), appleTrees: trees.filter(t => t.v === 1).map(t => ({ x: Math.round(t.x), y: Math.round(t.y) })) }; },
   poster(cx, cy) { // card art (used to make art/card-park.jpg)
