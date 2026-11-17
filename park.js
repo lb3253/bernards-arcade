@@ -8,6 +8,10 @@
    them to that friend, and the thing gets put together. Every job built
    scores big, and the friend then thinks of the next job.
 
+   Bernard builds too: four sites of his own (doghouse, flower garden,
+   duck dock, toy box), three steps each. Stand on a site with the
+   pieces for its next step and he gets to work.
+
    Things for the bag: ballies, sticks, flowers, apples (bark at an apple
    tree), feathers (round the pond), shells (in the sand), acorns (under
    trees, and from squirrels). Also worth points: bones, butterflies and
@@ -138,7 +142,16 @@ const GIVERS = [
     { name: 'FLOWER RAFT', art: 'raft', need: { flower: 2, feather: 1 }, pts: 120, ask: 'Quack! A flower raft!', spot: { x: 1850, y: 630 } }] }
 ];
 for (const g of GIVERS) Object.assign(g, { idx: 0, state: 'want', t: 0, built: {}, cheer: 0, parts: [], say: { s: '', t: 0 } });
-const SPOTS = []; for (const g of GIVERS) { SPOTS.push(g); for (const j of g.jobs) if (j.spot) SPOTS.push(j.spot); }
+// Bernard's own building sites. Each is built in three steps: stand on the site with the pieces and he gets to work.
+const SITES = [
+  { id: 'house', name: 'DOGHOUSE', x: 1250, y: 1336, rad: [0, 30, 34, 34], sign: [84, 8], bw: 62, steps: ['the floor', 'the walls', 'the roof'], stages: [{ need: { stick: 4 }, pts: 80 }, { need: { stick: 5 }, pts: 120 }, { need: { stick: 3, flower: 2 }, pts: 200 }] },
+  { id: 'garden', name: 'FLOWER GARDEN', x: 1650, y: 940, rad: [0, 0, 0, 0], sign: [98, 6], bw: 76, flat: 36, steps: ['the flower bed', 'the first flowers', 'the shell border'], stages: [{ need: { flower: 3 }, pts: 80 }, { need: { flower: 4 }, pts: 120 }, { need: { flower: 3, shell: 3 }, pts: 200 }] },
+  { id: 'dock', name: 'DUCK DOCK', x: 1990, y: 718, rad: [0, 0, 0, 0], sign: [58, 10], bw: 40, flat: 130, steps: ['the posts', 'the planks', 'the diving board'], stages: [{ need: { stick: 4 }, pts: 80 }, { need: { stick: 5 }, pts: 120 }, { need: { stick: 3, feather: 2 }, pts: 200 }] },
+  { id: 'toybox', name: 'TOY BOX', x: 1130, y: 1186, rad: [0, 24, 26, 26], sign: [66, 8], bw: 50, steps: ['the box', 'the first ballies', 'a full toy box'], stages: [{ need: { stick: 3 }, pts: 80 }, { need: { ball: 4 }, pts: 120 }, { need: { ball: 5, acorn: 2 }, pts: 200 }] }
+];
+for (const q of SITES) Object.assign(q, { stage: 0, prog: 0, tok: 0 });
+const onDock = (x, y) => SITES[2].stage >= 2 && Math.abs(x - SITES[2].x) < 34 && y > SITES[2].y - 124 && y < SITES[2].y + 6;   // dry paws on the planks
+const SPOTS = []; for (const q of SITES) SPOTS.push(q); for (const g of GIVERS) { SPOTS.push(g); for (const j of g.jobs) if (j.spot) SPOTS.push(j.spot); }
 const inPond = (x, y, pad) => { const dx = (x - POND.x) / (POND.rx + (pad || 0)), dy = (y - POND.y) / (POND.ry + (pad || 0)); return dx * dx + dy * dy < 1; };
 const ringOff = (x, y) => Math.abs(Math.hypot((x - RING.x) / RING.rx, (y - RING.y) / RING.ry) - 1) * 560;   // rough distance from the loop path
 const onPath = (x, y, pad) => ringOff(x, y) < 30 + pad || (Math.abs(y - 810) < 30 + pad && x > 390 && x < 2490) || (Math.abs(x - 1440) < 30 + pad && y > 250);
@@ -163,6 +176,7 @@ const props = [], trees = [];
   props.push({ kind: 'basket', x: PICNIC.x + 30, y: PICNIC.y + 44, r: 14, hop: 20 });
   for (const g of GIVERS) if (g.id !== 'tita') props.push({ kind: g.id === 'duck' ? 'mama' : 'kid', g, x: g.x, y: g.y, r: 15, hop: 0 });
   props.push({ kind: 'tita', g: GIVERS[2], x: 1130, y: 772.5, r: 0, hop: 0 });
+  for (const q of SITES) { q.prop = { kind: 'site', q, x: q.x, y: q.y - (q.flat || 0), r: 0, hop: 0 }; props.push(q.prop, { kind: 'sign', q, x: q.x + q.sign[0], y: q.y + q.sign[1], r: 0, hop: 0 }); }
 })();
 const waters = props.filter(p => p.water);
 
@@ -255,6 +269,25 @@ function bakeArt() {
     for (const x of [28, 42, 56]) { ell(g, x, 24, 8, 7); fs(g, '#FFE066'); ell(g, x + 1, 16, 5.5, 5.5); fs(g, '#FFE066'); ell(g, x + 3, 15, 1.1, 1.2); fs(g, '#111'); g.beginPath(); g.moveTo(x + 6, 16); g.lineTo(x + 10, 17.5); g.lineTo(x + 6, 19); g.closePath(); fs(g, '#F2A020'); } });
   ART.raft = bake(84, 50, g => { ell(g, 42, 34, 38, 13); fs(g, '#2F8A3C'); ell(g, 40, 32, 34, 10); fs(g, '#4CAE50'); for (const [x, c] of [[22, '#FF7AB8'], [42, '#FFFFFF'], [60, '#FF7AB8']]) { for (let k = 0; k < 5; k++) { const a = k / 5 * TAU; ell(g, x + Math.cos(a) * 5, 28 + Math.sin(a) * 4, 4, 3.5); fs(g, c); } ell(g, x, 28, 3, 2.6); fs(g, '#FFD23F'); }
     g.beginPath(); g.moveTo(42, 22); g.quadraticCurveTo(46, 2, 62, 2); g.quadraticCurveTo(58, 16, 42, 22); g.closePath(); fs(g, '#F4F8FF'); });
+  // what Bernard builds himself, one picture for each step
+  const house = (g, st) => { rr(g, 12, 98, 106, 20, 5); fs(g, '#B8783C'); rr(g, 12, 96, 106, 10, 4); fs(g, '#E0A860'); g.strokeStyle = '#96602C'; g.lineWidth = 1.5; for (let x = 30; x < 112; x += 18) { g.beginPath(); g.moveTo(x, 97); g.lineTo(x, 105); g.stroke(); }
+    if (st >= 2) { g.fillStyle = '#E8D0A0'; g.fillRect(22, 48, 86, 52); g.fillStyle = '#D0B480'; g.fillRect(84, 48, 24, 52); g.beginPath(); g.moveTo(48, 100); g.lineTo(48, 74); g.quadraticCurveTo(65, 54, 82, 74); g.lineTo(82, 100); g.closePath(); fs(g, '#4A2E1C'); }
+    if (st >= 3) { g.beginPath(); g.moveTo(8, 52); g.lineTo(65, 6); g.lineTo(122, 52); g.closePath(); fs(g, '#E8402F'); g.beginPath(); g.moveTo(65, 6); g.lineTo(122, 52); g.lineTo(100, 52); g.closePath(); fs(g, '#B82E22'); rr(g, 48, 38, 34, 12, 4); fs(g, '#FFF4E4'); for (const x of [52, 78]) { ell(g, x, 41, 3, 3); fs(g, '#FFF4E4'); ell(g, x, 47, 3, 3); fs(g, '#FFF4E4'); }
+      for (const [x, c] of [[18, '#FF7AB8'], [112, '#FFD23F']]) { g.strokeStyle = '#3C8A34'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(x, 112); g.lineTo(x, 98); g.stroke(); ell(g, x, 95, 6, 6); fs(g, c); ell(g, x, 95, 2.4, 2.4); fs(g, '#FFFFFF'); } } };
+  const garden = (g, st) => { ell(g, 84, 46, 76, 30); fs(g, '#6A4424'); ell(g, 84, 43, 72, 27); fs(g, '#8A5A34'); g.strokeStyle = '#6A4424'; g.lineWidth = 2; for (const y of [32, 44, 56]) { g.beginPath(); g.moveTo(28, y); g.lineTo(140, y); g.stroke(); }
+    const pts = [[40, 40], [64, 30], [88, 46], [112, 32], [128, 46], [58, 54], [100, 58], [78, 36], [46, 50], [120, 54], [92, 28], [70, 48]], n = st === 1 ? 6 : st === 2 ? 9 : 12;
+    for (let i = 0; i < n; i++) { const [x, y] = pts[i]; g.strokeStyle = '#3C8A34'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - (st === 1 ? 7 : 13)); g.stroke(); if (st === 1) { ell(g, x + 3, y - 7, 3.5, 2); fs(g, '#5CB452'); } else { const c = ['#FF7AB8', '#FFFFFF', '#FFD23F', '#C9A0FF'][i % 4]; for (let k = 0; k < 5; k++) { const a = k / 5 * TAU; ell(g, x + Math.cos(a) * 4.5, y - 15 + Math.sin(a) * 4.5, 3.6, 3.6); fs(g, c); } ell(g, x, y - 15, 2.6, 2.6); fs(g, '#F2A020'); } }
+    if (st >= 3) for (let i = 0; i < 16; i++) { const a = i / 16 * TAU; ell(g, 84 + Math.cos(a) * 76, 46 + Math.sin(a) * 30, 5, 4); fs(g, i % 2 ? '#FFC8A8' : '#FFE0CC'); } };
+  const dock = (g, st) => { g.fillStyle = '#6A4424'; for (const x of [10, 62]) for (const y of [34, 80, 126]) g.fillRect(x, y, 9, 24);
+    if (st >= 2) { g.fillStyle = '#C88848'; g.fillRect(8, 26, 65, 122); g.fillStyle = '#E0A860'; g.fillRect(8, 26, 65, 5); g.strokeStyle = '#96602C'; g.lineWidth = 1.6; for (let y = 40; y < 146; y += 13) { g.beginPath(); g.moveTo(8, y); g.lineTo(73, y); g.stroke(); } }
+    if (st >= 3) { g.fillStyle = '#F4E9D8'; g.fillRect(28, 2, 25, 30); g.fillStyle = '#3AB8FF'; g.fillRect(28, 2, 25, 5); g.strokeStyle = '#7A4E28'; g.lineWidth = 3; g.beginPath(); g.moveTo(70, 60); g.lineTo(70, 30); g.stroke(); g.beginPath(); g.moveTo(71, 30); g.lineTo(80, 35); g.lineTo(71, 40); g.closePath(); fs(g, '#FFD23F'); } };
+  const toybox = (g, st) => { if (st >= 2) { rr(g, 12, 10, 78, 40, 6); fs(g, '#2A6AA8'); }
+    const ball = (x, y) => { ell(g, x, y, 10, 10); fs(g, '#C8E83A'); ell(g, x - 3, y - 3, 4, 3.5); fs(g, '#E6F880'); };
+    if (st >= 2) for (const [x, y] of st >= 3 ? [[28, 44], [50, 40], [72, 44], [38, 32], [62, 32], [50, 24]] : [[30, 46], [52, 44], [72, 46]]) ball(x, y);
+    if (st >= 3) { rr(g, 66, 16, 24, 8, 4); fs(g, '#F4E9D8'); for (const [x, y] of [[66, 15], [66, 25], [90, 15], [90, 25]]) { ell(g, x, y, 4, 4); fs(g, '#F4E9D8'); } }
+    rr(g, 10, 46, 82, 36, 6); fs(g, '#3A8ACF'); rr(g, 10, 46, 82, 9, 4); fs(g, '#63B0E8'); g.beginPath(); for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, q = k % 2 ? 5 : 11; g.lineTo(51 + Math.cos(a) * q, 67 + Math.sin(a) * q); } g.closePath(); fs(g, '#FFD23F'); };
+  for (let st = 1; st <= 3; st++) { ART['house' + st] = bake(130, 122, g => house(g, st)); ART['garden' + st] = bake(170, 82, g => garden(g, st)); ART['dock' + st] = bake(84, 152, g => dock(g, st)); ART['toybox' + st] = bake(102, 86, g => toybox(g, st)); }
+  ART.sign = bake(34, 44, g => { g.fillStyle = '#7A5230'; g.fillRect(14, 20, 6, 22); rr(g, 2, 2, 30, 22, 4); fs(g, '#E0A860'); ell(g, 17, 15, 5, 4); fs(g, '#7A4E28'); for (const [x, y] of [[10, 9], [15, 6.5], [20, 6.5], [25, 9]]) { ell(g, x, y, 2.3, 2.3); fs(g, '#7A4E28'); } });
   ART.crown = bake(38, 18, g => { for (const [x, y, c] of [[6, 12, '#FF7AB8'], [13, 8, '#FFFFFF'], [19, 6, '#FF7AB8'], [25, 8, '#FFFFFF'], [32, 12, '#FF7AB8']]) { ell(g, x, y, 5, 5); fs(g, c); ell(g, x, y, 2, 2); fs(g, '#FFD23F'); } });
   ART.mama = bake(60, 50, g => { ell(g, 26, 32, 22, 13); fs(g, '#F4F0E6'); ell(g, 18, 30, 11, 7); fs(g, '#D8D2C2'); ell(g, 44, 16, 10.5, 9.5); fs(g, '#F4F0E6'); g.beginPath(); g.moveTo(52, 16); g.lineTo(59, 19); g.lineTo(52, 22); g.closePath(); fs(g, '#F2A020'); ell(g, 47, 14, 1.8, 2); fs(g, '#111');
     g.fillStyle = '#F2A020'; g.fillRect(20, 44, 5, 5); g.fillRect(30, 44, 5, 5); g.beginPath(); g.moveTo(38, 6); g.lineTo(30, 1); g.lineTo(31, 11); g.closePath(); fs(g, '#FF7AB8'); g.beginPath(); g.moveTo(38, 6); g.lineTo(46, 1); g.lineTo(45, 10); g.closePath(); fs(g, '#FF7AB8'); });
@@ -274,6 +307,7 @@ const sfx = {
   slurp: () => tone(500 + Math.random() * 200, .06, 'sine', .05, 900), splash: () => noise(.2, .1, 2400, 900),
   squirrel: () => { for (let i = 0; i < 4; i++) setTimeout(() => tone(1800 + Math.random() * 600, .04, 'square', .025), i * 70); },
   quack: () => { tone(420, .08, 'sawtooth', .04, 330); setTimeout(() => tone(400, .1, 'sawtooth', .04, 300), 110); },
+  tok: () => { tone(220 + Math.random() * 60, .05, 'square', .05); noise(.05, .12, 900, 400); },
   whistle: () => tone(1700, .3, 'sine', .05, 1500), rustle: () => noise(.3, .12, 3000, 1200),
   build: () => { for (let i = 0; i < 8; i++) setTimeout(() => tone(330 + i * 70, .08, 'triangle', .05), i * 150); }, menu: () => tone(660, .06, 'square', .04),
   tick: () => tone(880, .06, 'square', .035), go: () => tone(990, .3, 'square', .06),
@@ -340,9 +374,9 @@ function bindTouch() {
 let state = 'title', time = 0, stateT = 0, pauseIdx = 0, score = 0, best = 0, newBest = false, autoPlay = false;
 let dog = null, cam = { x: 0, y: 0 }, items = [], squirrels = [], flies = [], ducks = [], toss = null, tossCool = 4, boneT = 12;
 let particles = [], floats = [], banner = null, hintT = 0, tip = '', tipT = 0, jobsDone = 0;
-let bag = {}, tally = {}, sc = { jobs: 0, picks: 0, tricks: 0 };
+let bag = {}, tally = {}, sc = { jobs: 0, picks: 0, tricks: 0 }, allBuilt = false;
 const KINDS = ['ball', 'stick', 'flower', 'apple', 'feather', 'shell', 'acorn'];   // what goes in his bag
-const STOCK = { ball: 14, stick: 12, flower: 10, feather: 5, shell: 5, acorn: 6 };  // how many lie around the park
+const STOCK = { ball: 14, stick: 17, flower: 13, feather: 6, shell: 6, acorn: 6 };  // how many lie around the park
 const TIPS = { apple: 'Bark next to an apple tree to shake the apples down', feather: 'Feathers lie around the pond', shell: 'Shells hide in the playground sand', acorn: 'Acorns lie under the trees, and squirrels drop them', flower: 'Big flowers grow in the grass' };
 try { best = +localStorage.getItem('park_best') || 0; } catch (e) { }
 
@@ -362,13 +396,15 @@ function newSquirrel(S) { const t = pick(trees), a = rnd(.3, 2.8); S = S || {}; 
 function newFly(F) { const s = spotFor('ball', 200); F = F || {}; F.x = F.hx = s.x; F.y = F.hy = s.y; F.ph = rnd(0, TAU); F.col = pick(['#FFD23F', '#FF8AC0', '#9EE8FF', '#FFFFFF', '#C9A0FF']); F.hide = 0; return F; }
 const jobOf = g => g.jobs[g.idx % g.jobs.length];
 const spotOf = (g, j) => j.wear ? g : j.spot;
-function has(g) { const j = jobOf(g); for (const k in j.need) if ((bag[k] || 0) < j.need[k]) return false; return true; }
+function hasFor(need) { for (const k in need) if ((bag[k] || 0) < need[k]) return false; return true; }
+const has = g => hasFor(jobOf(g).need);
 function newOrder(g, quiet) { g.state = 'want'; g.t = 0; const j = jobOf(g); g.say = { s: j.ask, t: quiet ? 0 : 3 }; const k = Object.keys(j.need).find(k => TIPS[k]); if (k && !quiet) { tip = TIPS[k]; tipT = 7; } }
 function newGame() {
-  dog = { x: START.x, y: START.y, z: 0, vx: 0, vy: 0, vz: 0, face: -1, fx: -1, sq: 0, anim: 0, water: 1, sprinting: false, drinking: false, barkT: 0, barkCool: 0, hopped: {}, pant: 0, gulp: 0, dipT: 0, idleT: 0, act: '', actT: 0, wetT: 0, wasWet: false, lean: 0, happy: 0 };
+  dog = { x: START.x, y: START.y, z: 0, vx: 0, vy: 0, vz: 0, face: -1, fx: -1, sq: 0, anim: 0, water: 1, sprinting: false, drinking: false, barkT: 0, barkCool: 0, hopped: {}, pant: 0, gulp: 0, dipT: 0, idleT: 0, act: '', actT: 0, wetT: 0, wasWet: false, lean: 0, happy: 0, work: null };
   score = 0; jobsDone = 0; sc = { jobs: 0, picks: 0, tricks: 0 }; newBest = false; items = []; particles = []; floats = []; banner = null; toss = null; tossCool = 3; boneT = 14; hintT = 10; tip = ''; tipT = 0;
   bag = {}; tally = {}; for (const k of KINDS) bag[k] = 0;
   for (const w of waters) w.fresh = 0; for (const t of trees) { t.ready = 0; t.shakeT = 0; }
+  allBuilt = false; for (const q of SITES) { q.stage = 0; q.prog = 0; q.prop.r = 0; }
   for (const g of GIVERS) { g.idx = 0; g.built = {}; g.cheer = 0; g.parts = []; newOrder(g, true); }
   for (const k in STOCK) for (let i = 0; i < STOCK[k]; i++) addItem(k, 120);
   squirrels = []; for (let i = 0; i < 5; i++) squirrels.push(newSquirrel());
@@ -391,7 +427,7 @@ function shakeTree(t) { // apples come down when Bernard barks at an apple tree 
 function autoInput() { // test hook: Bernard does the jobs by himself
   let t = null; IN.run = false;
   if (dog.water < .3) { let w = { x: POND.x - POND.rx, y: POND.y }; for (const q of waters) if (dist(dog, q) < dist(dog, w)) w = q; t = w; if (nearWater()) { IN.x = IN.y = 0; return; } }
-  else { const g = GIVERS.find(g => g.state === 'want' && has(g)); if (g) t = g; else { const want = {}; for (const g of GIVERS) if (g.state === 'want') { const j = jobOf(g); for (const k in j.need) if ((bag[k] || 0) < j.need[k]) want[k] = 1; }
+  else { const g = GIVERS.find(g => g.state === 'want' && has(g)), q = SITES.find(q => q.stage < 3 && hasFor(q.stages[q.stage].need)); if (g) t = g; else if (q) { t = { x: q.x - q.rad[q.stage] - 40, y: q.y }; if (dist(dog, t) < 30) { IN.x = IN.y = 0; return; } } else { const want = {}; for (const q of SITES) if (q.stage < 3) for (const k in q.stages[q.stage].need) if ((bag[k] || 0) < q.stages[q.stage].need[k]) want[k] = 1; for (const g of GIVERS) if (g.state === 'want') { const j = jobOf(g); for (const k in j.need) if ((bag[k] || 0) < j.need[k]) want[k] = 1; }
     let bd = 1e9; for (const i of items) { if (i.dead || !want[i.kind]) continue; const d = dist(dog, i); if (d < bd) { bd = d; t = i; } }
     if (want.apple && !items.some(i => i.kind === 'apple' && !i.dead)) { const tr = trees.filter(t => t.v === 1 && !(t.ready > time)).sort((a, b) => dist(dog, a) - dist(dog, b))[0]; if (tr) { t = { x: tr.x, y: tr.y + 56 }; if (dist(dog, t) < 80) IN.hit.bark = true; } }
     if (!t) for (const i of items) { if (i.dead) continue; const d = dist(dog, i); if (d < bd) { bd = d; t = i; } } } }
@@ -399,7 +435,7 @@ function autoInput() { // test hook: Bernard does the jobs by himself
 }
 function updateDog(dt) {
   const D = dog; if (D.barkCool > 0) D.barkCool -= dt; if (D.barkT > 0) D.barkT -= dt; if (D.dipT > 0) D.dipT -= dt; if (D.happy > 0) D.happy -= dt;
-  const want = Math.hypot(IN.x, IN.y), wading = inPond(D.x, D.y, -6) && D.z < 4;
+  const want = Math.hypot(IN.x, IN.y), wading = inPond(D.x, D.y, -6) && D.z < 4 && !onDock(D.x, D.y);
   D.sprinting = IN.run && want > .2 && D.water > .02 && !wading;
   const sp = (D.sprinting ? TUNE.sprint : TUNE.walk) * (wading ? TUNE.wade : 1) * (D.water <= .02 ? .8 : 1);
   const tx = IN.x * sp, ty = IN.y * sp, a = TUNE.accel * dt * (D.z > 0 ? .35 : 1), v0 = Math.hypot(D.vx, D.vy);
@@ -430,7 +466,7 @@ function updateDog(dt) {
     if (!(w.fresh > time)) { w.fresh = time + 18; gain('water', D.x, D.y, 'FRESH WATER!'); } }
   if (D.water < .25 && !D.drinking) { D.pant -= dt; if (D.pant <= 0) { D.pant = 5; say(D.x, D.y - 40, D.water <= .02 ? 'so thirsty… find water!' : 'thirsty!', '#9EE8FF', 16); } }
   // standing about: he sniffs the grass, then wags
-  if (v <= 30 && D.z <= 0 && !D.drinking) { D.idleT += dt; if (D.act) { D.actT -= dt; if (D.actT <= 0) { D.act = ''; D.idleT = rnd(0, 1); } } else if (D.idleT > 2.4) { D.act = Math.random() < .6 ? 'sniff' : 'wag'; D.actT = D.act === 'sniff' ? 1.4 : 1.2; } }
+  if (v <= 30 && D.z <= 0 && !D.drinking && !D.work) { D.idleT += dt; if (D.act) { D.actT -= dt; if (D.actT <= 0) { D.act = ''; D.idleT = rnd(0, 1); } } else if (D.idleT > 2.4) { D.act = Math.random() < .6 ? 'sniff' : 'wag'; D.actT = D.act === 'sniff' ? 1.4 : 1.2; } }
 }
 function updateSquirrel(S, dt) {
   const d = dist(S, dog), sees = d < (dog.sprinting ? TUNE.squirrelSee + 60 : TUNE.squirrelSee);
@@ -452,6 +488,17 @@ function updateGivers(dt) {
       g.cheer = 2.6; g.state = 'rest'; g.t = 0; g.idx++; } }
     else if (g.state === 'rest') { g.t += dt; if (g.t >= 3) newOrder(g); } }
 }
+function updateSites(dt) { // Bernard builds: stand on a site with the pieces for its next step and he gets to work
+  const D = dog; D.work = null;
+  for (const q of SITES) { if (q.stage >= 3) continue; const st = q.stages[q.stage], near = Math.hypot(D.x - q.x, (D.y - q.y + Math.min(20, (q.flat || 0) * .5)) * 1.2) < q.rad[q.stage] + 84;
+    if (near && hasFor(st.need) && Math.hypot(D.vx, D.vy) < 70 && D.z <= 0) { D.work = q; D.idleT = 0; D.act = ''; if (Math.abs(q.x - D.x) > 24) D.face = q.x > D.x ? 1 : -1; q.prog += dt / 2.4; q.tok -= dt;
+      if (q.tok <= 0) { q.tok = .2; sfx.tok(); fx(lerp(D.x, q.x, .7), lerp(D.y, q.y, .7), 3, ['#E8D0A0', '#FFFFFF', '#C88848'], { up: 60, s1: 80 }); }
+      if (q.prog >= 1) { for (const k in st.need) bag[k] -= st.need[k]; q.prog = 0; q.stage++; q.prop.r = q.rad[q.stage]; score += st.pts; sc.jobs += st.pts; jobsDone++; D.happy = 3;
+        say(q.x, q.y - 110, '+' + st.pts, '#FFD23F', 26); setBanner(q.name + ': ' + q.steps[q.stage - 1] + '!', (q.stage >= 3 ? 'all finished  ·  ' : 'Bernard built it  ·  ') + '+' + st.pts + ' points', '#9EE8FF', 2.4); sfx.fanfare(); fx(q.x, q.y - (q.flat || 0) * .5, 24, ['#FFD23F', '#FFFFFF', '#9EE8FF'], { z: 20, up: 110, s1: 170, life: 1.2 });
+        if (q.rad[q.stage]) { const dx = D.x - q.x, dy = D.y - q.y, d = Math.hypot(dx, dy * 1.5) || 1, R = q.rad[q.stage] + 20; if (d < R) { D.x += dx / d * (R - d); D.y += (dy || 1) / d * (R - d); } }
+        if (!allBuilt && SITES.every(o => o.stage >= 3)) { allBuilt = true; score += 500; sc.jobs += 500; setBanner('PARK BUILDER!', 'Bernard built everything  ·  +500 points', '#FFD23F', 3.2); } } }
+    else if (q.prog > 0) q.prog = Math.max(0, q.prog - dt * .6); }
+}
 function updateWorld(dt) {
   // pick-ups on the ground go in his bag
   for (const it of items) { if (it.dead || dog.z > 30 || time - it.born < (it.fall ? .5 : 0)) continue; if (Math.hypot(it.x - dog.x - dog.face * 30, (it.y - dog.y) * 1.3) < 34 || dist(it, dog) < 26) { it.dead = true; dog.dipT = .26;
@@ -463,7 +510,7 @@ function updateWorld(dt) {
   boneT -= dt; if (boneT <= 0) { boneT = rnd(16, 24); if (!items.some(i => i.kind === 'bone' && !i.dead)) addItem('bone', 500); }
   for (const t of trees) if (t.shakeT > 0) t.shakeT -= dt;
   for (const S of squirrels) updateSquirrel(S, dt);
-  updateGivers(dt);
+  updateGivers(dt); updateSites(dt);
   // butterflies: only a jump reaches them
   for (const F of flies) { if (F.hide > 0) { F.hide -= dt; if (F.hide <= 0) newFly(F); continue; } F.ph += dt; F.x = F.hx + Math.sin(F.ph * .7) * 70 + Math.sin(F.ph * 1.9) * 20; F.y = F.hy + Math.sin(F.ph * 1.1) * 34; F.z = 50 + Math.sin(F.ph * 2.3) * 9;
     if (dog.z > 16 && Math.hypot(F.x - dog.x - dog.face * 24, F.y - dog.y) < 46) { F.hide = rnd(5, 9); gain('fly', F.x, F.y, 'SNAP!'); sfx.pick(); fx(F.x, F.y, 8, [F.col, '#FFFFFF'], { z: F.z, up: 30 }); } }
@@ -507,11 +554,12 @@ function update(dt) {
 
 /* ---------------- drawing ---------------- */
 function drawDog() {
-  const D = dog, v = Math.hypot(D.vx, D.vy), moving = v > 30, running = v > 250, air = D.z > 0, wading = inPond(D.x, D.y, -6) && !air, glad = D.act === 'wag' || D.happy > 0;
+  const D = dog, v = Math.hypot(D.vx, D.vy), moving = v > 30, running = v > 250, air = D.z > 0, wading = inPond(D.x, D.y, -6) && !air && !onDock(D.x, D.y), glad = D.act === 'wag' || D.happy > 0;
   const cyc = D.anim * TAU, bob = air ? 0 : !moving ? (glad ? Math.abs(Math.sin(time * 10)) * 2.5 : .6 + Math.sin(time * 2.2) * .6) : running ? 3 + Math.sin(cyc * 2) * 3.5 : Math.abs(Math.sin(cyc * 2)) * 2.6;
   let frame, rot = -D.lean;
   if (air) { frame = D.vz > 110 ? 22 : D.vz < -110 ? 24 : 23; rot = clamp(D.vz / 1400, -.2, .2); }
   else if (D.barkT > 0) frame = 25;
+  else if (D.work && !moving) frame = 20 + Math.floor(time * 9) % 2;
   else if (D.drinking) frame = 20 + Math.floor(time * 5) % 2;
   else if (D.dipT > 0 && !running) frame = 21;
   else if (moving) { frame = running ? bernRun(D.anim) : bernWalk(D.anim); if (running) rot += Math.sin(cyc) * .05; }
@@ -526,7 +574,8 @@ function drawDog() {
   if (!bern(frame, x, y + (wading ? 6 : 0), BU, flip, rot, null, kx, ky)) { ell(ctx, x, y - 40, 50, 26); fs(ctx, '#3A2A1E'); }
   ctx.restore();
   if (D.barkT > 0) for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(D.x + D.face * 58, D.y - 78 - D.z, 20 + i * 16 + (1 - D.barkT / .36) * 30, D.face > 0 ? -.7 : Math.PI - .7, D.face > 0 ? .7 : Math.PI + .7); ctx.strokeStyle = 'rgba(255,255,255,' + D.barkT * 2 + ')'; ctx.lineWidth = 4; ctx.stroke(); }
-  if (D.drinking) text(ctx, 'slurp slurp', D.x, D.y - 116, 14, '#9EE8FF', INK, 'center', 3);
+  if (D.work) text(ctx, 'building…', D.x, D.y - 112, 14, '#FFE680', INK, 'center', 3);
+  else if (D.drinking) text(ctx, 'slurp slurp', D.x, D.y - 116, 14, '#9EE8FF', INK, 'center', 3);
   else if (D.act === 'sniff') text(ctx, 'sniff sniff', D.x, D.y - 112, 13, '#FFFFFF', INK, 'center', 3);
 }
 function icon(kind, x, y, k) { if (!k) return put(ICON[kind], x, y, .5, .5); ctx.save(); ctx.translate(x, y); ctx.scale(k, k); put(ICON[kind], 0, 0, .5, .5); ctx.restore(); }
@@ -558,6 +607,10 @@ function drawProp(p) {
   else if (p.kind === 'basket') put(ART.basket, p.x, p.y + 10);
   else if (p.kind === 'fountain') { put(ART.fountain, p.x, p.y + 44);
     for (let i = 0; i < 7; i++) { const u = ((time * .9 + i / 7) % 1), a = i * 2.4, r = u * 30; ell(ctx, p.x + Math.cos(a) * r, p.y - 78 + u * u * 46 - u * 18, 2.5, 2.5); fs(ctx, 'rgba(230,248,255,.95)'); } }
+  else if (p.kind === 'site') { const q = p.q; if (q.stage) put(ART[q.id + q.stage], q.x, q.y + 10);
+    if (q.stage < 3) { ctx.save(); ctx.setLineDash([9, 7]); ell(ctx, q.x, q.y - (q.flat || 0) * .5 - 4, q.bw + 10, q.flat ? Math.max(26, q.flat * .56) : 26); fs(ctx, 'rgba(255,255,255,.10)', 'rgba(255,255,255,.9)', 2.5); ctx.restore(); }
+    if (q.prog > 0) { const y = q.y - (q.stage ? 120 : 54); rr(ctx, q.x - 36, y, 72, 10, 5); fs(ctx, 'rgba(10,14,26,.7)', '#FFFFFF', 2); rr(ctx, q.x - 34, y + 2, Math.max(6, 68 * q.prog), 6, 3); fs(ctx, '#FFD23F'); } }
+  else if (p.kind === 'sign') { if (p.q.stage < 3) put(ART.sign, p.x, p.y + 4); else { ctx.beginPath(); for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5 + time, r = k % 2 ? 5 : 11; ctx.lineTo(p.x + Math.cos(a) * r, p.y - 16 + Math.sin(a) * r); } ctx.closePath(); fs(ctx, '#FFD23F', INK, 2); } }
   else if (p.kind === 'kid') { const g = p.g, cheer = g.cheer > 0 || g.state === 'build', hop = cheer ? Math.abs(Math.sin(time * 9)) * 12 : 0; shadow(p.x, p.y, 20, .28);
     const face = dog && Math.abs(dog.x - p.x) > 40 ? (dog.x > p.x ? 1 : -1) : g.face; sprite(cheer ? (g.id === 'nic' ? 'nicHop' : 'giuliaHop') : g.id, p.x, p.y - hop, 122, face < 0);
     if (g.built.crown) put(ART.crown, p.x + face * 3, p.y - 111 - hop); }
@@ -598,6 +651,8 @@ function drawWorld() {
     g.parts.forEach((k, i) => { const a = time * 7 + i / n * TAU, r = 58 * (1 - u); icon(k, s.x + Math.cos(a) * r, s.y - 34 + Math.sin(a) * r * .55 - Math.sin(u * Math.PI) * 26); }); if (Math.random() < .5) fx(s.x + rnd(-30, 30), s.y, 1, ['#FFD23F', '#FFFFFF'], { z: rnd(10, 50), up: 50, s1: 40 }); }
   for (const p of particles) { ctx.globalAlpha = clamp(p.life * 2.5, 0, 1); ell(ctx, p.x, p.y - p.z, p.r, p.r); fs(ctx, p.col); } ctx.globalAlpha = 1;
   if (dog) for (const g of GIVERS) if (vis(g)) bubble(g);
+  if (dog) for (const q of SITES) if (q.stage < 3 && vis(q)) { const st = q.stages[q.stage], ok = hasFor(st.need), x = q.x + q.sign[0], y = q.y + q.sign[1] - 62, w = Object.keys(st.need).length * 54 + 12, b = ok ? Math.abs(Math.sin(time * 6)) * 5 : 0;
+    rr(ctx, x - w / 2, y - 15 - b, w, 30, 10); fs(ctx, ok ? '#E4FFD8' : '#E8F4FF', ok ? '#2E9A3A' : '#2A6AA8', ok ? 3.5 : 2.5); chips(st, x - w / 2 + 6, y - b, INK); text(ctx, q.name, x, y - 26 - b, 11, '#FFFFFF', INK, 'center', 3); }
   for (const f of floats) { ctx.globalAlpha = clamp(f.life / f.max * 2, 0, 1); text(ctx, f.text, f.x, f.y, f.size, f.col, INK, 'center', 4); } ctx.globalAlpha = 1;
   ctx.restore();
 }
@@ -623,15 +678,21 @@ function drawHUD() {
   text(ctx, dry ? 'WATER  ·  thirsty!' : dog.sprinting ? 'WATER  ·  sprinting' : 'WATER', W - 236, 26, 12, dry ? '#9EE8FF' : '#B4C2E2', null, 'left');
   rr(ctx, W - 236, 40, 210, 16, 8); fs(ctx, 'rgba(255,255,255,.14)'); if (dog.water > .01) { rr(ctx, W - 236, 40, Math.max(14, 210 * dog.water), 16, 8); fs(ctx, dry ? '#FF9A6A' : '#4FB8F0'); }
   // jobs: who wants what
-  const jx = W - 250, jy = 80; panel(jx, jy, 238, 26 + GIVERS.length * 40); text(ctx, 'JOBS', jx + 14, jy + 14, 12, '#B4C2E2', null, 'left'); text(ctx, jobsDone + ' done', jx + 224, jy + 14, 12, '#FFE680', null, 'right');
+  const jx = W - 250, jy = 80; panel(jx, jy, 238, 26 + GIVERS.length * 40 + 60); text(ctx, 'JOBS', jx + 14, jy + 14, 12, '#B4C2E2', null, 'left'); text(ctx, jobsDone + ' done', jx + 224, jy + 14, 12, '#FFE680', null, 'right');
   GIVERS.forEach((g, i) => { const y = jy + 26 + i * 40, j = jobOf(g), ok = g.state === 'want' && has(g);
     if (ok) { rr(ctx, jx + 4, y, 230, 38, 9); fs(ctx, 'rgba(198,255,61,' + (.16 + Math.abs(Math.sin(time * 5)) * .14) + ')'); }
     face(g, jx + 22, y + 19, 14);
     if (g.state === 'want') { text(ctx, ok ? j.name + ': take it to ' + g.name + '!' : j.name, jx + 44, y + 10, 11, ok ? '#C6FF3D' : '#FFE680', null, 'left'); chips(j, jx + 42, y + 26, '#FFFFFF'); }
     else text(ctx, g.state === 'build' ? 'building…' : 'thinking of a new job…', jx + 44, y + 19, 12, '#B4C2E2', null, 'left'); });
+  { const y = jy + 26 + GIVERS.length * 40; text(ctx, 'BERNARD BUILDS', jx + 14, y + 10, 12, '#9EE8FF', null, 'left'); text(ctx, SITES.reduce((a, q) => a + q.stage, 0) + ' / 12', jx + 224, y + 10, 12, '#FFE680', null, 'right');
+    const q = SITES.filter(q => q.stage < 3).sort((a, b) => dist(dog, a) - dist(dog, b))[0];
+    if (!q) text(ctx, 'everything is built!', jx + 44, y + 38, 12, '#C6FF3D', null, 'left');
+    else { const st = q.stages[q.stage], ok = hasFor(st.need); if (ok) { rr(ctx, jx + 4, y + 20, 230, 38, 9); fs(ctx, 'rgba(158,232,255,' + (.16 + Math.abs(Math.sin(time * 5)) * .14) + ')'); }
+      ell(ctx, jx + 22, y + 39, 14, 14); fs(ctx, '#2A6AA8', INK, 2); if (ART.sign) { ctx.save(); ctx.translate(jx + 22, y + 39); ctx.scale(.6, .6); put(ART.sign, 0, 0, .5, .5); ctx.restore(); }
+      text(ctx, ok ? q.name + ': stand on the site!' : q.name + ': ' + q.steps[q.stage], jx + 44, y + 30, 11, ok ? '#C6FF3D' : '#9EE8FF', null, 'left'); chips(st, jx + 42, y + 46, '#FFFFFF'); } }
   // arrows: water when thirsty, friends whose job is ready
   if (dry && !dog.drinking) { let t = { x: clamp(dog.x, POND.x - POND.rx, POND.x + POND.rx), y: POND.y }, bd = dist(dog, t); for (const w of waters) if (dist(dog, w) < bd) { bd = dist(dog, w); t = w; } pointer(t, '#63BCE8', 'water'); }
-  else for (const g of GIVERS) if (g.state === 'want' && has(g)) { pointer(g, '#C6FF3D', g.name); break; }
+  else { const g = GIVERS.find(g => g.state === 'want' && has(g)), q = SITES.find(q => q.stage < 3 && hasFor(q.stages[q.stage].need)); if (g) pointer(g, '#C6FF3D', g.name); else if (q && dog.work !== q) pointer(q, '#9EE8FF', 'build: ' + q.name.toLowerCase()); }
   // map
   const mw = 150, mh = 84, mx = 12, my = H - mh - 12, kx = mw / WW, ky = mh / WH; rr(ctx, mx, my, mw, mh, 8); fs(ctx, 'rgba(40,110,50,.85)', 'rgba(255,255,255,.5)', 2);
   ctx.save(); rr(ctx, mx, my, mw, mh, 8); ctx.clip(); ctx.strokeStyle = '#E2C98C'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(mx + RING.x * kx, my + RING.y * ky, RING.rx * kx, RING.ry * ky, 0, 0, TAU); ctx.moveTo(mx + 390 * kx, my + 810 * ky); ctx.lineTo(mx + 2490 * kx, my + 810 * ky); ctx.moveTo(mx + 1440 * kx, my + 250 * ky); ctx.lineTo(mx + 1440 * kx, my + mh); ctx.stroke();
@@ -639,6 +700,7 @@ function drawHUD() {
   for (const t of trees) if (t.v === 1) { ell(ctx, mx + t.x * kx, my + t.y * ky, 2.5, 2.5); fs(ctx, t.ready > time ? '#3F8E3A' : '#E8402F'); }
   const DOT = { ball: '#E8FF50', stick: '#7A4E28', flower: '#FF7AB8', apple: '#E8402F', feather: '#FFFFFF', shell: '#FFC8A8', acorn: '#C88A48', bone: '#FFFFFF' };
   for (const it of items) if (!it.dead) { ctx.fillStyle = DOT[it.kind]; ctx.fillRect(mx + it.x * kx - 1.5, my + it.y * ky - 1.5, 3, 3); }
+  for (const q of SITES) { const ok = q.stage < 3 && hasFor(q.stages[q.stage].need); ctx.fillStyle = q.stage >= 3 ? '#FFFFFF' : ok ? '#C6FF3D' : '#63BCE8'; ctx.strokeStyle = INK; ctx.lineWidth = 1.5; ctx.fillRect(mx + q.x * kx - 4, my + q.y * ky - 4, 8, 8); ctx.strokeRect(mx + q.x * kx - 4, my + q.y * ky - 4, 8, 8); }
   for (const g of GIVERS) { const ok = g.state === 'want' && has(g), r = ok ? 5 + Math.abs(Math.sin(time * 6)) * 2 : 4; ell(ctx, mx + g.x * kx, my + g.y * ky, r, r); fs(ctx, ok ? '#C6FF3D' : '#FFD23F', INK, 1.5); }
   ell(ctx, mx + dog.x * kx, my + dog.y * ky, 4.5, 4.5); fs(ctx, '#FFFFFF', INK, 2); ctx.restore();
   // his bag
@@ -655,7 +717,7 @@ function drawTitle() {
   text(ctx, 'BERNARD', W / 2, 92, 46, '#FFFFFF', INK, 'center', 9); text(ctx, 'IN THE PARK', W / 2, 162, 78, '#C6FF3D', INK, 'center', 13);
   const bx = W / 2 + Math.sin(time * 1.1) * 250; shadow(bx, 322, 52, .35); bern(bernRun(time * 2.6), bx, 322 - 3 - Math.sin(time * 2.6 * TAU * 2) * 3, BU * 1.2, Math.cos(time * 1.1) > 0, Math.sin(time * 2.6 * TAU) * .04);
   panel(W / 2 - 340, 346, 680, 104);
-  text(ctx, 'Your friends in the park need things built. Fetch what they ask for!', W / 2, 370, 18, '#FFFFFF');
+  text(ctx, 'Build your doghouse, a garden, a dock and a toy box, and help your friends!', W / 2, 370, 17, '#FFFFFF');
   text(ctx, 'Collect ballies, sticks, flowers, apples, feathers, shells and acorns', W / 2, 399, 15, '#FFE680');
   text(ctx, touch.on ? 'Drag on the left to run  ·  JUMP and RUN buttons on the right' : 'B jump  ·  hold Y to sprint  ·  A bark  ·  stand by water to drink', W / 2, 427, 15, '#9EE8FF');
   if (Math.sin(time * 5) > -.3) text(ctx, touch.on ? 'TAP TO PLAY' : 'PRESS B TO PLAY', W / 2, 482, 30, '#C6FF3D', INK, 'center', 6);
@@ -671,10 +733,10 @@ function drawEnd() {
   rr(ctx, 190, 44, 580, 452, 22); fs(ctx, 'rgba(12,16,32,.94)', '#FFD23F', 4);
   text(ctx, 'WHAT A DAY!', W / 2, 86, 38, '#FFD23F', INK, 'center', 7);
   const picked = KINDS.reduce((a, k) => a + (tally[k] || 0), 0) + (tally.bone || 0), tricks = ['squirrel', 'fly', 'air', 'hop', 'water'].reduce((a, k) => a + (tally[k] || 0), 0);
-  [['Jobs done', jobsDone, sc.jobs], ['Things collected', picked, sc.picks], ['Squirrels, jumps and tricks', tricks, sc.tricks]].forEach(([name, n, p], i) => { const y = 138 + i * 38; if (stateT < .3 + i * .25) return;
+  [['Jobs and building', jobsDone, sc.jobs], ['Things collected', picked, sc.picks], ['Squirrels, jumps and tricks', tricks, sc.tricks]].forEach(([name, n, p], i) => { const y = 138 + i * 38; if (stateT < .3 + i * .25) return;
     text(ctx, name, 236, y, 19, '#B4C2E2', null, 'left'); text(ctx, String(n), 560, y, 19, '#FFFFFF', null, 'right'); text(ctx, String(p), 724, y, 22, p ? '#C6FF3D' : '#667', INK, 'right', 4); });
-  if (stateT > 1.1) { const made = []; for (const g of GIVERS) for (const j of g.jobs) if (g.built[j.art]) made.push(j.art);
-    if (made.length) { text(ctx, 'Built today', W / 2, 252, 14, '#B4C2E2'); made.forEach((a, i) => { ctx.save(); ctx.translate(W / 2 - (made.length - 1) * 31 + i * 62, 312); ctx.scale(.5, .5); put(ART[a], 0, 0, .5, 1); ctx.restore(); }); }
+  if (stateT > 1.1) { const made = []; for (const q of SITES) if (q.stage) made.push(q.id + q.stage); for (const g of GIVERS) for (const j of g.jobs) if (g.built[j.art]) made.push(j.art);
+    if (made.length) { text(ctx, 'Built today', W / 2, 252, 14, '#B4C2E2'); const gap = Math.min(62, 500 / made.length); made.forEach((a, i) => { ctx.save(); ctx.translate(W / 2 - (made.length - 1) * gap / 2 + i * gap, 312); ctx.scale(.42, .42); put(ART[a], 0, 0, .5, 1); ctx.restore(); }); }
     else text(ctx, 'Nothing built this time: check the JOBS list!', W / 2, 284, 16, '#B4C2E2'); }
   if (stateT > 1.4) { text(ctx, 'SCORE', W / 2 - 100, 356, 22, '#B4C2E2'); text(ctx, String(score), W / 2 + 40, 356, 50, '#FFFFFF', INK, 'center', 8);
     const stars = score >= 1000 ? 3 : score >= 500 ? 2 : 1; for (let i = 0; i < 3; i++) { ctx.beginPath(); for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, q = k % 2 ? 8 : 18; ctx.lineTo(W / 2 - 46 + i * 46 + Math.cos(a) * q, 406 + Math.sin(a) * q); } ctx.closePath(); fs(ctx, i < stars ? '#FFD23F' : 'rgba(255,255,255,.15)', INK, 2.5); }
@@ -706,10 +768,10 @@ bindTouch();
 window.PK = {
   start, stop, onQuit: null, get state() { return state; },
   // test hooks
-  dbg() { return { state, score, sc: { ...sc }, jobsDone, bag: { ...bag }, tally: { ...tally }, dog: dog && { x: Math.round(dog.x), y: Math.round(dog.y), z: Math.round(dog.z), water: +dog.water.toFixed(2), drinking: dog.drinking, act: dog.act }, items: items.filter(i => !i.dead).length, jobs: GIVERS.map(g => g.id + ':' + g.state + ':' + jobOf(g).art) }; },
+  dbg() { return { state, score, sc: { ...sc }, jobsDone, bag: { ...bag }, tally: { ...tally }, dog: dog && { x: Math.round(dog.x), y: Math.round(dog.y), z: Math.round(dog.z), water: +dog.water.toFixed(2), drinking: dog.drinking, act: dog.act }, items: items.filter(i => !i.dead).length, jobs: GIVERS.map(g => g.id + ':' + g.state + ':' + jobOf(g).art), sites: SITES.map(q => q.id + ':' + q.stage) }; },
   begin() { newGame(); }, autoplay(on) { autoPlay = !!on; }, goHome() { finish(); }, tp(x, y) { dog.x = x; dog.y = y; cam.x = clamp(x - W / 2, 0, WW - W); cam.y = clamp(y - H * .56, 0, WH - H); }, thirst(v) { dog.water = v; }, give(k, n) { bag[k] = (bag[k] || 0) + (n || 1); },
   sim(sec) { for (let i = 0; i < sec * 60; i++) { update(1 / 60); if (state !== 'play') break; } return { score, jobsDone, bag: { ...bag } }; },
-  spots() { return { givers: GIVERS.map(g => ({ id: g.id, x: g.x, y: g.y })), appleTrees: trees.filter(t => t.v === 1).map(t => ({ x: Math.round(t.x), y: Math.round(t.y) })) }; },
+  spots() { return { sites: SITES.map(q => ({ id: q.id, x: q.x, y: q.y })), givers: GIVERS.map(g => ({ id: g.id, x: g.x, y: g.y })), appleTrees: trees.filter(t => t.v === 1).map(t => ({ x: Math.round(t.x), y: Math.round(t.y) })) }; },
   poster(cx, cy) { // card art (used to make art/card-park.jpg)
     running = false; cancelAnimationFrame(raf); newGame(); musicStop(); state = 'poster'; cam.x = cx == null ? 620 : cx; cam.y = cy == null ? 800 : cy; const keep = dog; dog = null; floats = []; particles = []; items = []; squirrels = []; flies = []; drawWorld(); dog = keep;
     shadow(590, 470, 96, .32); bern(14, 590, 470, BU * 2.4, false, -.04);
