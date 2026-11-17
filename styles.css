@@ -1005,5 +1005,5 @@ footer, .snesfoot{ color:#8f9bb8 !important; }
 @media (prefers-reduced-motion:reduce){ #home .scrim::before, #home .scrim::after, .star::before, .pick.cab.is-center .cab-bezel, .marquee .bulbs i{ animation:none !important } }
 
 #pickKeep .thumb{background-image:url("/art/card-keep.jpg?v=3") !important;background-size:cover !important;background-position:50% 60% !important}
-#pickPark .thumb{background-image:url("/art/card-park.jpg?v=1") !important;background-size:cover !important;background-position:50% 60% !important}
+#pickPark .thumb{background-image:url("/art/card-park.jpg?v=2") !important;background-size:cover !important;background-position:50% 60% !important}
 body[data-screen="keep"] .fs-btn, body[data-screen="park"] .fs-btn, body[data-screen="brt"] .fs-btn{ top:auto !important; bottom:10px; }
