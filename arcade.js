@@ -512,7 +512,7 @@ let pointer={down:false,x:0,y:0};
 const GP = { idx:null, id:"", prev:{}, focus:0, lastScreen:"", navHold:0, lastBtn:"" };
 
 const GP_ITEMS = {
-  home:     ["pickKeep","pickFlap","pickHop","pickAir","pickMemo","pickCups","pickBrt"],
+  home:     ["pickPark","pickKeep","pickFlap","pickHop","pickAir","pickMemo","pickCups","pickBrt"],
   memomenu: ["memoStartBtn","memoBack"],
   cupsmenu: ["cupsStartBtn","cupsBack"],
   catchmenu: ["catchStartBtn","catchBack"],
@@ -618,9 +618,9 @@ function uiBack(){ const sc=gpScreen(); if (sc==="pause") quitToArcade(); else i
 
 // ---------------------------------------------------------------- lobby carousel
 const CAR = {
-  items:["pickKeep","pickFlap","pickHop","pickAir","pickMemo","pickCups","pickBrt"],
-  flashKey:{pickKeep:"keep", pickFlap:"flap", pickHop:"hop", pickAir:"air", pickBallies:"ballies", pickMemo:"memo", pickCups:"cups", pickCatch:"catch", pickBba:"bba", pickBrt:"brt"},
-  spill:{pickKeep:"rgba(198,255,61,.30)", pickFlap:"rgba(58,184,255,.34)", pickHop:"rgba(139,226,74,.30)", pickAir:"rgba(255,77,109,.32)", pickBallies:"rgba(255,207,58,.30)", pickMemo:"rgba(166,107,255,.36)", pickCups:"rgba(255,165,58,.34)", pickCatch:"rgba(255,140,60,.34)", pickBba:"rgba(90,190,255,.34)", pickBrt:"rgba(255,210,63,.32)"},
+  items:["pickPark","pickKeep","pickFlap","pickHop","pickAir","pickMemo","pickCups","pickBrt"],
+  flashKey:{pickPark:"park", pickKeep:"keep", pickFlap:"flap", pickHop:"hop", pickAir:"air", pickBallies:"ballies", pickMemo:"memo", pickCups:"cups", pickCatch:"catch", pickBba:"bba", pickBrt:"brt"},
+  spill:{pickPark:"rgba(95,211,95,.34)", pickKeep:"rgba(198,255,61,.30)", pickFlap:"rgba(58,184,255,.34)", pickHop:"rgba(139,226,74,.30)", pickAir:"rgba(255,77,109,.32)", pickBallies:"rgba(255,207,58,.30)", pickMemo:"rgba(166,107,255,.36)", pickCups:"rgba(255,165,58,.34)", pickCatch:"rgba(255,140,60,.34)", pickBba:"rgba(90,190,255,.34)", pickBrt:"rgba(255,210,63,.32)"},
   index:0, pos:0, vel:0, target:0, bounce:0,
   tiltX:0, tiltY:0, wantTiltX:0, wantTiltY:0,
   drag:null, lastIdx:-1, chaseT:0, ready:false
@@ -669,6 +669,7 @@ function carouselLaunch(){
   else if (id==="pickBba") bbaOpen();
   else if (id==="pickBrt") brtOpen();
   else if (id==="pickKeep") kaOpen();
+  else if (id==="pickPark") pkOpen();
 }
 function brtOpen(){
   if (!window.BRT || typeof window.BRT.start!=="function") return;
@@ -710,6 +711,22 @@ function kaOpen(){ // Bernard's Keep-Away runs on its own canvas, like Road Trip
   window.KA.start();
 }
 window.kaOpen = kaOpen;
+function pkOpen(){ // Bernard in the Park runs on its own canvas, like Keep-Away
+  if (!window.PK || typeof window.PK.start!=="function") return;
+  hideAll(); menuHumStop();
+  try{ if (typeof musicStop==="function") musicStop(true); }catch(e){}
+  setMark("park"); MODE="park";
+  const root=document.getElementById("bp-root"); if (root) root.classList.add("on");
+  let seen=0; try{ seen=+localStorage.getItem("park_best")||0; }catch(e){}
+  window.PK.onQuit=function(){
+    const r=document.getElementById("bp-root"); if (r) r.classList.remove("on");
+    try{ if ((+localStorage.getItem("park_best")||0)>seen) ARCADE_FLASH.park=true; }catch(e){}
+    for (const n of ["face","confirm","back","startBtn","pausePlay","selPlay"]) GP.prev[n]=true;
+    goHome();
+  };
+  window.PK.start();
+}
+window.pkOpen = pkOpen;
 function carouselOnClick(id){
   const i=CAR.items.indexOf(id);
   if (i<0) return;
@@ -1175,7 +1192,7 @@ function pollGamepad(){
     gpEdge("face", face);
     return;
   }
-  if (MODE==="keep"){ gpEdge("selPlay", selB); gpEdge("pausePlay", startB); gpEdge("face", face); return; } // Keep-Away reads both pads itself
+  if (MODE==="keep" || MODE==="park"){ gpEdge("selPlay", selB); gpEdge("pausePlay", startB); gpEdge("face", face); return; } // Keep-Away reads both pads itself
   if (MODE==="brt"){
     // Road Trip reads the pad itself. From its title, Select still steps back to the picker.
     const selEdge = gpEdge("selPlay", selB);
@@ -1235,7 +1252,7 @@ addEventListener("keydown",e=>{
   const code=keyName(e);
   lastKeyCode=code||e.code||e.key||""; gpChip();
   if (!code) return;
-  if (MODE==="keep" && gpScreen()==="play") return; // Keep-Away handles its own keys
+  if ((MODE==="keep" || MODE==="park") && gpScreen()==="play") return; // Keep-Away handles its own keys
   if (gpScreen()!=="play"){
     const c=code;
     const home=gpScreen()==="home";
@@ -1396,7 +1413,7 @@ function actionDown(){
   else if (MODE==="catch") catchJump();
   else if (MODE==="bba") return;
   else if (MODE==="brt") return;
-  else if (MODE==="keep") return;
+  else if (MODE==="keep" || MODE==="park") return;
   else startCharge();
 }
 function actionUp(){
@@ -9178,7 +9195,7 @@ function frame(now){
       else if (MODE==="catch"){ if (C){ if(!PAUSED) updateCatch(d); drawCatch(); } }
       else if (MODE==="bba"){ /* Bernard's Big Adventure draws on its own canvas */ }
       else if (MODE==="brt"){ /* Bernard's Road Trip draws on its own canvas */ }
-      else if (MODE==="keep"){ /* Bernard's Keep-Away draws on its own canvas */ }
+      else if (MODE==="keep" || MODE==="park"){ /* Keep-Away and the Park draw on their own canvases */ }
       else { if (G){ if(!PAUSED) update(d); draw(); } }
     }
   }catch(err){
@@ -10077,6 +10094,7 @@ const MARKS={
   bba:   ["Bernard's","ADVENTURE"],
   brt:   ["Bernard's","ROAD TRIP"],
   keep:  ["Bernard's","KEEP-AWAY"],
+  park:  ["Bernard in","THE PARK"],
   memo:  ["Bernard","SAYS"],
   cups:  ["Bernard Hides","THE BALL"],
   jeep:  ["Bernard Goes","OFF ROAD"]
@@ -10104,7 +10122,7 @@ function hideAll(){
 function refreshBests(){
   const get=k=>{ try{ return +localStorage.getItem(k)||0; }catch(e){ return 0; } };
   const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent = v ? "\u2605 "+v : ""; };
-  set("bestBallies",get("ballies_best")); set("bestKeep",get("ka_best")); set("bestTita",get("tita_best")); set("bestFlap",get("flap_best"));
+  set("bestBallies",get("ballies_best")); set("bestKeep",get("ka_best")); set("bestPark",get("park_best")); set("bestTita",get("tita_best")); set("bestFlap",get("flap_best"));
   set("bestPaddle",get("paddle_best")); set("bestAir",get("air_best")); set("bestHop",get("hop_best")); set("bestJeep",get("jeep_best"));
   set("bestMemo",get("memo_best"));
   set("bestCups",get("cups_best"));
@@ -10120,6 +10138,8 @@ function goHome(){
   if (brtRoot) brtRoot.classList.remove("on");
   if (MODE==="keep" && window.KA && typeof window.KA.stop==="function"){ try{ window.KA.stop(); }catch(e){} }
   const kaRoot=document.getElementById("ka-root"); if (kaRoot) kaRoot.classList.remove("on");
+  if (MODE==="park" && window.PK && typeof window.PK.stop==="function"){ try{ window.PK.stop(); }catch(e){} }
+  const bpRoot=document.getElementById("bp-root"); if (bpRoot) bpRoot.classList.remove("on");
   refreshBests();
   hideAll(); homeEl.classList.add("on"); setMark("home");
   MODE="ballies";

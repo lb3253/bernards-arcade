@@ -2,6 +2,7 @@
 
 TV arcade starring **Bernard**, a long-haired German Shepherd.
 
+- **Bernard in the Park** — Bernard has two minutes to explore a big park. Run in any direction, B jump, hold Y to sprint, A bark. Pick up ballies and sticks, jump for butterflies and Nick's throws, hop over logs and benches, and sprint after squirrels. Sprinting makes him thirsty: drink at the pond, the fountain or a dog bowl
 - **Bernard's Keep-Away** — monkey in the middle for 1 or 2 players, three rounds, kids against Bernard on the scoreboard. **Team Kids**: controller 1 = Nick, controller 2 = Giulia (with one pad the computer plays Giulia); B pass, A lob, Y fake, X dash. **Be Bernard**: controller 1 is the dog; B pounce, A bark, X zoomies. Power-ups, a star ring to throw through, a sprinkler and a squirrel keep it lively
 - **Flappy Bernard** — flap through the brick gaps
 - **Lane Hoppers with Bernard** — Nick or Giulia hop the streets, yards and creeks; Bernard ferries the water. Grab the bike for double hops.
