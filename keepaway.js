@@ -107,7 +107,7 @@ function fitStage() {
 
 /* ---------------- art helpers ---------------- */
 const IMG = {};
-for (const [k, src] of [['nic', '/art/spr-hop-nic.png'], ['nicHop', '/art/spr-hop-nic-hop.png'], ['giulia', '/art/spr-hop-giulia.png'], ['giuliaHop', '/art/spr-hop-giulia-hop.png'], ['bernard', '/art/spr-ka-bernard.png'], ['nicRun', '/art/spr-ka-nic-run.png'], ['giuliaRun', '/art/spr-ka-giulia-run.png'], ['tennis', '/art/spr-hop-ball.png'], ['bone', '/art/spr-hop-bone.png']]) { const i = new Image(); i.src = src; IMG[k] = i; }
+for (const [k, src] of [['nic', '/art/spr-hop-nic.png'], ['nicHop', '/art/spr-hop-nic-hop.png'], ['giulia', '/art/spr-hop-giulia.png'], ['giuliaHop', '/art/spr-hop-giulia-hop.png'], ['bernard', '/art/spr-ka-bernard.png?v=2'], ['nicRun', '/art/spr-ka-nic-run.png'], ['giuliaRun', '/art/spr-ka-giulia-run.png'], ['tennis', '/art/spr-hop-ball.png'], ['bone', '/art/spr-hop-bone.png']]) { const i = new Image(); i.src = src; IMG[k] = i; }
 const ready = k => IMG[k] && IMG[k].complete && IMG[k].naturalWidth > 0;
 function rr(g, x, y, w, h, r) { r = Math.min(r, w / 2, h / 2); g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 function ell(g, x, y, rx, ry) { g.beginPath(); g.ellipse(x, y, Math.max(0, rx), Math.max(0, ry), 0, 0, TAU); }
