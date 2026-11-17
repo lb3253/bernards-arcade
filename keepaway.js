@@ -74,9 +74,30 @@ const PIT = { x: 480, y: 344, r: 92 };
 /* ---------------- canvas ---------------- */
 const canvas = document.getElementById('ka-canvas');
 if (!canvas) return;
-canvas.width = W * RS; canvas.height = H * RS;
-const ctx = canvas.getContext('2d');
-ctx.setTransform(RS, 0, 0, RS, 0, 0);
+// The whole game is drawn small, on a 900 x 422 "pixel page" (one page pixel = one pixel of Bernard's art, which is a little
+// taller than wide), then blown up with hard edges, so everything on screen has the same chunky pixels he does.
+const PW = 900, PH = 422, SX = PW / W, SY = PH / H, PXS = RS >= 1.5 ? 3 : 2;
+canvas.width = PW * PXS; canvas.height = PH * PXS;
+const out = canvas.getContext('2d');
+const page = document.createElement('canvas'); page.width = PW; page.height = PH;
+const ctx = page.getContext('2d');
+ctx.setTransform(SX, 0, 0, SY, 0, 0);
+function present() { out.imageSmoothingEnabled = false; out.drawImage(page, 0, 0, canvas.width, canvas.height); }
+const snapX = x => Math.round(x * SX) / SX, snapY = y => Math.round(y * SY) / SY;
+// turn a smooth picture into pixel art: hard edges, fewer colours with a checker dither, and (for characters) a dark outline
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+function crunch(c, step, outline) {
+  const g = c.getContext('2d'), w = c.width, h = c.height; let im; try { im = g.getImageData(0, 0, w, h); } catch (e) { return c; }
+  const d = im.data, solid = new Uint8Array(w * h);
+  for (let y = 0, i = 0; y < h; y++) for (let x = 0; x < w; x++, i += 4) {
+    if (d[i + 3] < 120) { d[i + 3] = 0; continue; } d[i + 3] = 255; solid[y * w + x] = 1;
+    const t = (BAYER[(y & 3) * 4 + (x & 3)] / 16 - .47) * step * .8;
+    for (let k = 0; k < 3; k++) d[i + k] = clamp(Math.round((d[i + k] + t) / step) * step, 0, 255);
+  }
+  if (outline) for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const j = y * w + x; if (solid[j]) continue;
+    if ((x > 0 && solid[j - 1]) || (x < w - 1 && solid[j + 1]) || (y > 0 && solid[j - w]) || (y < h - 1 && solid[j + w])) { d[j * 4] = 38; d[j * 4 + 1] = 22; d[j * 4 + 2] = 14; d[j * 4 + 3] = 255; } }
+  g.putImageData(im, 0, 0); return c;
+}
 function fitStage() {
   const stage = document.getElementById('ka-stage'); if (!stage) return;
   const vw = document.documentElement.clientWidth || innerWidth, vh = document.documentElement.clientHeight || innerHeight;
@@ -108,7 +129,7 @@ function tree(g, x, y, s, dark) { // round-topped tree; (x, y) is the foot of th
   for (const [dx, dy, r] of [[-8, -70, 14], [14, -56, 11], [-20, -52, 9]]) { ell(g, x + dx * s, y + dy * s, r * s, r * s * .8); fs(g, dark ? '#55A248' : '#66B854'); }
 }
 function bakeYard(T) {
-  const c = document.createElement('canvas'); c.width = W * RS; c.height = H * RS; const g = c.getContext('2d'); g.scale(RS, RS);
+  const c = document.createElement('canvas'); c.width = PW; c.height = PH; const g = c.getContext('2d'); g.scale(SX, SY);
   // sky, sun, clouds
   let gr = g.createLinearGradient(0, 0, 0, 112); T.sky.forEach((col, i) => gr.addColorStop(i / (T.sky.length - 1), col)); g.fillStyle = gr; g.fillRect(0, 0, W, 114);
   const [sx, sy, sr, scol] = T.sun; gr = g.createRadialGradient(sx, sy, sr * .4, sx, sy, sr * 3.2); gr.addColorStop(0, 'rgba(255,240,170,.55)'); gr.addColorStop(1, 'rgba(255,240,170,0)'); g.fillStyle = gr; g.fillRect(sx - sr * 4, sy - sr * 4, sr * 8, sr * 8);
@@ -168,7 +189,7 @@ function bakeYard(T) {
   // golden hour: string lights hung from the wall pillars
   if (T.lights) { for (let x = 40; x + 168 < W + 100; x += 168) { g.strokeStyle = 'rgba(30,20,10,.7)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, 96); g.quadraticCurveTo(x + 84, 128, x + 168, 96); g.stroke();
       for (let i = 1; i < 8; i++) { const t = i / 8, bx = x + 168 * t, by = 96 + 64 * t * (1 - t); const gl = g.createRadialGradient(bx, by + 4, 1, bx, by + 4, 16); gl.addColorStop(0, 'rgba(255,225,140,.75)'); gl.addColorStop(1, 'rgba(255,225,140,0)'); g.fillStyle = gl; g.fillRect(bx - 16, by - 12, 32, 32); ell(g, bx, by + 4, 3.5, 4.5); fs(g, ['#FFE680', '#FF9A6A', '#9EE8FF', '#FFB3E0'][i % 4]); } } }
-  return c;
+  g.setTransform(1, 0, 0, 1, 0, 0); return crunch(c, 20, false);
 }
 function yardFor(i) { const T = THEMES[i]; if (!yardCache[T.id]) yardCache[T.id] = bakeYard(T); return yardCache[T.id]; }
 // fire pit table ringed by six Adirondack chairs; drawn with the people so they sort by depth
@@ -622,12 +643,19 @@ let pauseFrom = 'play';
 function shadow(x, y, rx, a) { ell(ctx, x, y, rx, rx * .32); fs(ctx, 'rgba(20,40,10,' + (a || .28) + ')'); }
 function panel(x, y, w, h, col) { rr(ctx, x, y, w, h, 12); fs(ctx, 'rgba(10,14,26,.8)', col || 'rgba(255,255,255,.18)', col ? 2.5 : 1.5); }
 const KCOL = { nic: '#3AB8FF', giulia: '#FF7AB8' };
-function sprite(key, x, y, h, flip, rot, alpha) { const img = IMG[key]; if (!ready(key)) return false; const w = h * img.naturalWidth / img.naturalHeight; ctx.save(); ctx.translate(x, y); if (flip) ctx.scale(-1, 1); if (rot) ctx.rotate(rot); if (alpha != null) ctx.globalAlpha = alpha; ctx.drawImage(img, -w / 2, -h, w, h); ctx.restore(); return true; }
+const pixCache = {};
+function pix(key, h) { // a pixel-art copy of a smooth sprite, made once for each size it is drawn at
+  const id = key + '|' + Math.round(h * 4); if (pixCache[id]) return pixCache[id]; const img = IMG[key];
+  const bw = Math.max(2, Math.round(h * img.naturalWidth / img.naturalHeight * SX)), bh = Math.max(2, Math.round(h * SY));
+  const c = document.createElement('canvas'); c.width = bw + 2; c.height = bh + 2; const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(img, 1, 1, bw, bh);
+  return pixCache[id] = crunch(c, 24, true);
+}
+function sprite(key, x, y, h, flip, rot, alpha) { if (!ready(key)) return false; const c = pix(key, h), w = c.width / SX, gh = c.height / SY; ctx.save(); ctx.translate(snapX(x), snapY(y)); if (flip) ctx.scale(-1, 1); if (rot) ctx.rotate(rot); if (alpha != null) ctx.globalAlpha = alpha; ctx.imageSmoothingEnabled = false; ctx.drawImage(c, -w / 2, -gh + 1 / SY, w, gh); ctx.restore(); return true; }
 // Bernard is a pixel-art sheet: 5 across, frames 0-3 standing (tail wag), 4-11 walk, 12-19 run. He faces left in the art.
-const BSHEET = { fw: 690, fh: 504, cols: 5, feet: 80 / 84, tall: 468 };
+const BSHEET = { fw: 690, fh: 504, cols: 5, feet: 80 / 84, tall: 468 }, BU = 468 / 5 / SX; // BU: the height at which one pixel of his art is exactly one page pixel
 function bern(frame, x, y, h, flip, rot, alpha, squat) { // (x, y) is the ground under his middle; h is ears-to-paws height
   if (!ready('bernard')) return false; const B = BSHEET, k = h / B.tall, w = B.fw * k, fh = B.fh * k * (squat || 1);
-  ctx.save(); ctx.translate(x, y); if (flip) ctx.scale(-1, 1); if (rot) ctx.rotate(rot); if (alpha != null) ctx.globalAlpha = alpha;
+  ctx.save(); ctx.translate(snapX(x), snapY(y)); if (flip) ctx.scale(-1, 1); if (rot) ctx.rotate(rot); if (alpha != null) ctx.globalAlpha = alpha; ctx.imageSmoothingEnabled = false;
   ctx.drawImage(IMG.bernard, (frame % B.cols) * B.fw, Math.floor(frame / B.cols) * B.fh, B.fw, B.fh, -w / 2, -fh * B.feet, w, fh); ctx.restore(); return true;
 }
 const bernWalk = t => 4 + (Math.floor(t * 8) % 8 + 8) % 8, bernRun = t => 12 + (Math.floor(t * 8) % 8 + 8) % 8, bernStand = () => Math.floor(time * 7) % 4;
@@ -653,7 +681,7 @@ function drawDog() {
   const squat = D.crouch > 0 ? .82 : D.mood === 'munch' ? .92 + Math.sin(time * 18) * .04 : 1;
   shadow(D.x, D.y, 46, .3 - hop * .004);
   if (D.crouch > 0) { ell(ctx, D.x, D.y, 62 + Math.sin(time * 30) * 4, 18); fs(ctx, null, 'rgba(255,90,60,.8)', 3); }
-  const h = 100, flip = D.face > 0, rot = tugging ? .16 : air ? lerp(.26, -.2, p) : D.mood === 'dizzy' ? Math.sin(time * 9) * .12 : running ? Math.sin(cyc) * .05 : 0;
+  const h = BU, flip = D.face > 0, rot = tugging ? .16 : air ? lerp(.26, -.2, p) : D.mood === 'dizzy' ? Math.sin(time * 9) * .12 : running ? Math.sin(cyc) * .05 : 0;
   const frame = air ? 16 : tugging || D.crouch > 0 ? 0 : moving ? (running ? bernRun(D.anim) : bernWalk(D.anim)) : D.mood === 'dizzy' || D.mood === 'skid' ? 0 : bernStand();
   const x = D.x + (tugging || D.crouch > 0 ? Math.sin(time * 38) * 2 : 0) - (tugging ? D.face * 30 : 0), y = D.y - bob - hop; // tugging: stand back so his mouth is on the ball
   if (D.zoomT > 0 || D.speedT > 0) for (let i = 2; i >= 1; i--) bern(frame, x - D.vx * .035 * i, y, h, flip, rot, .22, squat);
@@ -815,7 +843,7 @@ function drawEnd() {
   ctx.restore();
   // the winners bounce at the bottom
   const hop = i => Math.abs(Math.sin(time * 6 + i)) * 26;
-  if (stateT > .6) { if (kidsWin || tie) { sprite('nicHop', 96, H - 6 - hop(0), 150, false); sprite('giuliaHop', W - 96, H - 6 - hop(1.3), 150, true); } if (!kidsWin || tie) bern(bernStand(), tie ? W / 2 : 120, H - 4 - hop(2), 124, true, Math.sin(time * 6) * .08); if (!kidsWin && !tie) drawBallAt(200, H - 66 - hop(2), 14, time * 3, { ...BALL, r: 14 }); }
+  if (stateT > .6) { if (kidsWin || tie) { sprite('nicHop', 96, H - 6 - hop(0), 150, false); sprite('giuliaHop', W - 96, H - 6 - hop(1.3), 150, true); } if (!kidsWin || tie) bern(bernStand(), tie ? W / 2 : 120, H - 4 - hop(2), BU * 1.5, true, Math.sin(time * 6) * .08); if (!kidsWin && !tie) drawBallAt(200, H - 66 - hop(2), 14, time * 3, { ...BALL, r: 14 }); }
 }
 let endLine = ''; function pick1(a) { if (!endLine || !a.includes(endLine)) endLine = pick(a); return endLine; }
 function drawTitle() {
@@ -824,7 +852,7 @@ function drawTitle() {
   // a ball looping between the kids over Bernard's head
   const t = (time * .7) % 2, u = t < 1 ? t : 2 - t, bx = lerp(150, 810, ease(u)), by = 250 - Math.sin(u * Math.PI) * 120;
   sprite(t < 1 ? 'nicHop' : 'nic', 120, 500, 190, false); sprite(t < 1 ? 'giulia' : 'giuliaHop', 840, 500, 190, true);
-  bern(bernRun(time * 2.6), 480 + Math.sin(time * 1.4) * 150, 512, 140, Math.cos(time * 1.4) > 0, Math.sin(time * 2.6 * TAU) * .04);
+  bern(bernRun(time * 2.6), 480 + Math.sin(time * 1.4) * 150, 512, BU * 1.5, Math.cos(time * 1.4) > 0, Math.sin(time * 2.6 * TAU) * .04);
   drawBallAt(bx, by, 16, time * 6, { ...BALLS[0], r: 16 });
   text(ctx, "BERNARD'S", W / 2, 62, 34, '#FFFFFF', INK, 'center', 8); text(ctx, 'KEEP-AWAY', W / 2, 116, 72, '#FFD23F', INK, 'center', 14);
   text(ctx, '3 rounds  ·  kids against Bernard  ·  most points wins', W / 2, 166, 16, '#FFFFFF', INK, 'center', 4);
@@ -852,6 +880,7 @@ function render() {
   ctx.restore();
   if (flash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + flash * 1.6 + ')'; ctx.fillRect(0, 0, W, H); }
   if (state === 'ready') drawReady(); if (state === 'roundEnd') drawRoundEnd(); if (state === 'pause') drawPause(); if (state === 'end') drawEnd();
+  present();
 }
 
 /* ---------------- loop + arcade hookup ---------------- */
@@ -881,7 +910,7 @@ window.KA = {
   poster() { // card art: the yard, the three of them close together, ball in the air (used to make art/card-keep.jpg)
     running = false; cancelAnimationFrame(raf); ctx.drawImage(yardFor(0), 0, 0, W, H);
     const put = (k, x, y, h, flip) => { const img = IMG[k]; if (!img.naturalWidth) return; shadow(x, y, h * img.naturalWidth / img.naturalHeight * .32, .3); sprite(k, x, y, h, flip); };
-    put('nicHop', 322, 462, 230, false); put('giulia', 664, 476, 230, true); shadow(486, 524, 84, .3); bern(0, 486, 524, 176, true);
+    put('nicHop', 322, 462, 230, false); put('giulia', 664, 476, 230, true); shadow(486, 524, 84, .3); bern(0, 486, 524, BU * 2, true); present();
     if (ready('tennis')) ctx.drawImage(IMG.tennis, 470, 168, 46, 46);
   }
 };
