@@ -86,7 +86,7 @@ function fitStage() {
 
 /* ---------------- art helpers ---------------- */
 const IMG = {};
-for (const [k, src] of [['nic', '/art/spr-hop-nic.png'], ['nicHop', '/art/spr-hop-nic-hop.png'], ['giulia', '/art/spr-hop-giulia.png'], ['giuliaHop', '/art/spr-hop-giulia-hop.png'], ['bernard', '/art/spr-hop-bernard.png'], ['tennis', '/art/spr-hop-ball.png'], ['bone', '/art/spr-hop-bone.png']]) { const i = new Image(); i.src = src; IMG[k] = i; }
+for (const [k, src] of [['nic', '/art/spr-hop-nic.png'], ['nicHop', '/art/spr-hop-nic-hop.png'], ['giulia', '/art/spr-hop-giulia.png'], ['giuliaHop', '/art/spr-hop-giulia-hop.png'], ['bernard', '/art/spr-ka-bernard.png'], ['tennis', '/art/spr-hop-ball.png'], ['bone', '/art/spr-hop-bone.png']]) { const i = new Image(); i.src = src; IMG[k] = i; }
 const ready = k => IMG[k] && IMG[k].complete && IMG[k].naturalWidth > 0;
 function rr(g, x, y, w, h, r) { r = Math.min(r, w / 2, h / 2); g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 function ell(g, x, y, rx, ry) { g.beginPath(); g.ellipse(x, y, Math.max(0, rx), Math.max(0, ry), 0, 0, TAU); }
@@ -312,7 +312,7 @@ function newMatch(m) {
 function startRound(i) {
   round = i; THEME = THEMES[i]; BALL = BALLS[THEME.ball]; timer = TUNE.roundTime; streak = 0; tug = null; lastTick = 99;
   kids = [newKid(0, 'nic', 206, 360), newKid(1, 'giulia', 754, 360)];
-  dog = { x: 480, y: 238, vx: 0, vy: 0, ctl: -1, face: -1, run: 0, busy: 0, crouch: 0, pounceT: 0, pounceCool: 1.5, px: 0, py: 0, barkCool: 0, barkT: 0, zoomT: 0, hyper: i ? .25 : 0, stealT: 0, keepT: 0, keepAcc: 0, tugImmune: 0, distract: null, speedT: 0, slowT: 0, fooledAt: -9, zoomWait: 0, wet: 0, mood: '', plan: 'guard', planT: 1.5 };
+  dog = { x: 480, y: 238, vx: 0, vy: 0, ctl: -1, face: -1, run: 0, anim: 0, busy: 0, crouch: 0, pounceT: 0, pounceCool: 1.5, px: 0, py: 0, barkCool: 0, barkT: 0, zoomT: 0, hyper: i ? .25 : 0, stealT: 0, keepT: 0, keepAcc: 0, tugImmune: 0, distract: null, speedT: 0, slowT: 0, fooledAt: -9, zoomWait: 0, wet: 0, mood: '', plan: 'guard', planT: 1.5 };
   ball = { state: 'held', holder: i % 2, x: 0, y: 0, z: 34, spin: 0 }; kids[i % 2].think = 1.2;
   particles = []; floats = []; powerups = []; ring = null; squirrel = null; kidsDouble = dogDouble = 0;
   squirrelT = rnd(9, 15); powerT = rnd(4, 6); ringT = rnd(3, 5); sprT = 0;
@@ -388,14 +388,14 @@ function updateTug(dt) {
   const KI = k.ctl >= 0 ? PADS[k.ctl] : null, DI = dog.ctl >= 0 ? PADS[dog.ctl] : null;
   if (KI) { if (KI.hit.a || KI.hit.b || KI.hit.c || KI.hit.d) { tug.m += .14; sfx.tug(); } } else tug.m += (mode === 'kids' ? .36 : .34) * dt;
   if (DI) { if (DI.hit.a || DI.hit.b || DI.hit.c || DI.hit.d) { tug.m -= .12; sfx.tug(); } tug.m -= .05 * dt; } else tug.m -= (.24 + round * .04) * dt;
-  const mx = (k.x + dog.x) / 2 + (tug.m - .5) * 26 * (k.x >= dog.x ? 1 : -1), my = (k.y + dog.y) / 2; ball.x = mx + Math.sin(time * 40) * 2; ball.y = my; ball.z = 26;
+  const mx = (k.x + dog.x) / 2 + (tug.m - .5) * 26 * (k.x >= dog.x ? 1 : -1), my = (k.y + dog.y) / 2; ball.x = mx + Math.sin(time * 40) * 2; ball.y = my; ball.z = 44;
   if (tug.m >= 1) { tug = null; giveBall(k); k.catchCool = 1.1; k.cheer = .5; kidsPts(TUNE.tugWin, k.x, k.y, 'GOT IT BACK!', '#9CFF9C'); sfx.win(); dog.busy = 1.0; dog.mood = 'dizzy'; dog.x -= dog.face * 22; keepIn(dog, 18); dog.pounceCool = 1.6; fx(k.x, k.y, 10, '#9CFF9C', { z: 40, kind: 'star' }); }
   else if (tug.m <= 0 || tug.t > 3.2) { const hands = tug.hands; tug = null; k.stun = .55; k.x -= k.face * -16; keepIn(k); if (hands) dogGetsBall('steal'); else { ball.state = 'dog'; dog.tugImmune = 1.5; dogPts(15, dog.x, dog.y, 'MINE!'); sfx.bark(); } }
 }
 function updateBall(dt) {
   const b = ball; b.spin += dt * (b.state === 'air' ? 14 : b.state === 'ground' ? Math.hypot(b.vx, b.vy) * .03 : 0);
   if (b.state === 'held') { const k = kids[b.holder], reach = k.fakeT > 0 ? Math.sin((1 - k.fakeT / .32) * Math.PI) * 26 : 0; b.x = k.x + k.face * (16 + reach); b.y = k.y + .5; b.z = 40 + (k.fakeT > 0 ? 8 : 0); return; }
-  if (b.state === 'dog') { b.x = dog.x + dog.face * 26; b.y = dog.y + .5; b.z = 24; return; }
+  if (b.state === 'dog') { b.x = dog.x + dog.face * 49; b.y = dog.y + .5; b.z = 50; return; }
   if (b.state === 'tug') return;
   if (b.state === 'air') {
     const r = kids[b.to]; b.t += dt / b.dur;
@@ -530,7 +530,7 @@ function updateDog(dt) {
   else if (dog.ctl >= 0) humanDog(dt); else cpuDog(dt);
   if (tug) return;
   dog.x += dog.vx * dt; dog.y += dog.vy * dt * .86; keepIn(dog, 18);
-  const sp = Math.hypot(dog.vx, dog.vy); if (sp > 30) { dog.run += dt * sp * .06; if (Math.abs(dog.vx) > 24) dog.face = dog.vx > 0 ? 1 : -1; if (Math.random() < dt * (dog.zoomT > 0 ? 24 : 5)) fx(dog.x - dog.face * 16, dog.y, 1, dog.zoomT > 0 ? '#FFD23F' : 'rgba(230,246,200,.8)', { up: 16, s1: 40, r1: 3.5 }); }
+  const sp = Math.hypot(dog.vx, dog.vy); if (sp > 30) { dog.run += dt * sp * .06; dog.anim += dt * (sp > 135 ? clamp(sp / 80, 2.2, 3.6) : clamp(sp / 60, 1.1, 2.2)); if (Math.abs(dog.vx) > 24) dog.face = dog.vx > 0 ? 1 : -1; if (Math.random() < dt * (dog.zoomT > 0 ? 24 : 5)) fx(dog.x - dog.face * 40, dog.y, 1, dog.zoomT > 0 ? '#FFD23F' : 'rgba(230,246,200,.8)', { up: 16, s1: 40, r1: 3.5 }); }
   if (ball.state === 'dog') { // keeping it: points every second, kids have to catch him and tug it back
     dog.keepT += dt; dog.keepAcc += dt; if (dog.keepAcc >= 1) { dog.keepAcc -= 1; dogPts(TUNE.keepPts, dog.x, dog.y, ''); }
     if (dog.keepT >= TUNE.keepMax) { dogDrops(true); return; }
@@ -623,8 +623,16 @@ function shadow(x, y, rx, a) { ell(ctx, x, y, rx, rx * .32); fs(ctx, 'rgba(20,40
 function panel(x, y, w, h, col) { rr(ctx, x, y, w, h, 12); fs(ctx, 'rgba(10,14,26,.8)', col || 'rgba(255,255,255,.18)', col ? 2.5 : 1.5); }
 const KCOL = { nic: '#3AB8FF', giulia: '#FF7AB8' };
 function sprite(key, x, y, h, flip, rot, alpha) { const img = IMG[key]; if (!ready(key)) return false; const w = h * img.naturalWidth / img.naturalHeight; ctx.save(); ctx.translate(x, y); if (flip) ctx.scale(-1, 1); if (rot) ctx.rotate(rot); if (alpha != null) ctx.globalAlpha = alpha; ctx.drawImage(img, -w / 2, -h, w, h); ctx.restore(); return true; }
+// Bernard is a pixel-art sheet: 5 across, frames 0-3 standing (tail wag), 4-11 walk, 12-19 run. He faces left in the art.
+const BSHEET = { fw: 690, fh: 504, cols: 5, feet: 80 / 84, tall: 468 };
+function bern(frame, x, y, h, flip, rot, alpha, squat) { // (x, y) is the ground under his middle; h is ears-to-paws height
+  if (!ready('bernard')) return false; const B = BSHEET, k = h / B.tall, w = B.fw * k, fh = B.fh * k * (squat || 1);
+  ctx.save(); ctx.translate(x, y); if (flip) ctx.scale(-1, 1); if (rot) ctx.rotate(rot); if (alpha != null) ctx.globalAlpha = alpha;
+  ctx.drawImage(IMG.bernard, (frame % B.cols) * B.fw, Math.floor(frame / B.cols) * B.fh, B.fw, B.fh, -w / 2, -fh * B.feet, w, fh); ctx.restore(); return true;
+}
+const bernWalk = t => 4 + (Math.floor(t * 8) % 8 + 8) % 8, bernRun = t => 12 + (Math.floor(t * 8) % 8 + 8) % 8, bernStand = () => Math.floor(time * 7) % 4;
 // a round head cut out of a sprite, for the scoreboard
-function head(key, x, y, r, fy) { const img = IMG[key]; ell(ctx, x, y, r, r); fs(ctx, '#F4E9D8', INK, 2.5); if (!ready(key)) return; ctx.save(); ell(ctx, x, y, r - 1, r - 1); ctx.clip(); const s = img.naturalWidth * (key === 'bernard' ? .62 : .9); ctx.drawImage(img, (img.naturalWidth - s) * (key === 'bernard' ? .12 : .5), img.naturalHeight * (fy || 0), s, s, x - r, y - r, r * 2, r * 2); ctx.restore(); ell(ctx, x, y, r, r); fs(ctx, null, INK, 2.5); }
+function head(key, x, y, r, fy) { const img = IMG[key]; ell(ctx, x, y, r, r); fs(ctx, '#F4E9D8', INK, 2.5); if (!ready(key)) return; ctx.save(); ell(ctx, x, y, r - 1, r - 1); ctx.clip(); if (key === 'bernard') { ctx.drawImage(img, 36, 0, 212, 212, x - r, y - r, r * 2, r * 2); ctx.restore(); ell(ctx, x, y, r, r); fs(ctx, null, INK, 2.5); return; } const s = img.naturalWidth * (key === 'bernard' ? .62 : .9); ctx.drawImage(img, (img.naturalWidth - s) * (key === 'bernard' ? .12 : .5), img.naturalHeight * (fy || 0), s, s, x - r, y - r, r * 2, r * 2); ctx.restore(); ell(ctx, x, y, r, r); fs(ctx, null, INK, 2.5); }
 function drawKid(k) {
   const moving = Math.hypot(k.vx, k.vy) > 30, jump = k.cheer > 0 ? Math.sin(Math.min(1, k.cheer / .35) * Math.PI) * 16 : 0, bob = moving ? Math.abs(Math.sin(k.run)) * 5 : Math.sin(time * 2 + k.i * 2) * 1.2;
   const hopKey = k.who === 'nic' ? 'nicHop' : 'giuliaHop', useHop = (k.dashT > 0 || k.cheer > 0 || k.fakeT > 0 || (moving && Math.sin(k.run) > .3)) && ready(hopKey);
@@ -640,20 +648,22 @@ function drawKid(k) {
   if (k.ctl >= 0 && k.dashCool > 0 && k.dashT <= 0) { rr(ctx, k.x - 18, k.y + 30, 36, 5, 2.5); fs(ctx, 'rgba(0,0,0,.4)'); rr(ctx, k.x - 18, k.y + 30, 36 * (1 - k.dashCool / TUNE.dashCool), 5, 2.5); fs(ctx, '#9EE8FF'); }
 }
 function drawDog() {
-  const D = dog, moving = Math.hypot(D.vx, D.vy) > 30, bob = moving ? Math.abs(Math.sin(D.run)) * 6 : 0, hop = D.pounceT > 0 ? Math.sin((1 - D.pounceT / TUNE.pounceTime) * Math.PI) * 30 : 0;
-  const squat = D.crouch > 0 ? .8 : D.mood === 'munch' ? .9 + Math.sin(time * 18) * .04 : 1, tugging = !!tug;
-  shadow(D.x, D.y, 30, .3 - hop * .004);
-  if (D.crouch > 0) { ell(ctx, D.x, D.y, 46 + Math.sin(time * 30) * 4, 15); fs(ctx, null, 'rgba(255,90,60,.8)', 3); }
-  const img = IMG.bernard, h = 112 * squat, flip = D.face > 0, rot = (tugging ? .2 : D.pounceT > 0 ? -.3 : D.mood === 'dizzy' ? Math.sin(time * 9) * .12 : moving ? Math.sin(D.run * .5) * .06 : 0);
-  const x = D.x + (tugging || D.crouch > 0 ? Math.sin(time * 38) * 2 : 0), y = D.y - bob - hop;
-  if (D.zoomT > 0 || D.speedT > 0) for (let i = 2; i >= 1; i--) sprite('bernard', x - D.vx * .035 * i, y, h, flip, rot, .22);
-  if (!sprite('bernard', x, y, h, flip, rot)) { ell(ctx, x, y - 40, 40, 26); fs(ctx, '#3A2A1E'); }
-  if (D.zoomT > 0) { ell(ctx, D.x, D.y - 50, 54, 62); fs(ctx, null, 'rgba(255,210,63,' + (.35 + Math.sin(time * 20) * .2) + ')', 4); }
-  if (D.barkT > 0) for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(D.x + D.face * 30, D.y - 60, 20 + i * 16 + (1 - D.barkT / .35) * 30, D.face > 0 ? -.7 : Math.PI - .7, D.face > 0 ? .7 : Math.PI + .7); ctx.strokeStyle = 'rgba(255,255,255,' + D.barkT * 2 + ')'; ctx.lineWidth = 4; ctx.stroke(); }
+  const D = dog, sp = Math.hypot(D.vx, D.vy), moving = sp > 30, running = sp > 135, air = D.pounceT > 0, tugging = !!tug;
+  const cyc = D.anim * TAU, bob = air || !moving ? 0 : running ? 3 + Math.sin(cyc * 2) * 3 : Math.abs(Math.sin(cyc * 2)) * 1.5, p = air ? 1 - D.pounceT / TUNE.pounceTime : 0, hop = air ? Math.sin(p * Math.PI) * 30 : 0;
+  const squat = D.crouch > 0 ? .82 : D.mood === 'munch' ? .92 + Math.sin(time * 18) * .04 : 1;
+  shadow(D.x, D.y, 46, .3 - hop * .004);
+  if (D.crouch > 0) { ell(ctx, D.x, D.y, 62 + Math.sin(time * 30) * 4, 18); fs(ctx, null, 'rgba(255,90,60,.8)', 3); }
+  const h = 100, flip = D.face > 0, rot = tugging ? .16 : air ? lerp(.26, -.2, p) : D.mood === 'dizzy' ? Math.sin(time * 9) * .12 : running ? Math.sin(cyc) * .05 : 0;
+  const frame = air ? 16 : tugging || D.crouch > 0 ? 0 : moving ? (running ? bernRun(D.anim) : bernWalk(D.anim)) : D.mood === 'dizzy' || D.mood === 'skid' ? 0 : bernStand();
+  const x = D.x + (tugging || D.crouch > 0 ? Math.sin(time * 38) * 2 : 0) - (tugging ? D.face * 30 : 0), y = D.y - bob - hop; // tugging: stand back so his mouth is on the ball
+  if (D.zoomT > 0 || D.speedT > 0) for (let i = 2; i >= 1; i--) bern(frame, x - D.vx * .035 * i, y, h, flip, rot, .22, squat);
+  if (!bern(frame, x, y, h, flip, rot, null, squat)) { ell(ctx, x, y - 40, 50, 26); fs(ctx, '#3A2A1E'); }
+  if (D.zoomT > 0) { ell(ctx, D.x, D.y - 48, 76, 62); fs(ctx, null, 'rgba(255,210,63,' + (.35 + Math.sin(time * 20) * .2) + ')', 4); }
+  if (D.barkT > 0) for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(D.x + D.face * 54, D.y - 62, 20 + i * 16 + (1 - D.barkT / .35) * 30, D.face > 0 ? -.7 : Math.PI - .7, D.face > 0 ? .7 : Math.PI + .7); ctx.strokeStyle = 'rgba(255,255,255,' + D.barkT * 2 + ')'; ctx.lineWidth = 4; ctx.stroke(); }
   const note = D.mood === 'dizzy' ? '★' : D.mood === 'pant' ? 'pant… pant…' : D.mood === 'munch' ? 'nom nom' : D.mood === 'play' ? 'splash!' : D.mood === 'bark' ? 'WOOF! WOOF!' : D.slowT > 0 ? 'so full…' : '';
-  if (note) text(ctx, note, D.x + (note === '★' ? Math.sin(time * 10) * 14 : 0), D.y - 122, note === '★' ? 18 : 14, note === '★' ? '#FFE066' : '#FFFFFF', INK, 'center', 3);
+  if (note) text(ctx, note, D.x + (note === '★' ? Math.sin(time * 10) * 14 : 0), D.y - 116, note === '★' ? 18 : 14, note === '★' ? '#FFE066' : '#FFFFFF', INK, 'center', 3);
   if (D.ctl >= 0) { text(ctx, 'YOU', D.x, D.y + 18, 12, '#FFD23F', INK, 'center', 3); }
-  if (ball.state === 'dog' && !tug) { const f = 1 - D.keepT / TUNE.keepMax; rr(ctx, D.x - 26, D.y - 138, 52, 7, 3.5); fs(ctx, 'rgba(0,0,0,.45)'); rr(ctx, D.x - 26, D.y - 138, 52 * f, 7, 3.5); fs(ctx, '#FFB0A0'); }
+  if (ball.state === 'dog' && !tug) { const f = 1 - D.keepT / TUNE.keepMax; rr(ctx, D.x - 26, D.y - 132, 52, 7, 3.5); fs(ctx, 'rgba(0,0,0,.45)'); rr(ctx, D.x - 26, D.y - 132, 52 * f, 7, 3.5); fs(ctx, '#FFB0A0'); }
 }
 function drawBallAt(x, y, r, spin, B) {
   if (B.id === 'tennis' && ready('tennis')) { ctx.save(); ctx.translate(x, y); ctx.rotate(spin); ctx.drawImage(IMG.tennis, -r, -r, r * 2, r * 2); ctx.restore(); return; }
@@ -805,7 +815,7 @@ function drawEnd() {
   ctx.restore();
   // the winners bounce at the bottom
   const hop = i => Math.abs(Math.sin(time * 6 + i)) * 26;
-  if (stateT > .6) { if (kidsWin || tie) { sprite('nicHop', 96, H - 6 - hop(0), 150, false); sprite('giuliaHop', W - 96, H - 6 - hop(1.3), 150, true); } if (!kidsWin || tie) sprite('bernard', tie ? W / 2 : 110, H - 4 - hop(2), 132, true, Math.sin(time * 6) * .08); if (!kidsWin && !tie) drawBallAt(196, H - 40 - hop(2), 14, time * 3, { ...BALL, r: 14 }); }
+  if (stateT > .6) { if (kidsWin || tie) { sprite('nicHop', 96, H - 6 - hop(0), 150, false); sprite('giuliaHop', W - 96, H - 6 - hop(1.3), 150, true); } if (!kidsWin || tie) bern(bernStand(), tie ? W / 2 : 120, H - 4 - hop(2), 124, true, Math.sin(time * 6) * .08); if (!kidsWin && !tie) drawBallAt(200, H - 66 - hop(2), 14, time * 3, { ...BALL, r: 14 }); }
 }
 let endLine = ''; function pick1(a) { if (!endLine || !a.includes(endLine)) endLine = pick(a); return endLine; }
 function drawTitle() {
@@ -814,7 +824,7 @@ function drawTitle() {
   // a ball looping between the kids over Bernard's head
   const t = (time * .7) % 2, u = t < 1 ? t : 2 - t, bx = lerp(150, 810, ease(u)), by = 250 - Math.sin(u * Math.PI) * 120;
   sprite(t < 1 ? 'nicHop' : 'nic', 120, 500, 190, false); sprite(t < 1 ? 'giulia' : 'giuliaHop', 840, 500, 190, true);
-  sprite('bernard', 480 + Math.sin(time * 1.4) * 150, 512 - Math.abs(Math.sin(time * 5)) * 22, 150, Math.cos(time * 1.4) > 0);
+  bern(bernRun(time * 2.6), 480 + Math.sin(time * 1.4) * 150, 512, 140, Math.cos(time * 1.4) > 0, Math.sin(time * 2.6 * TAU) * .04);
   drawBallAt(bx, by, 16, time * 6, { ...BALLS[0], r: 16 });
   text(ctx, "BERNARD'S", W / 2, 62, 34, '#FFFFFF', INK, 'center', 8); text(ctx, 'KEEP-AWAY', W / 2, 116, 72, '#FFD23F', INK, 'center', 14);
   text(ctx, '3 rounds  ·  kids against Bernard  ·  most points wins', W / 2, 166, 16, '#FFFFFF', INK, 'center', 4);
@@ -871,7 +881,7 @@ window.KA = {
   poster() { // card art: the yard, the three of them close together, ball in the air (used to make art/card-keep.jpg)
     running = false; cancelAnimationFrame(raf); ctx.drawImage(yardFor(0), 0, 0, W, H);
     const put = (k, x, y, h, flip) => { const img = IMG[k]; if (!img.naturalWidth) return; shadow(x, y, h * img.naturalWidth / img.naturalHeight * .32, .3); sprite(k, x, y, h, flip); };
-    put('nicHop', 372, 470, 230, false); put('giulia', 598, 486, 230, true); put('bernard', 488, 516, 200, true);
+    put('nicHop', 322, 462, 230, false); put('giulia', 664, 476, 230, true); shadow(486, 524, 84, .3); bern(0, 486, 524, 176, true);
     if (ready('tennis')) ctx.drawImage(IMG.tennis, 470, 168, 46, 46);
   }
 };
